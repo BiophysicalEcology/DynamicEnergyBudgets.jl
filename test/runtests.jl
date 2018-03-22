@@ -1,5 +1,5 @@
-using DynamicEnergyBudgets
-using Base.Test
+Pkg.build("DynamicEnergyBudgets")
+Pkg.build("MechanisticModels")
 
-# write your own tests here
-@test 1 == 2
+include("structures.jl")
+include("functions.jl")
