@@ -25,9 +25,10 @@ DEBStructure(name::Symbol, param_specs::ParamSpecs, params, flags::DEBFlags,
     init_params = deepcopy(params)
     u = init_state(settings[:state_type])
     num_structures = floor(Int64, length(settings[:u0])/length(u))
-    assim_state = PhotoState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+    assim_state = PhotoState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
                              0.0, 0.0, 0, 0, false)
+    # assim_state = []
 
     state_names = fieldnames(u)
     state1_names = get_state1_names(u)

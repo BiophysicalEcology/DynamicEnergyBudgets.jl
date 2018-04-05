@@ -2,7 +2,7 @@ import Plots.px
 
 function debplot(settings, signals, plottable)
     # settings.u0 = collect(Iterators.flatten([s[:u] for s in signals[:structures]]))
-    settings = apply_all(settings, signals)
+    settings = apply_signals!(settings, signals)
     structures = settings.structures
     MechanisticModels.cascade_update_params!(structures)
     apply(DynamicEnergyBudgets.scale_time_dependent_params!, structures, settings.timestep_days)

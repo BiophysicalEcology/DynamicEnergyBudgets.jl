@@ -1,7 +1,10 @@
 import MechanisticModels.runmodel!
 
-###############################################################################
-# Model
+"""
+    runmodel!(du, settings, u, t)
+DEBSettings method for MechanisticModels.jl api.
+Applies environment and runs the DEB model.
+"""
 function runmodel!(du, settings::S, u, t::Number)::Void where S<:DEBSettings
     ss = settings.structures
     split_state!(ss, 0, u)
@@ -10,6 +13,7 @@ function runmodel!(du, settings::S, u, t::Number)::Void where S<:DEBSettings
         settings.apply_environment!(settings, t)
     end
 
+    # Store intermediate things for plotting. Slower and more memory intensive.
     if settings.save_intermediate
         set_current_flux!, ss, floor(Int, t)
     end
@@ -20,12 +24,24 @@ function runmodel!(du, settings::S, u, t::Number)::Void where S<:DEBSettings
 end
 
 
-function deb_model!(settings::S, t::Number)::Void where S<:DEBSettings
+"""
+    deb_model!(settings, t)
+A generalised multi-reserve, multi-structure Dynamic Energy Budget model.
+
+Applies metabolism, translocation and assimilation mehtods to N structures.
+
+settings is a struct with required model data, DEBSettings or similar.
+t is the timestep
+"""
+function deb_model!(settings::S, t::Number)::Void where S
     structures = settings.structures
     swapped = (Base.tail(structures)..., structures[1])
 
     apply(metabolism!, structures, t)
-    apply(translocation!, structures, swapped)
+    if length(structures) > 1
+        # FIXME what about rejected reserves in 1 structure organism?
+        apply(translocation!, structures, swapped)
+    end
     apply(assimilation!, structures, swapped, settings)
 
     return nothing
@@ -43,29 +59,30 @@ function metabolism!(s::S, t::Number)::Void where S<:DEBStructure
     return nothing
 end
 
+
+"""
+Some rejected reserve is translocated.
+But this grouping is somewhat unsatisfying.
+"""
 function translocation!(s::S1, sn::S2)::Void where {S1,S2}
     reuse_rejected_reserve!(s, sn)
     translocate!(s, sn, s.u)
     return nothing
 end
 
+
+"""
+Run a structure-specific assimilation function.
+"""
 function assimilation!(s::S1, sn::S2, p::P)::Void where {S1,S2,P}
     s.functions.assim(s, sn, s.u, p)
     return nothing
 end
 
 
-###############################################################################
-# Flux sub-functions
-
-# These functions do not know about structures, and can be used without
-# them as a library or in some other context.
-
-# These cover models with any combination of general reserve and C/N reserves.
-# Julia's multiple-dispatch allows identical function names to be applied to
-# state types with parent types like AbstractStateE or AbstractStateCNE.
-
-###############################################################################
+"""
+Catabolism for E, C and N, or C, N and E reserves.
+"""
 function catabolism!(s::S, u::AbstractState, t::Float64)::NTuple{2,Float64} where S
     return (0.0, 0.0)
 end
@@ -109,7 +126,10 @@ function catabolism!(s::S, u::AbstractStateCNE, t::Float64)::NTuple{2,Float64} w
 end
 
 
-###############################################################################
+"""
+Dissipation for any reserve.
+Growth, maturity and maintenence are grouped as dissipative processes.
+"""
 function dissipation!(s::S, u::AbstractState, θE::Float64, r::Float64)::Void where S
     growth!(s, u, θE, r)
     J_E_rep_mai = maturity!(s, u, θE)
@@ -131,6 +151,11 @@ function growth!(s::S, u::AbstractState, θE::Float64, r::Float64)::Void where S
     return nothing
 end
 
+# """
+#     maturity!(s, u, θE::Float64)
+# Calculates reserve drain due to maturity maintenance.
+# Stores in M state variable if it exists.
+# """
 @traitfn function maturity!{S,X; !StateHasM{X}}(s::S, u::X, θE::Float64)
     p = s.params; J = s.J; J1 = s.J1;
     # Only run for structures that take part in reproduction.
@@ -166,6 +191,11 @@ end
     return J_E_rep_mai
 end
 
+"""
+    maturity!(s, u, θE::Float64)
+Calculates reserve drain due to maintenance.
+Secretes product state P
+"""
 function maintenence!(s::S, u::AbstractState, θE::Float64, J_E_rep_mai::Float64)::Void where S
     p = s.params; J = s.J; J1 = s.J1;
     drain = -p.j_E_mai * u.V + J_E_rep_mai #(J_E_rep_mai here cancels out with reproduction)
@@ -178,9 +208,15 @@ function maintenence!(s::S, u::AbstractState, θE::Float64, J_E_rep_mai::Float64
     return nothing
 end
 
-###############################################################################
+
+"""
+    reuse_rejected_reserve!(s::S1, sn::S2) where {S1,S2}
+Reallocate state rejected from synthesizing units.
+TODO add a 1 structure method
+"""
 function reuse_rejected_reserve!(s::S1, sn::S2) where {S1,S2}
     p = s.params; J = s.J; J1 = s.J1;
+    # This decision seems arbitrary.
     # How would growth dynamics change if both rejected C and N were translocated?
     if s.name == :shoot
         J[:N,:rej] = -p.κEN * J1[:N,:rej]
@@ -195,10 +231,15 @@ end
 
 
 """
-This function is identical both directions, so T represents
-whichever is not the current structure.
+    translocate!(s, sn, u::AbstractState)
 
-This will not run with less than 2 structures.
+Versions for E, CN and CNE reserves.
+
+Translocation is occurs between adjacent structures. 
+This function is identical both directions, so sn represents
+whichever is not the current structure. Will not run with less than 2 structures.
+
+FIXME this will be broken for structure > 2
 """
 function translocate!(s::S1, sn::S2, u::AbstractState)::Void where {S1,S2}
     return nothing
@@ -250,7 +291,12 @@ function translocate!(s::S1, sn::S2, u::AbstractStateCNE)::Void where {S1,S2}
 end
 
 
-###############################################################################
+
+"""
+    reserve_drain!(J, u, col, drain, θE, params)
+Generalised reserve drain for any flux column *col* (ie :gro)
+and any combination of reserves.
+"""
 function reserve_drain!(J::Flux, u::AbstractState, col::Symbol, drain::Float64,
                         θE::Float64, params::P)::Void where P
     return nothing
@@ -276,7 +322,10 @@ function reserve_drain!(J::Flux, u::AbstractStateCNE, col::Symbol, drain::Float6
 end
 
 
-###############################################################################
+"""
+    reserve_loss!(J1, J, u, col, drain, θE, params)
+Generalised reserve loss to track carbon. 
+"""
 function reserve_loss!(J1::Flux, J::Flux, u::AbstractStateE, col::Symbol, θloss)::Void
     J1[:E,:los] -= J[:E,col] * θloss
     return nothing
@@ -294,7 +343,10 @@ function reserve_loss!(J1::Flux, J::Flux, u::AbstractStateCNE, col::Symbol, θlo
 end
 
 
-###############################################################################
+"""
+    calc_κtra(params::P) where P
+κtra is the difference between κsoma and κrep
+"""
 function calc_κtra(params::P) where P
     1.0 - params.κsoma - params.κrep
 end

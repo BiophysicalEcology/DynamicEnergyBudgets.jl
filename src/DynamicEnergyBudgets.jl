@@ -102,7 +102,5 @@ include("assimilation_inputs.jl")
 include("functions.jl")
 include("model.jl")
 include("environment.jl")
-include("interface.jl")
-include("plot.jl")
 
 end # module

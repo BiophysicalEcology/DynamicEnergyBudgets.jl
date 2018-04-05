@@ -2,6 +2,7 @@ using Revise
 using MechanisticModels
 using DynamicEnergyBudgets
 using AutoInteract
+using JLD
 using Reactive
 using Interact
 using ProfileView
@@ -11,7 +12,7 @@ include("../DynamicEnergyBudgets/src/settings.jl")
 
 use_environment = true
 save_intermediate = true
-# environment = []
+environment = []
 # environment = DynamicEnergyBudgets.load_nichemap("Northcote, victoria", 1)
 # save("environment.jld", "environment", environment)
 environment = load("environment.jld")["environment"]
@@ -33,6 +34,10 @@ apply(DynamicEnergyBudgets.scale_time_dependent_params!, settings.structures, se
 apply(DynamicEnergyBudgets.initialise_params!, settings.structures)
 
 plot_all(settings, sp.value, 1:10) 
+
+struct x
+    n::typeof(u"molN")
+end
 
 @time for i = 1:100 integrate(settings) end; nothing
 

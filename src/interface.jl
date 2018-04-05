@@ -16,7 +16,7 @@ function deb_widgets(settings)
 end
 
 function deb_plottables(settings)
-    widgets = make_plottable(settings)
+    widgets = make_plottables(settings)
     for s in widgets[:structures]
         delete!.(s, [:A, :params_specs, :params, :init_params, :param_ids, :J1, :J, :flags, :functions, :assim_state])
     end
