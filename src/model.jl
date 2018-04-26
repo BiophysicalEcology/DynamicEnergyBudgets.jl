@@ -1,319 +1,298 @@
-import MechanisticModels.runmodel!
+import BiophysicalModels.runmodel!
 
 """
     runmodel!(du, settings, u, t)
-DEBSettings method for MechanisticModels.jl api.
+DEBSettings method for BiophysicalModels.jl api.
 Applies environment and runs the DEB model.
 """
-function runmodel!(du, settings::S, u, t::Number)::Void where S<:DEBSettings
-    ss = settings.structures
-    split_state!(ss, 0, u)
+function runmodel!(du, u, scenario::Scenario, t::Number)
+    organism = scenario.nodes[1]
+    apply(apply_environment!, organism, scenario.environment, t)
 
-    if settings.use_environment
-        settings.apply_environment!(settings, t)
-    end
+    deb_model!(organism, t)
+    sum_flux!(du, organism) # FIXME du is all organs
 
-    # Store intermediate things for plotting. Slower and more memory intensive.
-    if settings.save_intermediate
-        set_current_flux!, ss, floor(Int, t)
-    end
-
-    deb_model!(settings, t)
-    sum_flux!(du, settings)
     return nothing
 end
 
-
 """
     deb_model!(settings, t)
-A generalised multi-reserve, multi-structure Dynamic Energy Budget model.
+A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
 
-Applies metabolism, translocation and assimilation mehtods to N structures.
+Applies metabolism, translocation and assimilation mehtods to N organs.
 
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
-function deb_model!(settings::S, t::Number)::Void where S
-    structures = settings.structures
-    swapped = (Base.tail(structures)..., structures[1])
+function deb_model!(organism, t::Number)
+    organs = organism.nodes
+    swapped = (Base.tail(organs)..., organs[1])
 
-    apply(metabolism!, structures, t)
-    if length(structures) > 1
-        # FIXME what about rejected reserves in 1 structure organism?
-        apply(translocation!, structures, swapped)
-    end
-    apply(assimilation!, structures, swapped, settings)
+    apply(metabolism!, organs, t)
+    # FIXME what about rejected reserves with 1 organ?
+    length(organs) > 1 && apply(translocation!, organs, swapped)
+    apply(assimilation!, organs, swapped, settings)
 
     return nothing
 end
 
 """
-Metabolism is an identical process for all structures, with potentially
+    metabolism!(s, t::Number)
+Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
-function metabolism!(s::S, t::Number)::Void where S<:DEBStructure
-    s.A = s.functions.area(s.u.V, s.params.M_Vref, s.params.M_Vscaling)
-    (θE, r) = catabolism!(s, s.u, t)
-    dissipation!(s, s.u, θE, r)
-    # autophagy!(u[i], params, J[i][i], r)
+function metabolism!(o, t::Number)
+    s.scaling = scaling(o.scaling, o.u.V)
+    (θE, r) = catabolism!(o, o.values, t)
+    dissipation!(o, o.values, θE, r)
+    feedback!(o, o.feedback, o.values, r)
     return nothing
 end
 
-
 """
+    translocation!(s, on)
 Some rejected reserve is translocated.
-But this grouping is somewhat unsatisfying.
+But this grouping of functions is somewhat unsatisfying.
 """
-function translocation!(s::S1, sn::S2)::Void where {S1,S2}
-    reuse_rejected_reserve!(s, sn)
-    translocate!(s, sn, s.u)
+function translocation!(o, on)
+    reuse_rejected_reserve!(o, on)
+    translocate!(o, on, o.values)
     return nothing
 end
-
-
-"""
-Run a structure-specific assimilation function.
-"""
-function assimilation!(s::S1, sn::S2, p::P)::Void where {S1,S2,P}
-    s.functions.assim(s, sn, s.u, p)
-    return nothing
-end
-
 
 """
 Catabolism for E, C and N, or C, N and E reserves.
 """
-function catabolism!(s::S, u::AbstractState, t::Float64)::NTuple{2,Float64} where S
-    return (0.0, 0.0)
-end
-function catabolism!(s::S, u::AbstractStateE, t)::NTuple{2,Float64} where S
-    p = s.params
-    J1 = s.J1
-    Aturnover = p.k_E * s.A
+function catabolism!(o, u::AbstractStateE, t::Number)
+    p = o.params
+    J1 = o.values.J1
+    Aturnover = p.k * o.A
     m = u.E / u.V
-    r = rate(t, s.rates, (m, Aturnover, p.j_E_mai, p.y_V_E, p.κsoma))
+    r = find_rate(t, o.rates, (m, Aturnover, p.j_E_mai, p.y_V_E, p.κsoma))
     J1[:E,:cat] = catabolic_fluxes(ureserve, Aturnover, r)
     return (0.0, r)
 end
-function catabolism!(s::S, u::AbstractStateCN, t::Float64)::NTuple{2,Float64} where S
-    p = s.params
-    J1 = s.J1
-    Aturnover = (p.k_EC, p.k_EN) .* s.A
+function catabolism!(o, u::AbstractStateCN, t::Number)
+    p = o.params
+    J1 = o.values.J1
+    Aturnover = p.k .* o.A
     ureserve = (u.C, u.N)
     m = ureserve ./ u.V
-    r = find_rate(t, s.rates, (m, Aturnover, p.j_E_mai, p.y_E_CH_NO,
+    r = find_rate(t, o.rates, (m, Aturnover, p.j_E_mai, p.y_E_CH_NO,
                                p.y_E_EN, p.y_V_E, p.κsoma))
     (J1[:C,:cat], J1[:N,:cat]) = catabolic_fluxes(ureserve, Aturnover, r)
     (J1[:C,:rej], J1[:N,:rej], J1[:E,:cat]) =
-    synthesizing_unit(J1[:C,:cat], J1[:N,:cat], p.y_E_CH_NO, p.y_E_EN)
+        synthesizing_unit(J1[:C,:cat], J1[:N,:cat], p.y_E_CH_NO, p.y_E_EN)
     return (0.0, r)
 end
-function catabolism!(s::S, u::AbstractStateCNE, t::Float64)::NTuple{2,Float64} where S
-    p = s.params
-    J1 = s.J1
-    Aturnover = (p.k_EC, p.k_EN, p.k_E) .* s.A
+function catabolism!(o, u::AbstractStateCNE, t::Number)
+    p = o.params
+    J1 = o.values.J1
+    Aturnover = p.k .* o.A
     ureserve = (u.C, u.N, u.E)
     m = ureserve ./ u.V
-    r = find_rate(t, s.rates, (m, Aturnover, p.j_E_mai, p.y_E_CH_NO,
+    r = find_rate(t, o.rates, (m, Aturnover, p.j_E_mai, p.y_E_CH_NO,
                                p.y_E_EN, p.y_V_E, p.κsoma))
     (J1[:C,:cat], J1[:N,:cat], J1[:EE,:cat]) = catabolic_fluxes(ureserve, Aturnover, r)
     (J1[:C,:rej], J1[:N,:rej], J1[:CN,:cat]) =
-    synthesizing_unit(J1[:C,:cat], J1[:N,:cat], p.y_E_CH_NO, p.y_E_EN)
+        synthesizing_unit(J1[:C,:cat], J1[:N,:cat], p.y_E_CH_NO, p.y_E_EN)
 
     J1[:E,:cat] = J1[:EE,:cat] + J1[:CN,:cat] # Total catabolic flux
     θE = J1[:EE,:cat]/J1[:E,:cat] # Proportion of general reserve flux in total catabolic flux
     return (θE, r)
 end
 
-
 """
+    dissipation!(s, u::AbstractState, θE, r)
 Dissipation for any reserve.
 Growth, maturity and maintenence are grouped as dissipative processes.
 """
-function dissipation!(s::S, u::AbstractState, θE::Float64, r::Float64)::Void where S
-    growth!(s, u, θE, r)
-    J_E_rep_mai = maturity!(s, u, θE)
-    maintenence!(s, u, θE, J_E_rep_mai)
+function dissipation!(o, u::AbstractState, θE, r)
+    growth!(o, u, θE, r)
+    maturity!(o, u, θE)
+    maintenence!(o, u, θE)
+    production!(o, u, θE)
     return nothing
 end
 
-function growth!(s::S, u::AbstractState, θE::Float64, r::Float64)::Void where S
-    p = s.params; J = s.J; J1 = s.J1;
+"""
+    growth!(o, u::AbstractState, θE, r)
+
+Allocates reserves to growth.
+"""
+function growth!(o, u::AbstractState, θE, r)
+    p = o.params; J = o.values.J; J1 = o.values.J1;
     y_E_V = 1/p.y_V_E
-    y_loss = 1 - p.y_P_V - p.y_V_E
 
     J[:V,:gro] = r * u.V # Growth flux
-    J[:P,:gro] = J[:V,:gro] * p.y_P_V
     drain = -y_E_V * r * u.V
     reserve_drain!(J, u, :gro, drain, θE, p)
     reserve_loss!(J1, J, u, :gro, 1.0)
-    J1[:E,:los] -= J[:V,:gro] + J[:P,:gro]
+    J1[:E,:los] -= J[:V,:gro]
     return nothing
 end
 
-# """
-#     maturity!(s, u, θE::Float64)
-# Calculates reserve drain due to maturity maintenance.
-# Stores in M state variable if it exists.
-# """
-@traitfn function maturity!{S,X; !StateHasM{X}}(s::S, u::X, θE::Float64)
-    p = s.params; J = s.J; J1 = s.J1;
-    # Only run for structures that take part in reproduction.
+"""
+    maturity!(o, u, θE)
+
+Allocates reserve drain due to maturity maintenance.
+Stores in M state variable if it exists.
+"""
+function maturity!(o, u, θE) end
+@traitfn function maturity!{X; !StateHasM{X}}(o, u::X, θE)
+    p = o.params; J = o.values.J; J1 = o.values.J1;
+    # Only run for organs that take part in reproduction.
     if p.κrep > 0.0
         # TODO: why does rep maintenance stop increasing at M_Vrep?
         # Is this a half finished reproduction model?
         # TODO: -θE * E_rep_mai here, but also θE * E_rep_mai included
         # below in maintenance. Is this intended?
-
         # Maturity maintenance costs
-        J_E_rep_mai = -p.j_E_rep_mai * min(u.V, p.M_Vrep)
-        drain = -(p.κrep * J1[:E,:cat] + J_E_rep_mai)
+        drain = -(p.κrep * J1[:E,:cat] + -p.j_E_rep_mai * min(u.V, p.M_Vrep))
         reserve_drain!(J, u, :rep, drain, θE, p)
         reserve_loss!(J1, J, u, :rep, 1.0)
-    else
-        J_E_rep_mai = 0.0
     end
-    return J_E_rep_mai
+    return nothing
 end
-@traitfn function maturity!{S,X; StateHasM{X}}(s::S, u::X, θE::Float64)
-    p = s.params; J = s.J; J1 = s.J1;
-    # Only run for structures that take part in reproduction.
+@traitfn function maturity!{X; StateHasM{X}}(o, u::X, θE)
+    p = o.params; J = o.values.J; J1 = o.values.J1;
+    # Only run for organs that take part in reproduction.
+    # TODO: no logic with parameter values.
     if p.κrep > 0.0
         # Maturity maintenance costs
-        J_E_rep_mai = -p.j_E_rep_mai * min(u.V, p.M_Vrep)
         J[:M,:gro] = p.κrep * J1[:E,:cat]
-        drain = -(J[:M,:gro] + J_E_rep_mai)
+        drain = -(J[:M,:gro] + -p.j_E_rep_mai * min(u.V, p.M_Vrep))
         reserve_drain!(J, u, :rep, drain, θE, p)
         reserve_loss!(J1, J, u, :rep, 1.0)
-    else
-        J_E_rep_mai = 0.0
     end
-    return J_E_rep_mai
-end
-
-"""
-    maturity!(s, u, θE::Float64)
-Calculates reserve drain due to maintenance.
-Secretes product state P
-"""
-function maintenence!(s::S, u::AbstractState, θE::Float64, J_E_rep_mai::Float64)::Void where S
-    p = s.params; J = s.J; J1 = s.J1;
-    drain = -p.j_E_mai * u.V + J_E_rep_mai #(J_E_rep_mai here cancels out with reproduction)
-    reserve_drain!(J, u, :mai, drain, θE, p)
-    reserve_loss!(J1, J, u, :mai, 1.0)
-
-    J[:P,:mai] = u.V * p.j_P_mai
-    J1[:E,:los] -= J[:P,:mai]
-
     return nothing
 end
 
+"""
+    maintenance!(o, u, θE)
+Allocates reserve drain due to maintenance.
+"""
+function maintenence!(o, u::AbstractState, θE)
+    p = o.params 
+    drain = -p.j_E_mai * u.V # Not temp related. Why?
+    reserve_drain!(o.J, u, :mai, drain, θE, p)
+    reserve_loss!(o.J1, o.J, u, :mai, 1.0)
+    return nothing
+end
 
 """
-    reuse_rejected_reserve!(s::S1, sn::S2) where {S1,S2}
-Reallocate state rejected from synthesizing units.
-TODO add a 1 structure method
+    production!(o, u::AbstractState, θE, r)
+
+Allocates waste products from growth and maintenance.
 """
-function reuse_rejected_reserve!(s::S1, sn::S2) where {S1,S2}
-    p = s.params; J = s.J; J1 = s.J1;
+function production!(o, u::AbstractState, θE, r)
+    p = o.params; J = o.values.J; J1 = o.values.J1;
+    J[:P,:gro] = J[:V,:gro] * p.y_P_V
+    J[:P,:mai] = u.V * p.j_P_mai # Maintenance product is not temp related. Why?
+    J1[:E,:los] -= J[:P,:gro] + J[:P,:mai]
+    return nothing
+end
+
+"""
+    reuse_rejected_reserve!(o, on)
+Reallocate state rejected from synthesizing units.
+
+TODO add a 1-organs method
+Also how does this interact with assimilation?
+"""
+function reuse_rejected_reserve!(o, on)
+    p = o.params; J = o.values.J; J1 = o.values.J1;
     # This decision seems arbitrary.
     # How would growth dynamics change if both rejected C and N were translocated?
-    if s.name == :shoot
+    # FIXME: balance this thing
+    if typeof(p.assimilation) <: CarbonAssimilation
         J[:N,:rej] = -p.κEN * J1[:N,:rej]
         J[:C,:rej] = (p.κEC - 1) * J1[:C,:rej]
-    else
+    elseif typeof(p.assimilation) <: NitrogenAssimilation
         J[:C,:rej] = -p.κEC * J1[:C,:rej]
         J[:N,:rej] = (p.κEN - 1) * J1[:N,:rej]
     end
-
     return nothing
 end
 
-
 """
-    translocate!(s, sn, u::AbstractState)
+    translocate!(o, on, u::AbstractState)
 
 Versions for E, CN and CNE reserves.
 
-Translocation is occurs between adjacent structures. 
-This function is identical both directions, so sn represents
-whichever is not the current structure. Will not run with less than 2 structures.
+Translocation is occurs between adjacent organs. 
+This function is identical both directiono, so on represents
+whichever is not the current organs. Will not run with less than 2 organs.
 
-FIXME this will be broken for structure > 2
+FIXME this will be broken for organs > 2
 """
-function translocate!(s::S1, sn::S2, u::AbstractState)::Void where {S1,S2}
+function translocate!(o, on, u::AbstractState)
     return nothing
 end
-function translocate!(s::S1, sn::S2, u::AbstractStateE)::Void where {S1,S2}
-    κtra = calc_κtra(s.params)
-    κtraT = calc_κtra(sn.params)
-    # Translocation of C, N and general reserves between structures
-    Cgain = κtraT * sn.J1[:E,:cat]
-    drain = -κtra * s.J1[:E,:cat]
-    s.J[:E,:tra] += Cdrain + Cgain
-    s.J1[:E,:los] -= gain
+function translocate!(o, on, u::AbstractStateE)
+    κtra = calc_κtra(o.params)
+    κtraT = calc_κtra(on.params)
+    # Translocation of C, N and general reserves between organs
+    Cgain = κtraT * on.values.J1[:E,:cat]
+    drain = -κtra * o.values.J1[:E,:cat]
+    o.values.J[:E,:tra] += Cdrain + Cgain
+    o.values.J1[:E,:los] -= gain
     return nothing
 end
-function translocate!(s::S1, sn::S2, u::AbstractStateCN)::Void where {S1,S2}
-    κtra = calc_κtra(s.params)
-    κtraT = calc_κtra(sn.params)
+function translocate!(o, on, u::AbstractStateCN)
+    J = o.values.J; J1 = o.values.J1;
+    Jn = on.values.J; J1n = on.values.J1;
+    κtra = calc_κtra(o.params)
+    κtraT = calc_κtra(on.params)
 
-    # Translocation of C, N and general reserves between structures
-    tra_C = -κtra * s.J1[:C,:cat]
-    tra_N = -κtra * s.J1[:N,:cat]
+    # Translocation of C, N and general reserves between organs
+    tra_C = -κtra * J1[:C,:cat]
+    tra_N = -κtra * J1[:N,:cat]
 
-    s.J[:C,:tra] = tra_C * 1/s.params.y_E_CH_NO
-    Cdrain = -κtra * s.J1[:C,:cat]
-    Cgain = s.params.y_E_ET * κtraT * sn.J1[:C,:cat]
-    s.J[:C,:tra] = Cdrain + Cgain
+    J[:C,:tra] = tra_C * 1/o.paramo.y_E_CH_NO
+    Cdrain = -κtra * J1[:C,:cat]
+    Cgain = o.params.y_E_ET * κtraT * J1n[:C,:cat]
+    J[:C,:tra] = Cdrain + Cgain
 
-    s.J[:N,:tra] = tra_N * 1/s.params.y_E_EN
-    Ndrain = -κtra * s.J1[:N,:cat]
-    Ngain = s.params.y_E_ET * κtraT * sn.J1[:N,:cat]
-    s.J[:N,:tra] = Ndrain + Ngain
+    J[:N,:tra] = tra_N * 1/o.params.y_E_EN
+    Ndrain = -κtra * J1[:N,:cat]
+    Ngain = o.params.y_E_ET * κtraT * J1n[:N,:cat]
+    J[:N,:tra] = Ndrain + Ngain
     return nothing
 end
-function translocate!(s::S1, sn::S2, u::AbstractStateCNE)::Void where {S1,S2}
-    κtra = calc_κtra(s.params)
-    κtraT = calc_κtra(sn.params)
+function translocate!(o, on, u::AbstractStateCNE)
+    p = o.params, J = o.values.J; J1 = o.values.J1;
 
-    θE = s.J1[:EE,:cat]/s.J1[:E,:cat]
+    θE = J1[:EE,:cat]/J1[:E,:cat]
 
-    drain = -κtra * s.J1[:E,:cat]
-    reserve_drain!(s.J, u, :tra, drain, θE, s.params)
-    reserve_loss!(s.J1, s.J, u, :tra, 1.0)
+    drain = -calc_κtra(p) * J1[:E,:cat]
+    reserve_drain!(J, u, :tra, drain, θE, p)
+    reserve_loss!(J1, J, u, :tra, 1.0)
 
-    gain = s.params.y_E_ET * κtraT * sn.J1[:E,:cat]
-    # Final general reserve status
-    s.J[:E,:tra] += gain
-    s.J1[:E,:los] -= gain
+    gain = p.y_E_ET * calc_κtra(on.params) * on.values.J1[:E,:cat]
+    J[:E,:tra] += gain
+    J1[:E,:los] -= gain
     return nothing
 end
-
-
 
 """
     reserve_drain!(J, u, col, drain, θE, params)
 Generalised reserve drain for any flux column *col* (ie :gro)
 and any combination of reserves.
 """
-function reserve_drain!(J::Flux, u::AbstractState, col::Symbol, drain::Float64,
-                        θE::Float64, params::P)::Void where P
+function reserve_drain!(J, u::AbstractState, col::Symbol, drain, θE, params)
     return nothing
 end
-function reserve_drain!(J::Flux, u::AbstractStateE, col::Symbol, drain::Float64,
-                        θE::Float64, params::P)::Void where P
+function reserve_drain!(J, u::AbstractStateE, col::Symbol, drain, θE, params)
     J[:E,col] = drain * θE
     return nothing
 end
-function reserve_drain!(J::Flux, u::AbstractStateCN, col::Symbol, drain::Float64,
-                        θE::Float64, params::P)::Void where P
+function reserve_drain!(J, u::AbstractStateCN, col::Symbol, drain, θE, params)
     J[:C,col] = drain/params.y_E_CH_NO
     J[:N,col] = drain/params.y_E_EN
     return nothing
 end
-function reserve_drain!(J::Flux, u::AbstractStateCNE, col::Symbol, drain::Float64,
-                        θE::Float64, params::P)::Void where P
+function reserve_drain!(J, u::AbstractStateCNE, col::Symbol, drain, θE, params)
     J_CN = drain * (1.0 - θE)
     J[:C,col] = J_CN/params.y_E_CH_NO
     J[:N,col] = J_CN/params.y_E_EN
@@ -321,34 +300,58 @@ function reserve_drain!(J::Flux, u::AbstractStateCNE, col::Symbol, drain::Float6
     return nothing
 end
 
-
 """
     reserve_loss!(J1, J, u, col, drain, θE, params)
 Generalised reserve loss to track carbon. 
 """
-function reserve_loss!(J1::Flux, J::Flux, u::AbstractStateE, col::Symbol, θloss)::Void
+function reserve_loss!(J1, J, u::AbstractStateE, col::Symbol, θloss)
     J1[:E,:los] -= J[:E,col] * θloss
     return nothing
 end
-function reserve_loss!(J1::Flux, J::Flux, u::AbstractStateCN, col::Symbol, θloss)::Void
+function reserve_loss!(J1, J, u::AbstractStateCN, col::Symbol, θloss)
     J1[:C,:los] -= J[:C,col] * θloss
     J1[:N,:los] -= J[:N,col] * θloss
     return nothing
 end
-function reserve_loss!(J1::Flux, J::Flux, u::AbstractStateCNE, col::Symbol, θloss)::Void
+function reserve_loss!(J1, J, u::AbstractStateCNE, col::Symbol, θloss)
     J1[:C,:los] -= J[:C,col] * θloss
     J1[:N,:los] -= J[:N,col] * θloss
     J1[:E,:los] -= J[:E,col] * θloss
     return nothing
 end
-
 
 """
     calc_κtra(params::P) where P
 κtra is the difference between κsoma and κrep
 """
-function calc_κtra(params::P) where P
-    1.0 - params.κsoma - params.κrep
+calc_κtra(params) = 1.0 - params.κsoma - params.κrep
+
+"""
+    find_rate(t, rates::Array{Float64}, args)
+Calculate rate formula.
+
+TODO: use Roots.jl for this
+"""
+function find_rate(t, rates, args::Tuple{NTuple{N},NTuple{N},Vararg}) where {N}
+    local f = rate_formula
+    local found = false
+
+    # Find the largest possible rate window.
+    x0, x1 = (-1.0u"mol/mol*d^-1", 2.0u"mol/mol*d^-1") #rate_window(args...) 
+
+    # bounds = (-1.0u"mol/mol*d^-1", 2.0u"mol/mol*d^-1") #rate_window(args...) 
+    find_zero(x -> rate_formula(x, args...), bounds, FalsePosition(); xtol=BI_XTOL)
+
+    # Save rate for plotting.
+    save_rate!(t, rates, x)
+    return x
+end
+
+function save_rate!(t, rates, newrate)
+    t_floor = floor(Int64, t)
+    if t_floor == t
+        rates[t_floor + 1] = ustrip(newrate)
+    end
 end
 
 

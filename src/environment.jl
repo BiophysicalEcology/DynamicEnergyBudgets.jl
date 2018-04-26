@@ -1,4 +1,3 @@
-export load_nichemap, apply_nichemap!, apply_deb_environment!, apply_energy_balance!
 
 function load_nichemap(location, years::Real)
     # TODO: also get soil nitrate/ammonia levels.
@@ -12,73 +11,68 @@ function load_nichemap(location, years::Real)
     for key in keys(env[:soilmoist])
         env[:soilmoist][key] = water_content_to_mols_per_litre.(env[:soilmoist][key])
     end
-    # TODO: Separate out the photosynthetic spectrum.
-    # env[:metout][:SOLR] = watts_to_light_mol.(env[:metout][:SOLR])
 
     return env
 end
 
-function apply_deb_environment!(settings, t::Real)
-    update(s) = begin
-        p = s.params
-        p.J_L_F = radiation 
-        p.X_H = soilmoist 
-    end
-    (airtemp, soiltemp, soilmoist, radiation, windspeed, humidity) = 
-    get_nichemap(settings.environment, t)
-    apply(update, structures)
-    temps = celcius_to_kelvin.((airtemp, soiltemp))
-    map(correct_temps, s, temps)
+function apply_environment!(organ, 
+                            env::NicheMapMicroclimate, 
+                            t::Number)
+    a = organ.values.assim_state
+    pos = t + 1
+
+    a.windspeed = interpolate(env.metout[:VLOC], pos) * u"m*s^-1"
+    a.rh = interpolate(env.humid[:RH20cm], pos) 
+    a.tair = interpolate(env.metout[:TALOC], pos) * u"°C"
+    radiation = interpolate(env.metout[:SOLR], pos) 
+    a.rnet = radiation * u"W*m^-2"
+    a.par = radiation * 4.57u"mol*m^-2*s^-1" 
+
+    photosynthesis_transpiration!(a, organ.params.assimilation.photoparams)
+    correct_temps!(organ, a.tleaf)
 end
 
-function apply_energy_balance!(settings, t::Real)
-    update(s, airtemp, soiltemp, soilmoist, radiation, windspeed, humidity) = begin
-      p = s.params
-      p.photo_flux_density = radiation  
-      p.Tair = airtemp
-      p.rel_humidity = humidity
-      p.wind = windspeed
-      p.X_H = soilmoist 
-    end
-    structures = settings.structures
-    updates = get_nichemap(settings.environment, t)
-    # Update params for each structure
-    apply(update, structures, updates...)
+function apply_environment!(organ::Organ, 
+                            environment::NicheMapMicroclimate,
+                            t::Number)
+    a = organ.values.assim_state
+    pos = t + 1
 
-    (airtemp, soiltemp, soilmoist, radiation, windspeed, humidity) = updates
-    setval!(structures[1].assim_state, structures[1].params)
-    gas_ex!(structures[1].assim_state, structures[1].params)
-    leaftemp = (structures[1].assim_state.Tleaf)
-    temps = celcius_to_kelvin.((leaftemp, soiltemp))
-    map(correct_temps!, structures, temps)
+    a.soiltemp = interpolate(env.soil[:D10cm], pos) * u"°C"
+    a.soilmoist = interpolate(env.soilmoist[:WC10cm], pos)
+    a.soilpot = interpolate(env.soilmoist[:WC10cm], pos)
+    a.soilpotshade = interpolate(env.shadpot[:PT10cm], pos)
+    a.soilpotshade = interpolate(env.soilshade[:PT10cm], pos)
+
+    correct_temps!(organ, a.soiltemp)
 end
 
-function get_nichemap(env::E, t::Real)::NTuple{6,Float64} where E
-    t0 = 1 #/ settings.timestep_days
-    pos = t0 + t
-    airtemp = interpolate(env[:metout][:TALOC], pos) 
-    soiltemp = interpolate(env[:soil][:D10cm], pos) 
-    soilmoist = interpolate(env[:soilmoist][:WC10cm], pos)
-    radiation = interpolate(env[:metout][:SOLR], pos) 
-    windspeed = interpolate(env[:metout][:VLOC], pos) 
-    humidity = interpolate(env[:humid][:RH20cm], pos) 
+# function apply_environment!(environment::NicheMapMicroclimate, organ::Organ, t::Number)
+#      update(s) = begin
+#          p = s.params
+#          p.J_L_F = radiation 
+#          p.X_H = soilmoist 
+#      end
+#      (airtemp, soiltemp, soilmoist, radiation, windspeed, humidity) = 
+#          get_nichemap(environment, t)
+#      apply(update, organs)
+#      temps = celcius_to_kelvin.((airtemp, soiltemp))
+#      map(correct_temps, settings.structures, temps)
+# end
 
-    return (airtemp, soiltemp, soilmoist, radiation, windspeed, humidity)
-end
-
-function correct_temps!(s::S, temp::Real) where S
-    p = s.params
-    corr = tempcorr(temp, p.REFERENCE_TEMP, p.ARRH_TEMP, p.LOWER_BOUNDARY, 
-                    p.ARRH_LOWER, p.UPPER_BOUNDARY, p.ARRH_UPPER)
+function correct_temps!(o, temp::Number)
+    p = o.params
+    corr = tempcorr(temp |> u"K", getfield.(tc, fieldnames(tc))...)
     # Scale params by temperature 
-    for id in s.flags.temp
-        s.params[id] = s.init_params[id] * corr
-    end
+    # for key in o.flags.temp
+        value = getfield(o.init_params, key) * corr
+        setfield!(o, key, value)
+    # end
 end
 
-interpolate(array::Array{Float64,1}, pos::Real)::Float64 = begin
+interpolate(array, pos::Number) = begin
     int = floor(Int64, pos)
     frac::Float64 = pos - int
-    array[int] * (1.0 - frac) + array[int + 1] * frac
+    array[int] * (1 - frac) + array[int + 1] * frac
 end
-interpolate(array::Array{Float64,1}, pos::Int)::Float64 = array[int]
+interpolate(array, pos::Int) = array[int]
