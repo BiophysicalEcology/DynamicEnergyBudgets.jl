@@ -1,16 +1,5 @@
 using Base.tail
 
-export scale_time_dependent_params!get_num_states, get_state_names, get_total_states
-
-get_state_names(u::FieldVector) = fieldnames(u)
-get_num_states(p::S) where S<:AbstractStructuredSettings = 
-    length(fieldnames(p.structures[1].u))
-get_state_names(p::S) where S<:AbstractStructuredSettings = 
-    get_state_names(p.structures[1].u)
-get_total_states(p::S) where S<:AbstractSettings = length(p.u0)
-
-
-# -----------------------------------------------------------------------------
 # Outer constructor for DEBStructure
 DEBStructure(name::Symbol, param_specs::ParamSpecs, params, flags::DEBFlags,
              functions, settings) = begin
@@ -23,12 +12,9 @@ DEBStructure(name::Symbol, param_specs::ParamSpecs, params, flags::DEBFlags,
 
     A = 0.0
     init_params = deepcopy(params)
-    u = init_state(settings[:state_type])
+    u = init_state(typeof(settings[:u0][1]), settings[:state_type])
     num_structures = floor(Int64, length(settings[:u0])/length(u))
-    assim_state = PhotoState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                             0.0, 0.0, 0, 0, false)
-    # assim_state = []
+    assim_state = uzeros(PhotoIntermediate)
 
     state_names = fieldnames(u)
     state1_names = get_state1_names(u)
@@ -47,10 +33,34 @@ function split_flux(base::AbstractArray, t::Int)
 end
 
 function build_axis(x, y, len, timerange)
-    AxisArray(zeros(Float64, length(x), length(y), len),
+    AxisArray(fill(0.0u"mol*hr^-1", (length(x), length(y), len)),
               Axis{:state}(x),
               Axis{:transformations}(y),
               Axis{:time}(timerange))
+end
+
+function unitize(a, t)
+    if t.name.name == :Quantity
+        t(a)
+    else
+        a
+    end
+end
+
+function uconstruct(datatype::DataType, args)
+    fts = fieldtype.(datatype, fieldnames(datatype))
+    fields = map(unitize, args, fts)
+    datatype(fields...)
+end
+
+function uzeros(datatype::DataType)
+    args = zeros(Float64, length(fieldnames(datatype)))
+    uconstruct(datatype, args)
+end
+
+function uones(datatype::DataType)
+    args = ones(Float64, length(fieldnames(datatype)))
+    uconstruct(datatype, args)
 end
 
 
@@ -68,14 +78,12 @@ end
 split_state!(::Tuple{}, ::Int, _)::Void = nothing
 
 
-initialise_params!(s::S where S) = s.params .= s.init_params
-
-scale_time_dependent_params!(s::S where S, timestep_days::Float64) = begin 
-    for id in s.flags.time
-        # TODO this is dangerous, it should use the param_specs value.
-        s.init_params[id] *= timestep_days
+initialise_params!(s) = begin
+    for name in fieldnames(s.params)
+        setfield!(s.params, name, getfield(s.init_params, name))
     end
 end
+
 
 set_current_flux!(ss::Tuple{<:DEBStructure,Vararg}, t::Int)::Void = begin
   s = ss[1]
@@ -87,7 +95,7 @@ end
 set_current_flux!(::Tuple{}, ::Int)::Void = nothing
 
 
-sum_flux!(du::AbstractArray, p::P where P<:AbstractStructuredSettings)::Void = begin
+sum_flux!(du, p::P where P<:AbstractStructuredSettings)::Void = begin
     ss = p.structures
     num_structures = length(p.structures)
     trans = length(TRANS)
@@ -95,16 +103,16 @@ sum_flux!(du::AbstractArray, p::P where P<:AbstractStructuredSettings)::Void = b
     sum_flux!(du, ss, num_structures, 0, states, trans)
     return nothing
 end
-function sum_flux!(du::AbstractArray, ss::Tuple{<:DEBStructure,Vararg},
-                   num_structures::Int, offset::Int, states::Int, trans::Int)::Void
+sum_flux!(du, ss::Tuple{<:DEBStructure,Vararg},
+          num_structures::Int, offset::Int, states::Int, trans::Int)::Void = begin
     J = ss[1].J
     for x = 1:states
-        sum = 0.0
+        sum = 0.0unit(J[1,1])
         for y = 1:trans
             sum += J[x, y]
         end
-        du[x + offset] = sum
+        du[x + offset] = sum * 1.0u"hr"
     end
     sum_flux!(du, tail(ss), num_structures, offset + states, states, trans)
 end
-sum_flux!(::AbstractArray, ::Tuple{}, ::Int, ::Int, ::Int, ::Int)::Void = nothing
+sum_flux!(du, ::Tuple{}, ::Int, ::Int, ::Int, ::Int)::Void = nothing
