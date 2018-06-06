@@ -4,23 +4,27 @@ using Base.Test
 using StaticArrays
 using DataStructures
 using DataFrames
-using MechanisticModels
+using BiophysicalModels
 using DynamicEnergyBudgets
-using MechanisticModels.cascade_update_params!
+using BiophysicalModels.cascade_update_params!
 
+mutable struct TestPars1
+  param_one::Float64
+  param_two::Float64
+  param_three::Float64
+end
 
 uptv!(tv) = begin
     tp.param_three = 99.0
 end
 
 tspan = (1.0, 10.0)
-MechanisticModels.eval_paramstype([:param_one, :param_two, :param_three])
-ps1 = MechanisticModels.ParamSpecs(:param_one => ParamSpec(1, 1.0), :param_two => ParamSpec(2, 2.0, :time))
-ps2 = MechanisticModels.ParamSpecs(:param_two => ParamSpec(2, 99.0), :param_three => ParamSpec(3, 3.0))
+ps1 = BiophysicalModels.ParamSpecs(:param_one => ParamSpec(1, 1.0), :param_two => ParamSpec(2, 2.0, :time))
+ps2 = BiophysicalModels.ParamSpecs(:param_two => ParamSpec(2, 99.0), :param_three => ParamSpec(3, 3.0))
 
 function build_test_structure(param_specs)
-    v = MechanisticModels._Parameters(0.0, 0.0, 0.0)
-    fl = MechanisticModels.get_flags(DEBStructure, param_specs)
+    v = TestPars1(0.0, 0.0, 0.0)
+    fl = BiophysicalModels.get_flags(DEBStructure, param_specs)
     f = DEBFunctions(x -> x, x -> 2, x -> 3x, x -> 4x)
     settings = OrderedDict(:u0 => [0.0, 0.0, 0.0, 0.0], :state_type => StateVE, :tspan => tspan)
     DEBStructure(:name, param_specs, v, fl, f, settings)
@@ -75,8 +79,8 @@ end
         @test structures[1].params.param_one == 0.0
         @test structures[1].param_specs[:param_one].value == 1.0
         @test_throws KeyError structures[2].param_specs[:param_one].value
-        cascade_update_params!(structures)
-        DynamicEnergyBudgets.initialise_params!(structures)
+        cascade_update_params!(TestPars1, structures)
+        apply(DynamicEnergyBudgets.initialise_params!, structures)
         # param_one cascades down to structure 2
         @test structures[1].params.param_one == 1.0
         @test structures[2].params.param_one == 1.0
@@ -90,9 +94,9 @@ end
 
     @testset "scale_time_dependent_params! scales :time flagged params" begin
         structures = build_test_structure.((ps1, ps2)) 
-        cascade_update_params!(structures)
+        cascade_update_params!(TestPars1, structures)
         @test structures[2].init_params.param_three == 3.0
-        DynamicEnergyBudgets.scale_time_dependent_params!(structures, timestep_days)
+        apply(DynamicEnergyBudgets.scale_time_dependent_params!, structures, timestep_days)
         # params with :time flag are scaled
         @test structures[1].init_params.param_two == timestep_days * 2.0 
         # Others remain unaffected

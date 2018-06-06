@@ -2,7 +2,7 @@ using Revise
 
 using Base.Test
 using RCall
-using MechanisticModels
+using BiophysicalModels
 using DynamicEnergyBudgets
 using DynamicEnergyBudgets.Flux
 using DynamicEnergyBudgets.build_axis
@@ -23,12 +23,10 @@ function transform_R_to_jul(Jr)
     Jbase2 = build_axis(state_names, TRANS, 1, 1:1)
     Jjul = (split_flux(Jbase1, 1), split_flux(Jbase2, 1))
     Jjul[1][:, :ass] = Jr[1:5, 1]
-    # Jjul[2][:, :rej] = Jr[6:10, 1]
     Jjul[1][:, :gro] = Jr[1:5, 2]
     Jjul[1][:, :mai] = Jr[1:5, 3]
 
     Jjul[2][:, :ass] = Jr[1:5, 1 + 5]
-    # Jjul[1][:, :rej] = Jr[6:10, 1 + 5]
     Jjul[2][:, :gro] = Jr[6:10, 2 + 5]
     Jjul[2][:, :mai] = Jr[6:10, 3 + 5]
 
@@ -41,51 +39,50 @@ end
 
 function test_states(name, M_ref, M_test, tol)
     for i = 1:10
-        println(string(name, ": M_", state_names[rem(i-1,5) + 1], " : "))
-        @test M_ref[i] ≈ M_test[i] atol = 1e-15
+        r = M_ref[i]
+        t = M_test[i]
+        println(string(name, ": M_", state_names[rem(i-1,5) + 1], " r = t : ", r, " = ", t))
+        @test r ≈ t atol = 1e-15
     end
 end
 
 function test_fluxes(name, J_ref, J_test)
+    J_test[2][:C,:mai] += J_test[2][:C,:rej]
+    J_test[1][:N,:mai] += J_test[1][:N,:rej]
     for i = 1:2
         for k = 1:5
-            for l = 1:5
+            for l in eachindex(TRANS)
+                if TRANS[l] == :rej break end 
                 r = J_ref[i][k, l]
                 t = J_test[i][k, l]
                 println(string(name, ": J[", i, "][", state_names[k], ",", 
-                               DynamicEnergyBudgets.TRANS[l], "] : ", r, " = ", t))
-                # @test r ≈ t atol = 1e-15
+                               DynamicEnergyBudgets.TRANS[l], "] r = t : ", r, " = ", t))
+                @test r ≈ t atol = 1e-15
             end
         end
     end
 end
 
-@testset "Rate" begin
+@testset "Metabolic rate is correct" begin
     tspan = (0.0, 10.0)
     t = 0.0
     u = deepcopy(u0)
     du = deepcopy(u0)
     settings = test_settings(tspan)
-    MechanisticModels.runmodel!(du, settings, u, t)
+    BiophysicalModels.runmodel!(du, settings, u, t)
     rS = settings.structures[1].rates[1]
     rR = settings.structures[2].rates[1]
     @test rS ≈ 0.0756394041835524
     @test rR ≈ 0.1999960679199535296124
 end
 
-@testset "flux balance" begin
-    tspan = (0.0, 10.0)
-    settings = test_settings(tspan; save_intermediate = true)
-    sol = integrate(settings)
-end
-
-@testset "runmodel!" begin
+@testset "runmodel! integrates a single timestep" begin
     tspan = (0.0, 100.0)
     settings = test_settings(tspan)
     u = deepcopy(u0)
     du = deepcopy(u0)
     t = 1.0 
-    MechanisticModels.runmodel!(du, settings, u, t)
+    BiophysicalModels.runmodel!(du, settings, u, t)
 
     @rput u0
     R"""
@@ -112,10 +109,10 @@ function get_J(structures, n::Int)
     (structures[1].Jbase[:,:,n], structures[2].Jbase[:,:,n])
 end
 
-@testset "Small Regression" begin
+@testset "Short timespan: no assimilation" begin
 
     tspan = (0.0, 10.0)
-    settings = test_settings(tspan; save_intermediate = true)
+    settings = test_settings(tspan; save_intermediate=true)
     s = settings.structures
     sol = integrate(settings)
     M9 = sol.u[10]
@@ -154,9 +151,9 @@ end
     test_states("M10", M10_ref, M10_test, 1e-15)
 end
 
-@testset "Medium Regression" begin
+@testset "Medium timespan: assimilation active" begin
     tspan = (0.0, 60.0)
-    settings = test_settings(tspan; save_intermediate = true)
+    settings = test_settings(tspan; save_intermediate=true)
     s = settings.structures
     sol = integrate(settings)
     M19 = sol.u[20]
@@ -204,9 +201,9 @@ end
     test_states("M60", M60_ref, M60_test, 1e-15)
 end
 
-@testset "Large Regression" begin
+@testset "Large timespan: should have everything happening" begin
     tspan = (0.0, 500.0)
-    settings = test_settings(tspan; save_intermediate = true)
+    settings = test_settings(tspan; save_intermediate=true)
     s = settings.structures
     sol = integrate(settings)
     M69 = sol.u[70]

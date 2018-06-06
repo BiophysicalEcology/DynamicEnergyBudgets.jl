@@ -7,48 +7,48 @@ using DataFrames
 using DataStructures
 using Unitful
 using SimpleRoots
-using MultiScaleArrays
-using DifferentialEquations
+using OrdinaryDiffEq
 using Parameters
-
-using UnitfulMoles
-# using BiophysicalModels
-using DynamicEnergyBudgetsBase
-using PlantPhysiology
+using Mixers
+using MetaParameters
 using NicheMap
+using Photosynthesis
 
-
-macro def(name, definition)
-    return quote
-        macro $(esc(name))()
-            esc($(Expr(:quote, definition)))
-        end
-    end
-end
+@metaparam label ""
+@metaparam range [0.0, 1.0]
 
 include("state.jl")
 include("constants.jl")
 include("conversions.jl")
 include("types.jl")
 include("environment.jl")
-# include("structures.jl")
 include("assimilation_inputs.jl")
 include("model.jl")
+include("functions.jl")
+include("apply.jl")
 
+export tempcorr,
+       rate_bracket,
+       rate_formula,
+       catabolic_fluxes,
+       half_saturation,
+       stoich_merge,
+       synthesizing_unit
 
-export integrate, OrderedDict, DataFrame, Tspan 
-
-export get_state1_names, init_state
-export area_mass_kooijman, shoot_assimilation!, maestra,
-       photosynthesis_sla, photosynthesis_kooijman, photomoduleC3,
-       root_assimilation!, nitrogen_uptake, nitrogen_uptake_sla
-export deb_model, find_rate
-export load_nichemap, apply_nichemap!, apply_deb_environment!, apply_energy_balance!, apply_maestra!
+export integrate,
+       Tspan,
+       get_state1_names,
+       init_state,
+       describe,
+       paramrange,
+       runmodel!,
+       debmodel!,
+       apply_environment!
 
 export AbstractState, 
        AbstractStateE, 
        AbstractStateCN, 
-       AbstractStateCNE
+       AbstractStateCNE,
        StateV,
        StateE,
        StatePV,
@@ -87,10 +87,16 @@ export Assimilation,
        CarbonReserve,
        NitrogenReserve,
        GeneralReserve,
+       NitrogenVars,
        Params,
+       Vars,
        StateData,
        Organ,
        Organism,
-       Scenario
+       Scenario,
+       OrganState,
+       OrganismState,
+       ScenarioState
+
 
 end # module

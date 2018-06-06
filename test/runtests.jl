@@ -1,5 +1,5 @@
 Pkg.build("DynamicEnergyBudgets")
-Pkg.build("MechanisticModels")
+Pkg.build("BiophysicalModels")
 
 include("structures.jl")
-include("functions.jl")
+include("regression.jl")
