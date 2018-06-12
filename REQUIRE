@@ -1,1 +1,15 @@
 julia 0.6
+Unitful
+SimpleTraits
+Mixers
+Parameters
+MetaParameters
+Unitful
+AxisArrays
+StaticArrays
+DataFrames
+DataStructures
+SimpleRoots
+OrdinaryDiffEq
+NicheMap
+Photosynthesis

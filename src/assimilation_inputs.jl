@@ -43,40 +43,31 @@ function assimilation!(o, on)
     assimilation!(o, on, o.params.assimilation, o.state)
 end
 
-function assimilation!(o, on, f::CarbonAssimilation, u::AbstractStateCNE)::Void
-    p = o.params; v = o.vars
-    if !germinated(u.V, p.M_Vgerm) 
-        on.J[:N,:rej] = o.J[:E,:ass] = o.J[:C,:ass] = o.J[:N,:ass] = zero(o.J[1,1])
-        return nothing
-    end
+function assimilation!(o, on, f::CarbonAssimilation, u::AbstractStateCNE)
+    germinated(u.V, p.M_Vgerm) || return nothing
+    p = o.params
 
     J1_EC_ass = photosynthesis(f, o) * u.V * v.scale
-    # Rejected N-reserve from root
-    J1_EN_ass = -p.y_EN_ENT * on.J1[:N,:rej] 
+
     # Merge rejected N from root and photosynthesized C into reserves
-    (o.J[:C,:ass], o.J[:N,:ass], o.J[:E,:ass]) = 
-        synthesizing_unit(J1_EC_ass, J1_EN_ass, p.y_E_CH_NO, p.y_E_EN)
+    (o.J[:C,:ass], o.J[:N,:tra], o.J[:E,:ass]) = 
+        synthesizing_unit(J1_EC_ass, o.J[:N,:tra], p.y_E_CH_NO, p.y_E_EN)
     return nothing
 end
 
 function assimilation!(o, on, f::NH4_NO3_Assimilation, u::AbstractStateCNE)
     p = o.params
-    if !germinated(u.V, p.M_Vgerm) 
-        o.J[:E,:ass] = o.J[:C,:ass] = o.J[:N,:ass] = zero(o.J[1,1]) 
-        J[:C,:ass] = -p.y_EC_ECT * o.J1[:C,:trans]
-        return nothing
-    end
-    (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o, on)
+    germinated(u.V, p.M_Vgerm) || return nothing
 
-    J1_EC_ass = -p.y_EC_ECT * on.J1[:C,:rej] # Rejected C-reserve from shoot
+    (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o, on)
 
     θNH = J_NH_ass/J_N_ass                          # Fraction of ammonia in arriving N-flux
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
     y_E_CH = θNH * f.y_E_CH_NH + θNO * p.y_E_CH_NO  # Yield coefficient from C-reserve to reserve
 
     # Merge rejected C from shoot and uptaken N into reserves
-    (o.J[:C,:ass], o.J[:N,:ass], o.J[:E,:ass]) = 
-        synthesizing_unit(J1_EC_ass, J_N_ass, y_E_CH, 1/p.n_N_E)
+    (o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass]) = 
+        synthesizing_unit(o.J[:C,:tra], J_N_ass, y_E_CH, 1/p.n_N_E)
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     o.J[:N,:ass] = (J_NO_ass - θNO * p.n_N_E * o.J[:E,:ass]) * 1/p.n_N_EN
@@ -89,7 +80,6 @@ function uptake_nitrogen(f::Kooijman_NH4_NO3_Assimilation, o, on)
     K1_NO = half_saturation(f.K_NO, f.K_H * v.scale, f.X_H * on.vars.scale) # Nitrate saturation
     J1_NH_ass = o.state.V * v.scale * half_saturation(f.j_NH_Amax, K1_NH, f.X_NH) # Arriving ammonia mols.mol⁻¹.s⁻¹
     J_NO_ass = o.state.V * v.scale * half_saturation(f.j_NO_Amax, K1_NO, f.X_NO) # Arriving nitrate mols.mol⁻¹.s⁻¹
-
     J_N_ass = J1_NH_ass + f.ρNO * J_NO_ass # Total arriving N flux
     return (J_N_ass, J_NO_ass, J1_NH_ass)
 end

@@ -6,7 +6,7 @@ using StaticArrays
 using DataFrames
 using DataStructures
 using Unitful
-using SimpleRoots
+using Roots
 using OrdinaryDiffEq
 using Parameters
 using Mixers
@@ -17,8 +17,12 @@ using Photosynthesis
 @metaparam label ""
 @metaparam range [0.0, 1.0]
 
+const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
+const TRANS1 = [:cat, :rej, :los]
+const BI_XTOL = 1e-10u"d^-1"
+const BI_MAXITER = 100
+
 include("state.jl")
-include("constants.jl")
 include("conversions.jl")
 include("types.jl")
 include("environment.jl")

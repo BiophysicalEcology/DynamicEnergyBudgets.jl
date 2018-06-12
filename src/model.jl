@@ -8,11 +8,12 @@ Applies environment and runs the DEB model.
 function runmodel!(du, u, p, t::Number)
     organism = p.nodes[1]
     apply(setvars!, organism.nodes, t)
-    offset_apply!(setstate!, u, organism.nodes)
+    offset_apply!(setstate!, organism.nodes, u, 0)
     apply(apply_environment!, organism.nodes, p.environment, t)
+    apply(zero_flux!, organism.nodes)
 
     debmodel!(organism, t)
-    offset_apply!(sum_flux!, du, organism.nodes)
+    offset_apply!(sum_flux!, du, organism.nodes, 0)
 
     return nothing
 end
@@ -26,15 +27,20 @@ end
 
 setvars!(o, t) = o.vars = o.varsrecord[t] 
 
-setstate!(u, offset::Int, o) = begin
+zero_flux!(o) = begin
+    fill!(o.J, zero(J[1,1]))
+    fill!(o.J1, zero(J1[1,1]))
+end
+
+setstate!(o, u, offset::Int) = begin
     for i in 1:length(o.state) 
         o.state[i] = u[i+offset]
     end
     offset + length(o.state)
 end
 
-sum_flux!(du, offset::Int, o) = begin
-    for i in 1:length(o.state) 
+sum_flux!(du, o, offset::Int) = begin
+    for i in 1:size(o.J, 1) 
         du[i+offset] = sum(o.J[i,:])
     end
     offset + length(o.state)
@@ -55,8 +61,7 @@ function debmodel!(organism, t::Number)
     swapped = (Base.tail(organs)..., organs[1])
 
     apply(metabolism!, organs, t)
-    # FIXME what about rejected reserves with 1 organ?
-    length(organs) > 1 && apply(translocation!, organs, swapped)
+    apply(translocation!, organs, swapped)
     apply(assimilation!, organs, swapped)
     return nothing
 end
@@ -75,18 +80,9 @@ function metabolism!(o, t::Number)
 end
 
 """
-    translocation!(s, on)
-Some rejected reserve is translocated.
-But this grouping of functions is somewhat unsatisfying.
-"""
-function translocation!(o, on)
-    reuse_rejected_reserve!(o, on)
-    translocate!(o, on, o.state)
-    return nothing
-end
-
-"""
 Catabolism for E, C and N, or C, N and E reserves.
+
+Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u::AbstractStateCNE, t::Number)
     p = o.params; v = o.vars; J1 = o.J1
@@ -96,8 +92,10 @@ function catabolism!(o, u::AbstractStateCNE, t::Number)
     v.rate = find_rate(v, (m, scaledturnover, p.j_E_mai, p.y_E_CH_NO, p.y_E_EN, p.y_V_E, p.κsoma))
     (J1[:C,:cat], J1[:N,:cat], J1[:EE,:cat]) = 
         catabolic_fluxes(ureserve, scaledturnover, v.rate)
+
     (J1[:C,:rej], J1[:N,:rej], J1[:CN,:cat]) =
         synthesizing_unit(J1[:C,:cat], J1[:N,:cat], p.y_E_CH_NO, p.y_E_EN)
+
     J1[:E,:cat] = J1[:EE,:cat] + J1[:CN,:cat] # Total catabolic flux
     v.θE = J1[:EE,:cat]/J1[:E,:cat] # Proportion of general reserve flux in total catabolic flux
     return nothing
@@ -110,9 +108,9 @@ Growth, maturity and maintenence are grouped as dissipative processes.
 """
 function dissipation!(o, u)
     growth!(o, u)
-    maturity!(o.maturity, o, u)
+    maturity!(o.params.maturity, o, u)
     maintenence!(o, u)
-    production!(o, u)
+    product!(o, u)
     return nothing
 end
 
@@ -122,12 +120,12 @@ Allocates reserves to growth.
 """
 function growth!(o, u)
     v = o.vars; p = o.params; J = o.J; J1 = o.J1;
-    y_E_V = 1/p.y_V_E
-    J[:V,:gro] = v.rate * u.V # Growth flux
-    drain = -y_E_V * v.rate * u.V
-    reserve_drain!(J, u, :gro, drain, v.θE, p)
-    reserve_loss!(J1, J, u, :gro, 1.0)
-    J1[:E,:los] -= J[:V,:gro]
+    grow = v.rate * u.V
+    J[:V,:gro] = grow 
+    drain = -(1/p.y_V_E) * grow 
+    loss = (1/p.y_V_E - 1) * v.rate * u.V
+    reserve_drain!(o, :gro, drain, v.θE)
+    reserve_loss!(o, loss)
     return nothing
 end
 
@@ -142,19 +140,19 @@ function maturity!(f, o, u) end
     v = o.vars; p = o.params; J = o.J; J1 = o.J1;
     # TODO: why does rep maintenance stop increasing at M_Vrep?
     # Is this a half finished reproduction model?
-    # TODO: -θE * E_rep_mai here, but also θE * E_rep_mai included
-    # below in maintenance. Is this intended?
-    drain = -(p.κrep * J1[:E,:cat] + -p.j_E_rep_mai * min(u.V, p.M_Vrep))
-    reserve_drain!(J, u, :rep, drain, v.θE, p)
-    reserve_loss!(J1, J, u, :rep, 1.0)
+    drain = -(f.κrep * J1[:E,:cat] + -f.j_E_rep_mai * min(u.V, f.M_Vrep))
+    reserve_drain!(o, :rep, drain, v.θE)
+    reserve_loss!(o, -drain)
     return nothing
 end
-@traitfn function maturity!{X; StateHasM{X}}(f::Maturity, u::X)
+
+@traitfn function maturity!{X; StateHasM{X}}(f::Maturity, o, u::X)
     v = o.vars; p = o.params; J = o.J; J1 = o.J1;
     J[:M,:gro] = f.κrep * J1[:E,:cat]
-    drain = -(J[:M,:gro] + -f.j_E_rep_mai * min(u.V, f.M_Vrep))
-    reserve_drain!(J, u, :rep, drain, v.θE, p)
-    reserve_loss!(J1, J, u, :rep, 1.0)
+    maint = -f.j_E_rep_mai * u.V
+    drain = -J[:M,:gro] + maint # min(u.V, f.M_Vrep))
+    reserve_drain!(o, :rep, drain, v.θE)
+    reserve_loss!(o, -maint)
     return nothing
 end
 
@@ -163,44 +161,39 @@ end
 Allocates reserve drain due to maintenance.
 """
 function maintenence!(o, u)
-    v = o.vars; p = o.params 
-    drain = -p.j_E_mai * u.V
-    reserve_drain!(o.J, u, :mai, drain, v.θE, p)
-    reserve_loss!(o.J1, o.J, u, :mai, 1.0)
-    return nothing
+    drain = -o.params.j_E_mai * u.V
+    reserve_drain!(o, :mai, drain, o.vars.θE)
+    reserve_loss!(o, -drain) # all maintenance is loss
+    nothing
 end
 
 """
-    production!(o, u::AbstractState, θE, r)
+    product!(o, u::AbstractState, θE, r)
 Allocates waste products from growth and maintenance.
 """
-function production!(o, u)
-    p = o.params; J = o.J; J1 = o.J1;
-    J[:P,:gro] = J[:V,:gro] * p.y_P_V
-    J[:P,:mai] = u.V * p.j_P_mai
-    J1[:E,:los] -= J[:P,:gro] + J[:P,:mai]
+function product!(o, u)
+    o.J[:P,:gro] = o.J[:V,:gro] * o.params.y_P_V
+    o.J[:P,:mai] = u.V * o.params.j_P_mai
+    # undo the reserve loss from growth: it went to product
+    loss_correction = -(o.J[:P,:gro] + o.J[:P,:mai])
+    reserve_loss!(o, loss_correction)
     return nothing
 end
 
-"""
-    reuse_rejected_reserve!(o, on)
-Reallocate state rejected from synthesizing units.
 
-TODO add a 1-organs method
-Also how does this interact with assimilation?
 """
-function reuse_rejected_reserve!(o, on)
-    p = o.params; J = o.J; J1 = o.J1;
-    # This decision seems arbitrary.
-    # How would growth dynamics change if both rejected C and N were translocated?
-    # FIXME: balance this thing
-    if typeof(p.assimilation) <: CarbonAssimilation
-        J[:N,:rej] = -p.κEN * J1[:N,:rej]
-        J[:C,:rej] = (p.κEC - 1) * J1[:C,:rej]
-    elseif typeof(p.assimilation) <: NitrogenAssimilation
-        J[:C,:rej] = -p.κEC * J1[:C,:rej]
-        J[:N,:rej] = (p.κEN - 1) * J1[:N,:rej]
-    end
+    translocate!(o, on, u::AbstractState)
+Versions for E, CN and CNE reserves.
+
+Translocation is occurs between adjacent organs. 
+This function is identical both directiono, so on represents
+whichever is not the current organs. Will not run with less than 2 organs.
+
+FIXME this will be broken for organs > 2
+"""
+function translocation!(o, on)
+    reuse_rejected!(o, on)
+    translocate!(o, on)
     return nothing
 end
 
@@ -214,52 +207,61 @@ whichever is not the current organs. Will not run with less than 2 organs.
 
 FIXME this will be broken for organs > 2
 """
-translocate!(o, on, u) = nothing
-
-function translocate!(o, on, u::AbstractStateCNE)
+function translocate!(o, on)
     p = o.params; J = o.J; J1 = o.J1;
-
-    drain = -calc_κtra(p) * J1[:E,:cat]
-    reserve_drain!(J, u, :tra, drain, o.vars.θE, p)
-    reserve_loss!(J1, J, u, :tra, 1.0)
-
-    gain = p.y_E_ET * calc_κtra(on.params) * on.J1[:E,:cat]
-    J[:E,:tra] += gain
-    J1[:E,:los] -= gain
+    trans = -κtra(p) * J1[:E,:cat] # fraction of catabolised reserves translocated
+    reserve_drain!(o, :tra, trans, o.vars.θE) # drain from translocation
+    on.J[:E,:tra] += p.y_E_ET * trans # translocation to other organ
+    # rejected reserves are translocated and used in assimilation.
     return nothing
 end
 
 """
-    reserve_drain!(J, u, col, drain, θE, params)
+    reuse_rejected!(o, on)
+Reallocate state rejected from synthesizing units.
+
+TODO add a 1-organs method
+Also how does this interact with assimilation?
+"""
+function reuse_rejected!(o, on)
+    p = o.params
+    # rejected reserves are translocated and used in assimilation.
+    o.J[:C,:rej] = -o.J1[:C,:rej]
+    o.J[:N,:rej] = -o.J1[:N,:rej]
+    on.J[:C,:tra] = p.y_EC_ECT * o.J1[:C,:rej]
+    on.J[:N,:tra] = p.y_EN_ENT * o.J1[:N,:rej]
+    o.J1[:C,:los] += (1 - p.y_EC_ECT) * o.J1[:C,:rej]
+    o.J1[:N,:los] += (1 - p.y_EN_ENT) * o.J1[:N,:rej]
+    return nothing
+end
+
+"""
 Generalised reserve drain for any flux column *col* (ie :gro)
 and any combination of reserves.
 """
-function reserve_drain!(J, u::AbstractStateCNE, col, drain, θE, params)
-    J_CN = drain * (1.0 - θE)
-    J[:C,col] = J_CN/params.y_E_CH_NO
-    J[:N,col] = J_CN/params.y_E_EN
-    J[:E,col] = drain * θE
+function reserve_drain!(o, col, drain, θE)
+    J_CN = drain * (1.0 - θE) # fraction on drain from C and N reserves
+    o.J[:C,col] = J_CN/o.params.y_E_CH_NO
+    o.J[:N,col] = J_CN/o.params.y_E_EN
+    o.J[:E,col] = drain * θE
     return nothing
 end
 
 """
-    reserve_loss!(J1, J, u, col, drain, θE, params)
 Generalised reserve loss to track carbon. 
 """
-function reserve_loss!(J1, J, u::AbstractStateCNE, col, θloss)
-    J1[:C,:los] -= J[:C,col] * θloss
-    J1[:N,:los] -= J[:N,col] * θloss
-    J1[:E,:los] -= J[:E,col] * θloss
+function reserve_loss!(o, loss)
+    o.J1[:C,:los] += loss/o.params.y_E_CH_NO
+    o.J1[:N,:los] += loss/o.params.y_E_EN
     return nothing
 end
 
 """
-    calc_κtra(params::P) where P
-κtra is the difference between κsoma and κrep
+    κtra(params::P) where P
+κtra is the difference paramsbetween κsoma and κrep
 """
-calc_κtra(params) = 1.0 - params.κsoma - κrep(params)
-
-κrep(params) = typeof(params.maturity) == nothing ? 0.0 : params.maturity.κrep
+κtra(params) = 1.0 - params.κsoma - κrep(params)
+κrep(params) = :κrep in fieldnames(params.maturity) ? params.maturity.κrep : 0.0
 
 """
     find_rate(t, args)

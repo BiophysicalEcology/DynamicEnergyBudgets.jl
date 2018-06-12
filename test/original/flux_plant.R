@@ -49,7 +49,6 @@ flux_plant <- function(t, M, p){
   # global y_ES_CH_NO y_CH_ES_NO y_ER_CH_NO y_CH_ER_NO y_ER_CH_NH
   # global y_VS_ES y_ES_VS y_VR_ER y_ER_VR y_ES_ER y_ER_ES
   # global y_ES_ENS y_ENS_ES y_ER_ENR y_ENR_ER y_ENS_ENR y_ECR_ECS
-  # global kap_ECS kap_ECR kap_ENS kap_ENR kap_SS
   # global kap_SR kap_RS kap_TS kap_TR
   # global j_ES_MS j_ER_MR j_ES_JS j_PS_MS j_PR_MR y_PS_VS y_PR_VR
 

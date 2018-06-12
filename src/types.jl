@@ -92,13 +92,13 @@ abstract type AbstractScaling end
     M_Vscaling::typeof(1.0u"mol") = 400.0u"mol" | [40.0u"mol", 2000.0u"mol"] | "shoots scaling mass"
 end
 
-@label @range @with_kw struct Params{A,S,C,Fb,Al,M}
+@label @range @with_kw mutable struct Params{A,S,C,Fb,Al,M}
     assimilation::A                            = C3Photosynthesis()      | _                                               | _
     scaling::S                                 = KooijmanArea()          | _                                               | _
     tempcorr::C                                = TempCorrLowerUpper()    | _                                               | _
     feedback::Fb                               = Autophagy()             | _                                               | _
     allometry::Al                              = SqrtAllometry()         | _                                               | _
-    maturity::M                                = nothing                 | _ | _ 
+    maturity::M                                = Maturity()              | _                                               | _ 
     κsoma::Float64                             = 0.6                     | [0.0, 1.0]                                      | "reserve flux allocated to growth"
     #
     M_Vgerm::typeof(1.0u"mol")                 = 0.5u"mol"               | _                                               | "structural mass at germination"
@@ -111,30 +111,34 @@ end
     y_E_ET::typeof(1.0u"mol*mol^-1")           = 0.8u"mol*mol^-1"        | _                                               | "translocated reserve:"
     y_EC_ECT::typeof(1.0u"mol*mol^-1")         = 1.0u"mol*mol^-1"        | _                                               | "translocated C-reserve"
     y_EN_ENT::typeof(1.0u"mol*mol^-1")         = 1.0u"mol*mol^-1"        | _                                               | "translocated N-reserve"
-    y_E_CH_NO::typeof(1.0u"mol*mol^-1")        = 1.5u"mol*mol^-1"        | _                                               | "from C-reserve to reserve, using nitrate" # 0.75 EC per E.
-    y_E_EN::typeof(1.0u"mol*mol^-1")           = 0.5u"mol*mol^-1"        | _                                               | "from N-reserve to reserve: 2 EN per E"
     #
+    k_E::typeof(1.0u"mol*mol^-1*d^-1")         = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "reserve turnover rate"
+    k_EC::typeof(1.0u"mol*mol^-1*d^-1")        = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "C-reserve turnover rate"
+    k_EN::typeof(1.0u"mol*mol^-1*d^-1")        = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "N-reserve turnover rate"
+
+    # What do thes actually simulate in a plant? why would non-processes reserve be lost? here and during translocation?
+    κEC::typeof(1.0)                           = 0.2                     | [0.0, 1.0]                                      | "non-processed C-reserve returned to C-reserve"
+    κEN::typeof(1.0)                           = 0.5                     | [0.0, 1.0]                                      | "non-processed N-reserve returned to N-reserve"
+
+    # These all really have to be the same for all organs
+    # They probably have to be the same in P/V/M and E or the math is broken
     n_N_P::typeof(1.0u"mol*mol^-1")            = 0.0u"mol*mol^-1"        | _                                               | "N/C in product (wood)"
     n_N_V::typeof(1.0u"mol*mol^-1")            = 0.15u"mol*mol^-1"       | _                                               | "N/C in structure" # Shouldnt this be identical to the reserve?
     n_N_EC::typeof(1.0u"mol*mol^-1")           = 0.0u"mol*mol^-1"        | _                                               | "N/C in C-reserve"
     n_N_EN::typeof(1.0u"mol*mol^-1")           = 10.0u"mol*mol^-1"       | _                                               | "N/C in N-reserve"
     n_N_E::typeof(1.0u"mol*mol^-1")            = 0.2u"mol*mol^-1"        | _                                               | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
 
-    k_E::typeof(1.0u"mol*mol^-1*d^-1")         = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "reserve turnover rate"
-    k_EC::typeof(1.0u"mol*mol^-1*d^-1")        = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "C-reserve turnover rate"
-    k_EN::typeof(1.0u"mol*mol^-1*d^-1")        = 0.2u"mol*mol^-1*d^-1"   | [0.0u"mol*mol^-1*d^-1", 1.0u"mol*mol^-1*d^-1"]  | "N-reserve turnover rate"
-
-    κEC::typeof(1.0)                           = 0.2                     | [0.0, 1.0]                                      | "non-processed C-reserve returned to C-reserve"
-    κEN::typeof(1.0)                           = 0.5                     | [0.0, 1.0]                                      | "non-processed N-reserve returned to N-reserve"
-
     w_P::typeof(1.0u"g*mol^-1")                = 25.0u"g*mol^-1"         | _                                               | "mol-weight of shoot product (wood)"
     w_V::typeof(1.0u"g*mol^-1")                = 25.0u"g*mol^-1"         | _                                               | "mol-weight of shoot structure"
     w_C::typeof(1.0u"g*mol^-1")                = 25.0u"g*mol^-1"         | _                                               | "mol-weight of shoot C-reserve"
     w_N::typeof(1.0u"g*mol^-1")                = 25.0u"g*mol^-1"         | _                                               | "mol-weight of shoot N-reserve"
     w_E::typeof(1.0u"g*mol^-1")                = 25.0u"g*mol^-1"         | _                                               | "mol-weight of shoot reserve"
+
+    y_E_CH_NO::typeof(1.0u"mol*mol^-1")        = 1.5u"mol*mol^-1"        | _                                               | "from C-reserve to reserve, using nitrate" # 0.75 EC per E.
+    y_E_EN::typeof(1.0u"mol*mol^-1")           = 0.5u"mol*mol^-1"        | _                                               | "from N-reserve to reserve: 2 EN per E"
 end
 
-@with_kw mutable struct Maturity
+@label @range @with_kw mutable struct Maturity
     j_E_rep_mai::typeof(1.0u"mol*mol^-1*d^-1") = 0.001u"mol*mol^-1*d^-1" | [0.0u"mol*mol^-1*d^-1", 0.01u"mol*mol^-1*d^-1"] | "shoots spec maturity maint costs "
     κrep::typeof(1.0)                          = 0.05                    | [0.0, 1.0]                                      | "shoots reserve flux allocated to development/reprod."
     M_Vrep::typeof(1.0u"mol")                  = 10.0u"mol"              | _                                               | "shoots structural mass at start reproduction" # TODO: isn't this variable/seasonally triggered?
