@@ -30,6 +30,7 @@ include("assimilation_inputs.jl")
 include("model.jl")
 include("functions.jl")
 include("apply.jl")
+include("setup.jl")
 
 export tempcorr,
        rate_bracket,
@@ -68,15 +69,15 @@ export AbstractState,
        StatePVCNE,
        StatePVMCNE
 
-export Assimilation,
-       CarbonAssimilation,
-       NitrogenAssimilation,
+export AbstractAssimilation,
+       AbstractCarbonAssimilation,
+       AbstractNitrogenAssimilation,
        NH4_NO3_Assimilation,
-       KooijmanPhotosynthesis,
+       N_Assimilation,
        C3Photosynthesis,
+       KooijmanPhotosynthesis,
        KooijmanSLAPhotosynthesis,
        Kooijman_NH4_NO3_Assimilation,
-       KooijmanSLA_NH4_NO3_Assimilation,
        AbstractStateFeedback,
        Autophagy,
        AbstractTempCorr,
@@ -91,8 +92,10 @@ export Assimilation,
        CarbonReserve,
        NitrogenReserve,
        GeneralReserve,
+       CarbonVars,
        NitrogenVars,
        Params,
+       SharedParams,
        Vars,
        StateData,
        Organ,
@@ -101,6 +104,5 @@ export Assimilation,
        OrganState,
        OrganismState,
        ScenarioState
-
 
 end # module

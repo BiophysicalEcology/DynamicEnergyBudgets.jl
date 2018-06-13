@@ -6,4 +6,8 @@ else
     using Test
 end
 
+include("setup.jl")
+include("math.jl")
 include("balance.jl")
+include("assimilation.jl")
+include("diffeq.jl")

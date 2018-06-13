@@ -5,7 +5,7 @@
 DEB tempcorr function. Uses lower and uppper bounds if they are supplied.
 Temperatures all in Kelvins.
 """
-tempcorr(t, tc) = 1.0
+tempcorr(t, tc::Void) = 1.0
 tempcorr(t, tc::AbstractTempCorr) = tempcorr(t |> u"K", getfield.(tc, fieldnames(tc))...)
 tempcorr(t, t1, a) = exp(a/t1 - a/t)
 tempcorr(t, t1, a, l, al) = 
@@ -13,22 +13,6 @@ tempcorr(t, t1, a, l, al) =
 tempcorr(t, t1, a, l, al, h, ah) = 
     exp(a/t1 - a/t) * (1.0 + exp(al/t1 - al/l) + exp(ah/h - ah/t1)) / 
     (1.0 + exp(al/t - al/l) + exp(ah/h - ah/t))
-
-"""
-Get bracket of possible rates with CN or CNE rserves
-Calculated for y_E_CH_NO and y_E_EN -> ∞
-"""
-function rate_bracket(ureserve::NTuple{2}, A_turnover::NTuple{2}, args::Vararg)::NTuple{2}
-    rate_bracket((ureserve[1], ureserve[2], 0.0), (A_turnover[1], A_turnover[2], 0.0), args...)
-end
-function rate_bracket(ureserve::NTuple{3}, A_turnover::NTuple{3}, 
-                     j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)::NTuple{2}
-    # Calculate the limits of the rate_formula function when C or N → ∞
-    (uEC, uEN, uE) = ureserve
-    (AEC, AEN, AE) = A_turnover
-    lim(y) = (uE * AE + uEC * AEC - j_E_mai/(κsoma * y))/(1/(y_V_E * κsoma * y) + uE + uEC * y)
-    (lim(y_E_EN), lim(y_E_CH_NO))
-end
 
 """
     rate_formula(r, ureserve::NTuple, A_turnover::NTuple, j_E_mai, y_V_E, κsoma)
@@ -47,9 +31,6 @@ Returns the current catabolic flux at rate r,
 or the flux as a proportion of u[V], depending on ureserve values.
 """
 catabolic_fluxes(ureserve, A_turnover, r) = ureserve .* (A_turnover .- r)
-
-###############################################
-# Stoichiometry
 
 """
     half_saturation(x, half, max)
