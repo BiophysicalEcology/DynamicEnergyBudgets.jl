@@ -12,9 +12,9 @@ function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCN
 
     J1_EC_ass = photosynthesis(f, o1, o2)
 
-    o1.J[:C,:ass] = J1_EC_ass 
+    o1.J[:C,:ass] = J1_EC_ass
     # Merge rejected N from root and photosynthesized C into reserves
-    (o1.J[:C,:ass], o1.J[:N,:tra], o1.J[:E,:ass]) = 
+    (o1.J[:C,:ass], o1.J[:N,:tra], o1.J[:E,:ass]) =
         synthesizing_unit(J1_EC_ass, o1.J[:N,:tra], o1.shared.y_E_CH_NO, o1.shared.y_E_EN)
 
     return nothing
@@ -30,7 +30,7 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateC
     y_E_CH = θNH * f.y_E_CH_NH + θNO * o1.shared.y_E_CH_NO  # Yield coefficient from C-reserve to reserve
 
     # Merge rejected C from shoot and uptaken N into reserves
-    (o1.J[:C,:tra], o1.J[:N,:ass], o1.J[:E,:ass]) = 
+    (o1.J[:C,:tra], o1.J[:N,:ass], o1.J[:E,:ass]) =
         synthesizing_unit(o1.J[:C,:tra], J_N_ass, y_E_CH, 1/o1.shared.n_N_E)
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
@@ -41,11 +41,16 @@ end
 function assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
     germinated(u.V, o1.params.M_Vgerm) || return nothing
 
-    J_N_ass = uptake_nitrogen(f, o1, o2)
+    J_N_assim = uptake_nitrogen(f, o1, o2)
 
     # Merge rejected C from shoot and uptaken N into reserves
-    (o1.J[:C,:tra], o1.J[:N,:ass], o1.J[:E,:ass]) = 
-        synthesizing_unit(o1.J[:C,:tra], J_N_ass, o1.shared.y_E_CH_NO, 1/o1.shared.n_N_E)
+    (o1.J[:C,:tra], o1.J[:N,:ass], o1.J[:E,:ass]) =
+        synthesizing_unit(o1.J[:C,:tra], J_N_assim, o1.shared.y_E_CH_NO, 1/o1.shared.n_N_E)
+
+    # This was not in the orignal model, but is needed to balance C. N reserve is part C
+    # but incoming N is just N. C is being generated from nowhere in equation above.
+    # TODO: But this could end up with a negative C reserve!
+    # o1.J[:C,:ass] = -J_N_assim / o1.shared.n_N_E
 
     return nothing
 end
@@ -78,7 +83,7 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
 
     j_c_intake / (1 + bound_c + bound_o + co_l) * o1.state.V * v.scale
 end
- 
+
 """
 Returns nitrogen assimilated in mols per time.
 """

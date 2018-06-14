@@ -133,6 +133,7 @@ end
     J_L_F::typeof(1.0u"mol*m^-2*s^-1") = watts_to_light_mol(800.0)u"mol*m^-2*s^-1"     #| _ | "flux of useful photons"
     X_C::typeof(1.0u"mol*L^-1") = fraction_per_litre_gas_to_mols(400.0/1e6)u"mol*L^-1" #| _ | "carbon dioxide @ 400ppm"
     X_O::typeof(1.0u"mol*L^-1") = fraction_per_litre_gas_to_mols(0.21)u"mol*L^-1"      #| _ | "oxygen (21% volume in air) "
+    tair::typeof(1.0u"°C") = 25.0u"°C"
 end
 
 @with_kw mutable struct NitrogenVars

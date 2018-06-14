@@ -84,7 +84,7 @@ Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u::AbstractStateCNE, t::Number)
-    p = o.params; sh = o.shared; v = o.vars; J1 = o.J1;
+    p, v, u, sh, J, J1 = components(o); va = v.assimilation;
     scaledturnover = (v.k_EC, v.k_EN, v.k_E) .* v.scale
     ureserve = (u.C, u.N, u.E)
     m = ureserve ./ u.V
@@ -119,7 +119,7 @@ end
 Allocates reserves to growth.
 """
 function growth!(o, u)
-    v = o.vars; p = o.params; J = o.J; J1 = o.J1;
+    p, v, u, sh, J, J1 = components(o)
     grow = v.rate * u.V
     J[:V,:gro] = grow 
     drain = -(1/p.y_V_E) * grow 
@@ -137,7 +137,7 @@ Stores in M state variable if it exists.
 function maturity!(f, o, u) end
 
 @traitfn function maturity!{X; !StateHasM{X}}(f::Maturity, o, u::X)
-    v = o.vars; p = o.params; J = o.J; J1 = o.J1;
+    p, v, u, sh, J, J1 = components(o)
     # TODO: why does rep maintenance stop increasing at M_Vrep?
     # Is this a half finished reproduction model?
     drain = -(f.κrep * J1[:E,:cat] + -v.j_E_rep_mai * min(u.V, f.M_Vrep))
@@ -147,7 +147,7 @@ function maturity!(f, o, u) end
 end
 
 @traitfn function maturity!{X; StateHasM{X}}(f::Maturity, o, u::X)
-    v = o.vars; p = o.params; J = o.J; J1 = o.J1;
+    p, v, u, sh, J, J1 = components(o)
     J[:M,:gro] = f.κrep * J1[:E,:cat]
     maint = -v.j_E_rep_mai * u.V
     drain = -J[:M,:gro] + maint # min(u.V, f.M_Vrep))
@@ -172,10 +172,11 @@ end
 Allocates waste products from growth and maintenance.
 """
 function product!(o, u)
-    o.J[:P,:gro] = o.J[:V,:gro] * o.params.y_P_V
-    o.J[:P,:mai] = u.V * o.vars.j_P_mai
+    p, v, u, sh, J, J1 = components(o)
+    J[:P,:gro] = J[:V,:gro] * p.y_P_V
+    J[:P,:mai] = u.V * v.j_P_mai
     # undo the reserve loss from growth: it went to product
-    loss_correction = -(o.J[:P,:gro] + o.J[:P,:mai])
+    loss_correction = -(J[:P,:gro] + J[:P,:mai])
     reserve_loss!(o, loss_correction)
     return nothing
 end
@@ -304,8 +305,13 @@ although this may not make sense.
 germinated(M_V, M_Vgerm) = M_V > M_Vgerm 
 
 
-allometric_height(f::SqrtAllometry, p, u) = 
-    sqrt((u.P * p.w_P + u.V * p.w_V) / oneunit(u.V*p.w_V)) * f.scale
+allometric_height(f::SqrtAllometry, o) = begin
+    p, v, u, sh = components(o)
+    dim = oneunit(u.V * sh.w_V)
+    sqrt((u.P * sh.w_P + u.V * sh.w_V) / dim) * f.scale
+end
+    
+components(o::Organ) = o.params, o.vars, o.state, o.shared, o.J, o.J1
 
 # J: Flux matrix diagram.
 # Rows: state.

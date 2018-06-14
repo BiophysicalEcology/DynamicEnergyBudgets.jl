@@ -146,8 +146,9 @@ end
         c_loss = sum_C_loss(o1, o2)
         n_loss = sum_N_loss(o1, o2)
         @test -c_loss != zero(c_loss)
-        @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO ≈ -c_loss
-        @test upreferred(m1 + m2 + (N1 + N2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n/o1.shared.n_N_E
+        @test upreferred(m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
+        @test upreferred(m1 + m2 + (N1 + N2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n /o1.shared.n_N_E
+
     end
 end
 
@@ -259,7 +260,7 @@ end
 
         @test C1a != C1 # Assimilation should have added some C
         @test C2a == C2
-        @test_broken N1a == N1 # Assimilation shouldnt have added any N
+        @test N1a == N1 # Assimilation shouldnt have added any N
         @test N2a == N2
         @test m1 != m1a # Assimilation should have added some reserve
         @test m2 == m2a
