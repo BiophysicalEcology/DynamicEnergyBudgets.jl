@@ -106,8 +106,8 @@ end
     # They probably have to be the same in P/V/M and E or the math is broken
     n_N_P::typeof(1.0u"mol*mol^-1")        = 0.0u"mol*mol^-1"        | _                             | "N/C in product (wood)"
     n_N_V::typeof(1.0u"mol*mol^-1")        = 0.15u"mol*mol^-1"       | _                             | "N/C in structure" # Shouldnt this be identical to the reserve?
-    n_N_EC::typeof(1.0u"mol*mol^-1")       = 0.0u"mol*mol^-1"        | _                             | "N/C in C-reserve"
-    n_N_EN::typeof(1.0u"mol*mol^-1")       = 10.0u"mol*mol^-1"       | _                             | "N/C in N-reserve"
+    # If this > 0 it needs to be used in the model, but its not. n_N_C::typeof(1.0u"mol*mol^-1") = 0.0u"mol*mol^-1"        | _                             | "N/C in C-reserve"
+    n_N_N::typeof(1.0u"mol*mol^-1")        = 10.0u"mol*mol^-1"       | _                             | "N/C in N-reserve"
     n_N_E::typeof(1.0u"mol*mol^-1")        = 0.2u"mol*mol^-1"        | _                             | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
 
     w_P::typeof(1.0u"g*mol^-1")            = 25.0u"g*mol^-1"         | _                             | "mol-weight of shoot product (wood)"

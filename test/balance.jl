@@ -15,6 +15,11 @@ end
 sumstate(du, u::StatePVMCNE) = sum(du[[1,2,3,6]]), du[4], du[5]
 sumstate(du, u::StatePVCNE) = sum(du[[1,2,5]]), du[3], du[4]
 
+sum_C_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
+sum_N_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+sum_C_loss(o) = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
+sum_N_loss(o) = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+
 function factory()
     o = Organ()
     p = o.params
@@ -41,8 +46,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -57,8 +62,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -73,8 +78,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -91,8 +96,8 @@ end
     du
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -120,8 +125,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -136,8 +141,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -151,8 +156,8 @@ end
     sumflux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
-    c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
-    n_loss = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
+    c_loss = sum_C_loss(o)
+    n_loss = sum_N_loss(o)
     @test -c_loss != zero(c_loss)
     @test m + C * o.shared.y_E_CH_NO ≈ -c_loss
     @test m + N * o.shared.y_E_EN ≈ -n_loss
@@ -177,8 +182,8 @@ end
     m1, C1, N1 = sumstate(du1, u1)
     m2, C2, N2 = sumstate(du2, u2)
 
-    c_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
-    n_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+    c_loss = sum_C_loss(o1, o2)
+    n_loss = sum_N_loss(o1, o2)
     @test -c_loss != zero(c_loss)
     @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO ≈ -c_loss
     @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN ≈ -n_loss
@@ -201,8 +206,8 @@ end
     m1, C1, N1 = sumstate(du1, u1)
     m2, C2, N2 = sumstate(du2, u2)
 
-    c_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
-    n_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+    c_loss = sum_C_loss(o1, o2)
+    n_loss = sum_N_loss(o1, o2)
     @test -c_loss != zero(c_loss)
     @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO == -c_loss
     @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN == -n_loss

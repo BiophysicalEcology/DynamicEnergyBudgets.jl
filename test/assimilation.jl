@@ -13,6 +13,9 @@ end
 sumstate(du, u::StatePVMCNE) = sum(du[[1,2,3,6]]), du[4], du[5]
 sumstate(du, u::StatePVCNE) = sum(du[[1,2,5]]), du[3], du[4]
 
+sum_C_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
+sum_N_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+
 function Nfactory()
     o1 = Organ(vars=Vars(assimilation=NitrogenVars()));;
     p1 = o1.params
@@ -133,18 +136,18 @@ end
         m1, C1, N1 = sumstate(du1, u1)
         m2, C2, N2 = sumstate(du2, u2)
 
-        @test_broken C1a == C1 # Assimilation should nor have added any C
+        @test_broken C1a == C1 # Assimilation should not have added any C
         @test C2a == C2
         @test N1a != N1 # Assimilation should have added some N
         @test N2a == N2
         @test m1 != m1a # Assimilation should have added some reserve
         @test m2 == m2a
 
-        c_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
-        n_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+        c_loss = sum_C_loss(o1, o2)
+        n_loss = sum_N_loss(o1, o2)
         @test -c_loss != zero(c_loss)
         @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO ≈ -c_loss
-        @test_broken upreferred(m1 + m2 + (N1 + N2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n
+        @test upreferred(m1 + m2 + (N1 + N2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n/o1.shared.n_N_E
     end
 end
 
@@ -245,9 +248,9 @@ end
         o1.J1[:N,:rej] = 2.4oneunit(o1.J1[1,1])
         o2.J1[:N,:rej] = 2.9oneunit(o2.J1[1,1])
 
-        uptake_c = photosynthesis(f, o1, o2)
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
+        uptake_c = photosynthesis(f, o1, o2)
         assimilation!(f, o1, o2, u1)
         sumflux!(du1, o1, 0)
         sumflux!(du2, o2, 0)
@@ -261,10 +264,10 @@ end
         @test m1 != m1a # Assimilation should have added some reserve
         @test m2 == m2a
 
-        c_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
-        n_loss = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+        c_loss = sum_C_loss(o1, o2)
+        n_loss = sum_N_loss(o1, o2)
         @test -c_loss != zero(c_loss)
-        @test_broken upreferred(m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss + uptake_c)
+        @test upreferred(m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss + uptake_c * o1.shared.y_E_CH_NO)
         @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN ≈ -n_loss
 
     end
