@@ -8,8 +8,8 @@ Unitful
 AxisArrays
 StaticArrays
 DataFrames
-DataStructures
 Roots
 OrdinaryDiffEq
 Microclimate
 Photosynthesis
+DocStringExtensions
