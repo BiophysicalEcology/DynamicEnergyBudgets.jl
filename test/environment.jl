@@ -45,3 +45,9 @@ end
     @test va.soilmoist == 0.7
     @test va.swp == 100.0u"Pa"
 end
+
+@testset "temperature correction" begin
+    o = Organism()
+    @test tempcorr(80.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
+    @test tempcorr(-60.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
+end
