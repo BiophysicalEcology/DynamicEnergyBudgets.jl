@@ -27,9 +27,9 @@ matrix:
 
 ## uncomment the following lines to override the default test script
 script:
-  - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/MetaParameters.jl.git"); Pkg.build("MetaParameters")'
-  - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/Photosynthesis.jl.git"); Pkg.build("Photosynthesis")'
-  - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/Microclimate.jl.git"); Pkg.build("Microclimate")'
+  - julia -e 'Pkg.clone("https://github.com/rafaqz/MetaParameters.jl.git"); Pkg.build("MetaParameters")'
+  - julia -e 'Pkg.clone("https://github.com/rafaqz/Photosynthesis.jl.git"); Pkg.build("Photosynthesis")'
+  - julia -e 'Pkg.clone("https://github.com/rafaqz/Microclimate.jl.git"); Pkg.build("Microclimate")'
   - julia -e 'Pkg.clone(pwd()); Pkg.build("DynamicEnergyBudgets"); Pkg.test("DynamicEnergyBudgets"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
