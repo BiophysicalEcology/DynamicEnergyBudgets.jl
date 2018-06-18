@@ -9,7 +9,7 @@ AxisArrays
 StaticArrays
 DataFrames
 DataStructures
-SimpleRoots
+Roots
 OrdinaryDiffEq
 NicheMap
 Photosynthesis
