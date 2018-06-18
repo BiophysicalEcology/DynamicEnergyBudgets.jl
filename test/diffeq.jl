@@ -1,5 +1,7 @@
 using OrdinaryDiffEq
 
+Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
+
 @testset "diffeq works" begin
     # TODO test some actual results
     environment = nothing

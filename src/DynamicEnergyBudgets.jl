@@ -38,6 +38,8 @@ using SimpleTraits,
     $(DOCSTRING)
     """
 
+Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
+
 const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
 const TRANS1 = [:cat, :rej, :los]
 const BI_XTOL = 1e-10u"d^-1"
