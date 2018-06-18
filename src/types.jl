@@ -185,7 +185,7 @@ end
 end
 
 " Basic model components. For a plants, organs might be roots, shoots and leaves "
-mutable struct Organ{S,P,SH,V,F,F1,T,VR,FB,F1B}
+mutable struct Organ{S,P,SH,V,F,F1}
     state::S
     name::Symbol
     params::P
@@ -196,7 +196,7 @@ mutable struct Organ{S,P,SH,V,F,F1,T,VR,FB,F1B}
 end
 
 " Records of variables and flux for ploting and analysis "
-struct Records{T,V,F,F1}
+struct Records{V,F,F1}
     vars::V
     J::F
     J1::F1

@@ -1,17 +1,17 @@
 const water_fraction_to_M = 1.0u"m^3*m^-3" * 1u"kg*L^-1" / 18.0u"g*mol^-1"
 
 get_environment(::Type{Val{:soiltemperature}}, env::MicroclimateData, h, i) = 
-    niche_interpolate(interp, env.soil, i) * u"°C"
+    layer_interpolate(interp, env.soil, i) * u"°C"
 get_environment(::Type{Val{:watercontent}}, env::MicroclimateData, h, i) =
-    niche_interpolate(interp, env.soilmoist, i)
+    layer_interpolate(interp, env.soilmoist, i)
 get_environment(::Type{Val{:waterpotential}}, env::MicroclimateData, h, i) = 
-    niche_interpolate(interp, env.soilmoist, i) * u"Pa"
+    layer_interpolate(interp, env.soilmoist, i) * u"Pa"
 get_environment(::Type{Val{:airtemperature}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:TALOC], i) * u"°C"
 get_environment(::Type{Val{:windspeed}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:VLOC], i) * u"m*s^-1"
 get_environment(::Type{Val{:relhumidity}}, env::MicroclimateData, h, i) =
-    niche_interpolate(interp, env.humid, i)
+    layer_interpolate(interp, env.humid, i)
 get_environment(::Type{Val{:radition}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:SOLR], i) * u"W*m^-2"
 get_environment(::Type{Val{:par}}, env::MicroclimateData, h, i) =
@@ -27,7 +27,7 @@ apply_environment!(o, a::AbstractCarbonAssimilation, env, t) = begin
     p, v, u = components(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o)
-    interp = niche_setup(o.vars.height)
+    interp = layer_setup(o.vars.height)
 
     va.tair = get_environment(Val{:airtemperature}, env, h, pos)
     va.windspeed = get_environment(Val{:windspeed}, env, h, pos)
@@ -60,7 +60,7 @@ apply_environment!(o, a::AbstractNitrogenAssimilation, env, t) = begin
     p, v, u = components(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o)
-    interp = niche_setup(v.height)
+    interp = layer_setup(v.height)
     va.temp = get_environment(Val{:soiltemperature}, env, h, pos)
     va.X_H = get_environment(Val{:soilwatercontent}, env, h, pos) * water_fraction_to_M
 

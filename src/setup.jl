@@ -5,24 +5,21 @@ Organ(; state = StatePVMCNE(),
         name = :Shoot,
         params = Params(),
         shared = SharedParams(),
-        vars = Vars(),
-        time = 0u"hr":1u"hr":1000u"hr"
+        vars = Vars()
      ) = begin
 
     J = build_flux(fieldnames(state), TRANS)
     J1 = build_flux(get_state1_names(state), TRANS1)
-    Organ(state, name, params, shared, vars, J, J1, time, varsrecord, Jrecord, J1record)
+    Organ(state, name, params, shared, vars, J, J1)
 end
 
 """
 Outer construtor for defaults, without J and J1
 """
-Organism(; records = nothing,
+Organism(; time = 0u"hr":1u"hr":1000u"hr",
            shared = SharedParams(),
-           nodes = (Organ(time=time), 
-                    Organ(time=time,
-                          params=Params(assimilation=Kooijman_NH4_NO3Assimilation()),
-                          vars=Vars(assimilation=NitrogenVars())))) = begin
+           nodes = (Organ(), Organ(params=Params(assimilation=N_Assimilation()), 
+                                   vars=Vars(assimilation=NitrogenVars())))) = begin
     records = []
     for organ in nodes
         organ.shared = shared
@@ -35,7 +32,7 @@ end
 Records(o::Organ, time) = begin
     Jrec = build_record(build_J(o.state), time)
     J1rec = build_record(build_J1(o.state), time)
-    varsrec = build_record(vars, time)
+    varsrec = build_record(o.vars, time)
     Records(varsrec, Jrec, J1rec)
 end
 

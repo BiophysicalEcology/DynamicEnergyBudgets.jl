@@ -1,5 +1,6 @@
+using Revise
 using DynamicEnergyBudgets
-using DynamicEnergyBudgets: build_axis, setflux!, sumflux!, offset_apply!, setstate!
+using DynamicEnergyBudgets: Records, build_record, build_flux, set_cur_records!, sumflux!, offset_apply!, setstate!
 using AxisArrays
 using Unitful
 
@@ -9,9 +10,9 @@ else
     using Test
 end
 
-@testset "build axis arrays" begin
+@testset "build records" begin
     time=0u"hr":1u"hr":10u"hr"
-    a = build_axis([:one,:two], [:A,:B], time)
+    a = build_record(build_flux([:one,:two], [:A,:B]), time)
     @test axisnames(a) == (:time,)
     @test axisvalues(a) == (0u"hr":1u"hr":10u"hr",)
     @test axisnames(a[1]) == (:state, :transformations)
@@ -21,25 +22,29 @@ end
     a[1][:one,:A] = 10.0u"mol/hr"
     @test a[0.0u"hr"][:one,:A] == 10.0u"mol/hr"
     @test a[1.0u"hr"][:one,:A] == 0.0u"mol/hr"
+    o = Organ()
+    Records(o, time)
 end
 
 @testset "setflux" begin
     o = Organism();
+    apply(set_cur_records!, o.nodes, o.records, 1)
+    rec = o.records[1];
     or = o.nodes[1];
     @test or.J[1,1] == zero(or.J[1,1])
-    @test or.Jrecord[1][1,1] == zero(or.J[1,1])
+    @test rec.J[1][1,1] == zero(or.J[1,1])
 
     or.J[1,1] = 10oneunit(or.J[1,1])
     @test or.J[1,1] == 10oneunit(or.J[1,1])
-    @test or.Jrecord[1][1,1] == 10oneunit(or.J[1,1])
+    @test rec.J[1][1,1] == 10oneunit(or.J[1,1])
 
-    apply(setflux!, o.nodes, 5u"hr")
+    apply(set_cur_records!, o.nodes, o.records, 5u"hr")
     or.J[1,1] = 20oneunit(or.J[1,1])
     @test or.J[1,1] == 20oneunit(or.J[1,1])
-    @test or.Jrecord[5u"hr"][1,1] == 20oneunit(or.J[1,1])
+    @test rec.J[5u"hr"][1,1] == 20oneunit(or.J[1,1])
     or.J1[1,1] = 40oneunit(or.J1[1,1])
     @test or.J1[1,1] == 40oneunit(or.J[1,1])
-    @test or.J1record[5u"hr"][1,1] == 40oneunit(or.J1[1,1])
+    @test rec.J1[5u"hr"][1,1] == 40oneunit(or.J1[1,1])
 end
 
 @testset "sumflux" begin

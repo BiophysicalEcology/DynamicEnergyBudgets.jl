@@ -46,6 +46,8 @@ function debmodel!(organs, t::Number)
     return nothing
 end
 
+set_scaling!(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
+
 """
 Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
@@ -57,8 +59,6 @@ function metabolism!(o, t::Number)
     feedback!(o, o.shared.feedback, o.state)
     return nothing
 end
-
-set_scaling(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
 
 """
     catabolism!(o, u::AbstractStateCNE, t::Number)
