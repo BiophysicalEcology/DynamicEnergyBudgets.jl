@@ -1,21 +1,43 @@
+"""
+This is a generalised DEB model. It was developed for plant modelling, but can potentially 
+model any organisms and symbioses.
+
+This model can also be run in microclimates provided by the NicheMapr R package, and
+can use wide a range of photosynthesis and stomatal conductance formulations from
+[Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
+
+It is also an in-progress attempt at using Julia's multiple-dispatch methods to
+abstract and generalise DEB theory and maintain a short, maintainable codebase
+for multiple models - potentially any organism.
+
+Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M)
+plant model by Bas Kooijman.
+"""
 module DynamicEnergyBudgets
 
-using SimpleTraits
-using AxisArrays
-using StaticArrays
-using DataFrames
-using DataStructures
-using Unitful
-using Roots
-using OrdinaryDiffEq
-using Parameters
-using Mixers
-using MetaParameters
-using NicheMap
-using Photosynthesis
+using SimpleTraits,
+      AxisArrays,
+      StaticArrays,
+      DataFrames,
+      DataStructures,
+      Unitful,
+      Roots,
+      OrdinaryDiffEq,
+      Parameters,
+      Mixers,
+      MetaParameters,
+      NicheMap,
+      Photosynthesis,
+      DocStringExtensions
 
 @metaparam label ""
 @metaparam range [0.0, 1.0]
+
+@template TYPES =
+    """
+    $(TYPEDEF)
+    $(DOCSTRING)
+    """
 
 const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
 const TRANS1 = [:cat, :rej, :los]

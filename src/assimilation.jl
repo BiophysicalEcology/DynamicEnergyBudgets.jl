@@ -1,12 +1,15 @@
 """
-Runs assimilation methods, depending on formulation.
+    assimilation!(o1, o2)
+Runs assimilation methods, depending on formulation and state.
 """
-function assimilation! end
-
 function assimilation!(o1, o2)
     assimilation!(o1.params.assimilation, o1, o2, o1.state)
 end
 
+"""
+    assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCNE)
+Runs nitrogen uptake, and combines N with translocated C.
+"""
 function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCNE)
     germinated(u.V, o1.params.M_Vgerm) || return nothing
 
@@ -20,6 +23,11 @@ function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCN
     return nothing
 end
 
+"""
+    assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateCNE)
+Runs nitrogen uptake for nitrate and ammonia, and combines N with translocated C.
+Unused ammonia is discarded.
+"""
 function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateCNE)
     germinated(u.V, o1.params.M_Vgerm) || return nothing
 
@@ -38,6 +46,10 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateC
     return nothing
 end
 
+"""
+    assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
+Runs nitrogen uptake, and combines N with translocated C.
+"""
 function assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
     germinated(u.V, o1.params.M_Vgerm) || return nothing
 
@@ -56,14 +68,17 @@ function assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
 end
 
 """
+    photosynthesis(f::C3Photosynthesis, o1, o2)
 Returns carbon assimilated in mols per time.
 """
-function photosynthesis end
-
 function photosynthesis(f::C3Photosynthesis, o1, o2)
     o1.vars.assimilation.aleaf * f.SLA * o1.params.w_V * o1.state.V
 end
 
+"""
+    photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
+Returns carbon assimilated in mols per time.
+"""
 function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
     v = o1.vars; va = v.assimilation
     mass_area_coef = o1.shared.w_V * f.SLA
@@ -85,7 +100,8 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
 end
 
 """
-Returns nitrogen assimilated in mols per time.
+    uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)
+Returns total nitrogen, nitrate and ammonia assimilated in mols per time.
 """
 function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)
     p = o1.params; v = o1.vars; va = v.assimilation
@@ -100,6 +116,7 @@ function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)
 end
 
 """
+    uptake_nitrogen(f::N_Assimilation, o1, o2)
 Returns nitrogen assimilated in mols per time.
 """
 function uptake_nitrogen(f::N_Assimilation, o1, o2)

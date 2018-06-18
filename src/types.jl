@@ -1,16 +1,22 @@
+" Assimilation "
 abstract type AbstractAssimilation end
+" Paraent of all Carbon assimilation types"
 abstract type AbstractCarbonAssimilation <: AbstractAssimilation end
+" Paraent of all Nitrogen assimilation types"
 abstract type AbstractNitrogenAssimilation <: AbstractAssimilation end
+" Parent of Ammonia/Nitrate assimilation types"
 abstract type AbstractNH4_NO3Assimilation <: AbstractNitrogenAssimilation end
 
 @mix @label @range @with_kw struct SLA
     SLA::typeof(1.0u"m^2*g^-1") = 9.10u"m^2*g^-1" | [5.0, 30.0]u"m^2*g^-1" | "Ferns 17.4 Forbs 26.2 Graminoids 24.0 Shrubs 9.10 Trees 8.30"
 end
 
+" Uses  FvCB photosynthesis model from Photosynthesis.jl "
 @SLA mutable struct C3Photosynthesis{P} <: AbstractCarbonAssimilation
     photoparams::P = Photosynthesis.EnergyBalance() | _ | _
 end
 
+" Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "
 @SLA mutable struct KooijmanSLAPhotosynthesis <: AbstractCarbonAssimilation
     k_C_binding::typeof(1.0u"mol*mol^-1*s^-1") = 1.0u"mol*mol^-1*s^-1"                 | _ | "scaling rate for carbon dioxide"
     k_O_binding::typeof(1.0u"mol*mol^-1*s^-1") = 1.0u"mol*mol^-1*s^-1"                 | _ | "scaling rate for oxygen"
@@ -22,6 +28,7 @@ end
     j_O_Amax::typeof(1.0u"μmol*m^-2*s^-1")     = 0.001u"μmol*m^-2*s^-1"                    | _  | "max spec uptake of oxygen"
 end
 
+" Parameters for Ammonia/Nitrate assimilation "
 @label @range @with_kw mutable struct Kooijman_NH4_NO3Assimilation <: AbstractNH4_NO3Assimilation 
     j_NH_Amax::typeof(1.0u"μmol*mol^-1*s^-1")  = 50.0u"μmol*mol^-1*s^-1" | [0.1, 1000.0]u"μmol*mol^-1*s^-1" | "max spec uptake of ammonia"
     j_NO_Amax::typeof(1.0u"μmol*mol^-1*s^-1")  = 50.0u"μmol*mol^-1*s^-1" | [0.1, 1000.0]u"μmol*mol^-1*s^-1" | "max spec uptake of nitrate"
@@ -32,6 +39,7 @@ end
     K_H::typeof(1.0u"mol*L^-1")                = 10.0u"mol*L^-1"         | _                                | "half-saturation concentration of water"
 end
 
+" Parameters for lumped Nitrogen assimilation "
 @label @range @with_kw mutable struct N_Assimilation <: AbstractNitrogenAssimilation
     j_N_Amax::typeof(1.0u"μmol*mol^-1*s^-1")   = 50.0u"μmol*mol^-1*s^-1" | [0.1, 1000.0]u"μmol*mol^-1*s^-1" | "max spec uptake of ammonia"
     K_N::typeof(1.0u"mmol*L^-1")               = 10.0u"mmol*L^-1"        | _                                | "half-saturation concentration of nitrate"
@@ -39,6 +47,7 @@ end
 end
 
 
+" Temperature correction parameters"
 abstract type AbstractTempCorr end
 
 @mix @label @range @with_kw struct Tbase
@@ -54,30 +63,39 @@ end
     arrupper::typeof(1.0u"K")   = 70000.0u"K" | [7000.0, 140000.0]u"K" | "Arrhenius temperature for upper boundary"
 end
 
+" Simple temperature correction parameters "
 @Tbase mutable struct TempCorr <: AbstractTempCorr end
+" Temperature correction with lower boudn parameters"
 @Tbase @Tlow mutable struct TempCorrLower <: AbstractTempCorr end
+" Temperature correction with lower and upper bound parameters"
 @Tbase @Tlow @Tup mutable struct TempCorrLowerUpper <: AbstractTempCorr end
 
 
+" State feedback parameters. These modfy state based on state. "
 abstract type AbstractStateFeedback end
 
+" Autophagy. Parameters for self reabsorbtion when metabolic rates fall "
 @label @range @with_kw struct Autophagy <: AbstractStateFeedback
     K_autophagy::typeof(1.0u"mol") = 0.000001u"mol" | [0.0000001u"mol", 0.00001u"mol"] | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
 end
 
+" Allometry. Scaling rules to relate size to mass. "
 abstract type AbstractAllometry end
 
 @with_kw mutable struct SqrtAllometry <: AbstractAllometry
     scale::typeof(1.0u"m") = 0.1u"m"
 end
 
+" Surface area scaling rules "
 abstract type AbstractScaling end
 
+" Surface areai scaling curve. Simulates growth and shade crowding later in life. "
 @label @range @with_kw struct KooijmanArea <: AbstractScaling
     M_Vref::typeof(1.0u"mol")     = 4.0u"mol"   | [0.4u"mol", 20.0u"mol"]    | "shoots scaling reference"
     M_Vscaling::typeof(1.0u"mol") = 400.0u"mol" | [40.0u"mol", 2000.0u"mol"] | "shoots scaling mass"
 end
 
+" Model parameters that vary between organs "
 @label @range @with_kw mutable struct Params{A,S,Al,M}
     assimilation::A                        = C3Photosynthesis()      | _                             | _
     scaling::S                             = KooijmanArea()          | _                             | _
@@ -99,6 +117,7 @@ end
     k_EN::typeof(1.0u"mol*mol^-1*d^-1")    = 0.2u"mol*mol^-1*d^-1"   | [0.0, 1.0]u"mol*mol^-1*d^-1"  | "N-reserve turnover rate"
 end
 
+" Model parameters shared between organs "
 @label @range @with_kw mutable struct SharedParams{Fb,C}
     feedback::Fb                           = Autophagy()             | _                             | _
     tempcorr::C                            = TempCorrLowerUpper()    | _                             | _
@@ -120,6 +139,7 @@ end
     y_E_EN::typeof(1.0u"mol*mol^-1")       = 0.5u"mol*mol^-1"        | _                             | "from N-reserve to reserve: 2 EN per E"
 end
 
+" Maturity parameters. Seperated to make maturity modeling optional, reducing complexity "
 @label @range @with_kw mutable struct Maturity
     j_E_rep_mai::typeof(1.0u"mol*mol^-1*d^-1") = 0.001u"mol*mol^-1*d^-1" | [0.0, 0.01]u"mol*mol^-1*d^-1" | "shoots spec maturity maint costs "
     κrep::typeof(1.0)                          = 0.05                    | [0.0, 1.0]                    | "shoots reserve flux allocated to development/reprod."
@@ -128,7 +148,7 @@ end
     n_N_M::typeof(1.0u"mol*mol^-1")            = 10.0u"mol*mol^-1"       | _                             | "N/C in M-reserve"
 end
 
-
+" Variables for carbon assimilation "
 @with_kw mutable struct CarbonVars
     J_L_F::typeof(1.0u"mol*m^-2*s^-1") = watts_to_light_mol(800.0)u"mol*m^-2*s^-1"     #| _ | "flux of useful photons"
     X_C::typeof(1.0u"mol*L^-1") = fraction_per_litre_gas_to_mols(400.0/1e6)u"mol*L^-1" #| _ | "carbon dioxide @ 400ppm"
@@ -136,6 +156,7 @@ end
     tair::typeof(1.0u"°C") = 25.0u"°C"
 end
 
+" Variables for nitgroen assimilation "
 @with_kw mutable struct NitrogenVars
     # TODO work out the naming conventions here
     temp::typeof(25.0u"°C")       = 25.0u"°C"
@@ -147,6 +168,7 @@ end
     X_H::typeof(1.0u"mol*L^-1")   = 10.0u"mol*L^-1"  # | _ | _
 end
 
+" Model variables "
 @with_kw mutable struct Vars{V}
     assimilation::V                            = Photosynthesis.PhotoVars()
     scale::typeof(1.0)                         = 0.0
@@ -162,6 +184,7 @@ end
     height::typeof(1.0u"m")                    = 0.0u"m"
 end
 
+" Basic model components. For a plants, organs might be roots, shoots and leaves "
 mutable struct Organ{S,P,SH,V,F,F1,T,VR,FB,F1B}
     state::S
     name::Symbol
@@ -170,18 +193,26 @@ mutable struct Organ{S,P,SH,V,F,F1,T,VR,FB,F1B}
     vars::V
     J::F
     J1::F1
-    time::T
-    varsrecord::VR
-    Jrecord::FB
-    J1record::F1B
 end
 
-struct Organism{T,N,P}
-    time::T
+" Records of variables and flux for ploting and analysis "
+struct Records{T,V,F,F1}
+    vars::V
+    J::F
+    J1::F1
+end
+
+" A single organism. Models can be run directly for an organism without an environment. "
+struct Organism{R,N,P}
+    records::R
     shared::P
     nodes::N
 end
 
+"""
+A scenario is an organism (or potentially organisms) growing in response to 
+real or simulated environmental data.
+"""
 @with_kw struct Scenario{E,T,N}
     environment::E = []
     time::T        = 0u"hr":1u"hr":1000u"hr"

@@ -1,53 +1,35 @@
-# import BiophysicalModels.runmodel!
 
 """
-    runmodel!(du, settings, u, t)
-DEBSettings method for BiophysicalModels.jl api.
-Applies environment and runs the DEB model.
+Method to run a DEB scenario, with environment applied to organism(s).
 """
 function runmodel!(du, u, scenario::Scenario, t::Number)
     organism = scenario.nodes[1]
-    apply(setvars!, organism.nodes, t)
+    apply(set_cur_records!, organism.nodes, organism.records, t)
     apply(apply_environment!, organism.nodes, scenario.environment, t)
     runmodel!(du, u, organism, t)
 
     return nothing
 end
 
+"""
+Method to run a DEB organism model, with a static environment.
+"""
 function runmodel!(du, u, organism::Organism, t::Number)
-    apply(setvars!, organism.nodes, t)
-    offset_apply!(setstate!, organism.nodes, u, 0)
-    apply(setflux!, organism.nodes, t)
-    debmodel!(organism, t)
-    offset_apply!(sumflux!, du, organism.nodes, 0)
+    organs = organism.nodes
+    # set vars and flux to current record, for plotting and analysis
+    apply(set_cur_records!, organs, organism.records, t)
+    # copy state from u to organs
+    offset_apply!(setstate!, organs, u, 0)
+
+    debmodel!(organs, t)
+
+    # sum flux for each organism into du
+    offset_apply!(sumflux!, du, organs, 0)
 
     return nothing
 end
 
-setstate!(o, u, offset::Int) = begin
-    for i in 1:length(o.state) 
-        o.state[i] = u[i+offset]
-    end
-    offset + length(o.state)
-end
-
-setvars!(o, t) = o.vars = o.varsrecord[t] 
-
-setflux!(o,t) = begin
-    o.J = o.Jrecord[t]
-    o.J1 = o.J1record[t]
-end
-
-sumflux!(du, o, offset::Int) = begin
-    for i in 1:size(o.J, 1) 
-        du[i+offset] = sum(o.J[i,:])
-    end
-    offset + length(o.state)
-end
-
-
 """
-    deb_model!(settings, t)
 A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
 
 Applies metabolism, translocation and assimilation mehtods to N organs.
@@ -55,8 +37,7 @@ Applies metabolism, translocation and assimilation mehtods to N organs.
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
-function debmodel!(organism, t::Number)
-    organs = organism.nodes
+function debmodel!(organs, t::Number)
     swapped = (Base.tail(organs)..., organs[1])
 
     apply(metabolism!, organs, t)
@@ -66,21 +47,22 @@ function debmodel!(organism, t::Number)
 end
 
 """
-    metabolism!(s, t::Number)
 Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
 function metabolism!(o, t::Number)
-    o.vars.scale = scaling(o.params.scaling, o.state.V)
+    set_scaling!(o)
     catabolism!(o, o.state, t)
     dissipation!(o, o.state)
     feedback!(o, o.shared.feedback, o.state)
     return nothing
 end
 
-"""
-Catabolism for E, C and N, or C, N and E reserves.
+set_scaling(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
 
+"""
+    catabolism!(o, u::AbstractStateCNE, t::Number)
+Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u::AbstractStateCNE, t::Number)
@@ -102,7 +84,6 @@ function catabolism!(o, u::AbstractStateCNE, t::Number)
 end
 
 """
-    dissipation!(s, u::AbstractState, θE, r)
 Dissipation for any reserve.
 Growth, maturity and maintenence are grouped as dissipative processes.
 """
@@ -115,7 +96,6 @@ function dissipation!(o, u)
 end
 
 """
-    growth!(o, u::AbstractState, θE, r)
 Allocates reserves to growth.
 """
 function growth!(o, u)
@@ -130,7 +110,7 @@ function growth!(o, u)
 end
 
 """
-    maturity!(o, u, θE)
+    maturity!(f, o, u)
 Allocates reserve drain due to maturity maintenance.
 Stores in M state variable if it exists.
 """
@@ -157,7 +137,6 @@ end
 end
 
 """
-    maintenance!(o, u, θE)
 Allocates reserve drain due to maintenance.
 """
 function maintenence!(o, u)
@@ -168,7 +147,6 @@ function maintenence!(o, u)
 end
 
 """
-    product!(o, u::AbstractState, θE, r)
 Allocates waste products from growth and maintenance.
 """
 function product!(o, u)
@@ -183,7 +161,6 @@ end
 
 
 """
-    translocate!(o, on, u::AbstractState)
 Versions for E, CN and CNE reserves.
 
 Translocation is occurs between adjacent organs. 
@@ -199,7 +176,6 @@ function translocation!(o, on)
 end
 
 """
-    translocate!(o, on, u::AbstractState)
 Versions for E, CN and CNE reserves.
 
 Translocation is occurs between adjacent organs. 
@@ -221,7 +197,6 @@ function translocate!(o, on)
 end
 
 """
-    reuse_rejected!(o, on)
 Reallocate state rejected from synthesizing units.
 
 TODO add a 1-organs method
@@ -261,14 +236,12 @@ function reserve_loss!(o, loss)
 end
 
 """
-    κtra(params::P) where P
 κtra is the difference paramsbetween κsoma and κrep
 """
 κtra(params) = 1.0 - params.κsoma - κrep(params)
 κrep(params) = :κrep in fieldnames(params.maturity) ? params.maturity.κrep : 0.0
 
 """
-    find_rate(t, args)
 Calculate rate formula. TODO: use Roots.jl for this
 """
 function find_rate(v, args::Tuple{NTuple{N},NTuple{N},Vararg}) where {N}
@@ -291,6 +264,8 @@ feedback!(o, f::Autophagy, u::AbstractState) = begin
     nothing
 end
 
+"""
+"""
 scaling(f::KooijmanArea, uV) = begin
     uV > zero(uV) || return zero(uV)
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
@@ -305,6 +280,8 @@ although this may not make sense.
 germinated(M_V, M_Vgerm) = M_V > M_Vgerm 
 
 
+"""
+"""
 allometric_height(f::SqrtAllometry, o) = begin
     p, v, u, sh = components(o)
     dim = oneunit(u.V * sh.w_V)
