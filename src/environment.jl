@@ -1,20 +1,20 @@
 const water_fraction_to_M = 1.0u"m^3*m^-3" * 1u"kg*L^-1" / 18.0u"g*mol^-1"
 
-get_environment(::Type{Val{:soiltemperature}}, env::NicheMapMicroclimate, h, i) = 
+get_environment(::Type{Val{:soiltemperature}}, env::MicroclimateData, h, i) = 
     niche_interpolate(interp, env.soil, i) * u"°C"
-get_environment(::Type{Val{:watercontent}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:watercontent}}, env::MicroclimateData, h, i) =
     niche_interpolate(interp, env.soilmoist, i)
-get_environment(::Type{Val{:waterpotential}}, env::NicheMapMicroclimate, h, i) = 
+get_environment(::Type{Val{:waterpotential}}, env::MicroclimateData, h, i) = 
     niche_interpolate(interp, env.soilmoist, i) * u"Pa"
-get_environment(::Type{Val{:airtemperature}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:airtemperature}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:TALOC], i) * u"°C"
-get_environment(::Type{Val{:windspeed}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:windspeed}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:VLOC], i) * u"m*s^-1"
-get_environment(::Type{Val{:relhumidity}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:relhumidity}}, env::MicroclimateData, h, i) =
     niche_interpolate(interp, env.humid, i)
-get_environment(::Type{Val{:radition}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:radition}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:SOLR], i) * u"W*m^-2"
-get_environment(::Type{Val{:par}}, env::NicheMapMicroclimate, h, i) =
+get_environment(::Type{Val{:par}}, env::MicroclimateData, h, i) =
     lin_interpolate(env.metout[:SOLR], i) * 4.57u"mol*m^-2*s^-1"
 
 

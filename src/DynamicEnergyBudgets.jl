@@ -26,7 +26,7 @@ using SimpleTraits,
       Parameters,
       Mixers,
       MetaParameters,
-      NicheMap,
+      Microclimate,
       Photosynthesis,
       DocStringExtensions
 
