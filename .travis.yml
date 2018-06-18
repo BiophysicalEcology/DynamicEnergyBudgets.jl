@@ -29,7 +29,7 @@ matrix:
 script:
   - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/MetaParameters.jl.git"); Pkg.build("MetaParameters")'
   - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/Photosynthesis.jl.git"); Pkg.build("Photosynthesis")'
-  - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/NicheMap.jl.git"); Pkg.build("NicheMap")'
+  - julia --color=yes -e 'Pkg.clone("https://github.com/rafaqz/Microclimate.jl.git"); Pkg.build("Microclimate")'
   - julia -e 'Pkg.clone(pwd()); Pkg.build("DynamicEnergyBudgets"); Pkg.test("DynamicEnergyBudgets"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
