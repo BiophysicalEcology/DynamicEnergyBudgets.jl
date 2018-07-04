@@ -1,7 +1,7 @@
 using Revise
 using DynamicEnergyBudgets
 using DynamicEnergyBudgets: reuse_rejected!, dissipation!, translocate!, product!, 
-                            maintenence!, growth!, sumflux!, reserve_drain!, reserve_loss!,
+                            maintenence!, growth!, sum_flux!, reserve_drain!, reserve_loss!,
                             maturity!, metabolism!, catabolism!, assimilation!, translocation!,
                             scaling
 using Unitful
@@ -41,9 +41,9 @@ end
     o.vars.rate = 0.1u"d^-1"
     o.vars.θE = 0.621
 
-    catabolism!(o, o.state, 1)
+    catabolism!(o, o.state)
     growth!(o, u)
-    sumflux!(du, o, 0)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -57,9 +57,9 @@ end
     o, p, u, du = factory()
     o.vars.θE = 0.621
 
-    catabolism!(o, o.state, 1)
+    catabolism!(o, o.state)
     product!(o, u)
-    sumflux!(du, o, 0)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -73,9 +73,9 @@ end
     o, p, u, du = factory()
     o.vars.θE = 0.621
 
-    catabolism!(o, o.state, 1)
+    catabolism!(o, o.state)
     maintenence!(o, u)
-    sumflux!(du, o, 0)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -89,10 +89,10 @@ end
     o, p, u, du = factory();
     o.vars.θE = 0.621
 
-    catabolism!(o, o.state, 1)
+    catabolism!(o, o.state)
     f = Maturity()
     maturity!(f, o, u)
-    sumflux!(du, o, 0)
+    sum_flux!(du, o, 0)
     du
     m, C, N = sumstate(du, u)
 
@@ -103,10 +103,10 @@ end
     @test m + N * o.shared.y_E_EN ≈ -n_loss
 
     # o, p, u, du = factory()
-    # catabolism!(o, o.state, 1)
+    # catabolism!(o, o.state)
     # u = StatePVCNE()
     # maturity!(f, o, u)
-    # sumflux!(du, 0, o)
+    # sum_flux!(du, 0, o)
     # m, C, N = sumstate(du, u)
 
     # c_loss = o.J1[:E,:los] + o.J1[:C,:los] * o.shared.y_E_CH_NO
@@ -120,9 +120,9 @@ end
     o.vars.rate = 0.1u"d^-1"
     o.vars.θE = 0.621
 
-    catabolism!(o, o.state, 1)
+    catabolism!(o, o.state)
     dissipation!(o, u)
-    sumflux!(du, o, 0)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -137,8 +137,8 @@ end
     o.vars.rate = 0.1u"d^-1"
     o.vars.θE = 0.621
 
-    metabolism!(o, 1)
-    sumflux!(du, o, 0)
+    metabolism!(o)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -152,8 +152,8 @@ end
     # reset loss because it's additive
     o.J1[:E,:los] = o.J1[:C,:los] = o.J1[:N,:los] = zero(o.J1[:N,:los])
 
-    metabolism!(o, 1)
-    sumflux!(du, o, 0)
+    metabolism!(o)
+    sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
     c_loss = sum_C_loss(o)
@@ -177,8 +177,8 @@ end
     translocate!(o2, o1)
     @test maximum(abs.(o1.J)) != zero(o1.J[1,1])
     @test maximum(abs.(o2.J)) != zero(o2.J[1,1])
-    sumflux!(du1, o1, 0)
-    sumflux!(du2, o2, 0)
+    sum_flux!(du1, o1, 0)
+    sum_flux!(du2, o2, 0)
     m1, C1, N1 = sumstate(du1, u1)
     m2, C2, N2 = sumstate(du2, u2)
 
@@ -190,25 +190,27 @@ end
 end
 
 @testset "rejection is balanced" begin
-    o1, p1, u1, du1 = factory();
-    o2, p2, u2, du2 = factory();
+    _, _, u1, du1 = factory();
+    _, _, u2, du2 = factory();
+    o1 = Organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8))
+    o2 = Organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8))
+    p1 = o1.params; p2 = o2.params
     u2 .*= 2.7
     o1.J1[:C,:rej] = 2oneunit(o1.J1[1,1])
     o2.J1[:C,:rej] = 2oneunit(o2.J1[1,1])
     o1.J1[:N,:rej] = oneunit(o1.J1[1,1])
     o2.J1[:N,:rej] = oneunit(o2.J1[1,1])
 
-    p1.y_EC_ECT = p1.y_EN_ENT = p2.y_EC_ECT = p2.y_EN_ENT = 0.8
     reuse_rejected!(o1, o2)
     reuse_rejected!(o2, o1)
-    sumflux!(du1, o1, 0)
-    sumflux!(du2, o2, 0)
+    sum_flux!(du1, o1, 0)
+    sum_flux!(du2, o2, 0)
     m1, C1, N1 = sumstate(du1, u1)
     m2, C2, N2 = sumstate(du2, u2)
 
     c_loss = sum_C_loss(o1, o2)
     n_loss = sum_N_loss(o1, o2)
     @test -c_loss != zero(c_loss)
-    @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO == -c_loss
-    @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN == -n_loss
+    @test m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO == convert(typeof(1.0u"mol/hr"), -c_loss) 
+    @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN == convert(typeof(1.0u"mol/hr"), -n_loss)
 end

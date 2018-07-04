@@ -28,9 +28,9 @@ offset_apply!(f, o::Tuple{O,Vararg}, a::AbstractArray, offset::Int, args...) whe
     offset = f(o[1], a, offset, args...)
     offset_apply!(f, Base.tail(o), a, offset::Int, args...)
 end
-offset_apply!(f, o::Tuple{}, a::AbstractArray, offset::Int, args...) = nothing
 offset_apply!(f, a::AbstractArray, o::Tuple{O,Vararg}, offset::Int, args...) where O = begin
     offset = f(a, o[1], offset, args...)
     offset_apply!(f, a, Base.tail(o), offset::Int, args...)
 end
 offset_apply!(f, a::AbstractArray, o::Tuple{}, offset::Int, args...) = nothing
+offset_apply!(f, o::Tuple{}, a::AbstractArray, offset::Int, args...) = nothing

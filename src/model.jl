@@ -1,32 +1,19 @@
+import CompositeFieldVectors: reconstruct
 
 """
-Method to run a DEB scenario, with environment applied to organism(s).
+Run a DEB organism model.
 """
-function runmodel!(du, u, scenario::Scenario, t::Number)
-    organism = scenario.nodes[1]
-    apply(set_cur_records!, organism.nodes, organism.records, t)
-    apply(apply_environment!, organism.nodes, scenario.environment, t)
-    runmodel!(du, u, organism, t)
-
-    return nothing
+(o::Organism)(du, u, p, t::Number; record=false;) = reconstruct(o, p)(du, u, t) 
+(o::Organism)(du, u, p::Void, t::Number; record=false;) = begin
+    record && keep_records!(o, t)
+    o(du, u, t) 
 end
 
-"""
-Method to run a DEB organism model, with a static environment.
-"""
-function runmodel!(du, u, organism::Organism, t::Number)
-    organs = organism.nodes
-    # set vars and flux to current record, for plotting and analysis
-    apply(set_cur_records!, organs, organism.records, t)
-    # copy state from u to organs
-    offset_apply!(setstate!, organs, u, 0)
-
-    debmodel!(organs, t)
-
-    # sum flux for each organism into du
-    offset_apply!(sumflux!, du, organs, 0)
-
-    return nothing
+function (o::Organism)(du, u, t::Number)
+    set_state!(o, u)
+    set_environment!(o, t)
+    debmodel!(o.organs)
+    sum_flux!(du, o)
 end
 
 """
@@ -37,27 +24,22 @@ Applies metabolism, translocation and assimilation mehtods to N organs.
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
-function debmodel!(organs, t::Number)
+function debmodel!(organs::Tuple)
     swapped = (Base.tail(organs)..., organs[1])
-
-    apply(metabolism!, organs, t)
+    apply(metabolism!, organs)
     apply(translocation!, organs, swapped)
     apply(assimilation!, organs, swapped)
-    return nothing
 end
-
-set_scaling!(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
 
 """
 Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
-function metabolism!(o, t::Number)
+function metabolism!(o)
     set_scaling!(o)
-    catabolism!(o, o.state, t)
+    catabolism!(o, o.state)
     dissipation!(o, o.state)
     feedback!(o, o.shared.feedback, o.state)
-    return nothing
 end
 
 """
@@ -65,22 +47,21 @@ end
 Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
-function catabolism!(o, u::AbstractStateCNE, t::Number)
-    p, v, u, sh, J, J1 = components(o); va = v.assimilation;
-    scaledturnover = (v.k_EC, v.k_EN, v.k_E) .* v.scale
-    ureserve = (u.C, u.N, u.E)
-    m = ureserve ./ u.V
-    v.rate = find_rate(v, (m, scaledturnover, v.j_E_mai, 
-                           sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma))
+function catabolism!(o, u::AbstractStateCNE)
+    p, v, u, sh, J, J1 = unpack(o); va = v.assimilation;
+    scaled_turnover = (p.k_EC, p.k_EN, p.k_E) .* v.tempcorr .* v.scale
+    m = (u.C, u.N, u.E) ./ u.V
+
+    v.rate = find_rate(v, m, scaled_turnover, p.j_E_mai * v.tempcorr, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
     (J1[:C,:cat], J1[:N,:cat], J1[:EE,:cat]) = 
-        catabolic_fluxes(ureserve, scaledturnover, v.rate)
+        catabolic_fluxes((u.C, u.N, u.E), scaled_turnover, v.rate)
 
     (J1[:C,:rej], J1[:N,:rej], J1[:CN,:cat]) =
         synthesizing_unit(J1[:C,:cat], J1[:N,:cat], sh.y_E_CH_NO, sh.y_E_EN)
 
     J1[:E,:cat] = J1[:EE,:cat] + J1[:CN,:cat] # Total catabolic flux
     v.θE = J1[:EE,:cat]/J1[:E,:cat] # Proportion of general reserve flux in total catabolic flux
-    return nothing
+    nothing
 end
 
 """
@@ -92,21 +73,19 @@ function dissipation!(o, u)
     maturity!(o.params.maturity, o, u)
     maintenence!(o, u)
     product!(o, u)
-    return nothing
 end
 
 """
 Allocates reserves to growth.
 """
 function growth!(o, u)
-    p, v, u, sh, J, J1 = components(o)
+    p, v, u, sh, J, J1 = unpack(o)
     grow = v.rate * u.V
     J[:V,:gro] = grow 
     drain = -(1/p.y_V_E) * grow 
     loss = (1/p.y_V_E - 1) * v.rate * u.V
     reserve_drain!(o, :gro, drain, v.θE)
     reserve_loss!(o, loss)
-    return nothing
 end
 
 """
@@ -116,47 +95,43 @@ Stores in M state variable if it exists.
 """
 function maturity!(f, o, u) end
 
-@traitfn function maturity!{X; !StateHasM{X}}(f::Maturity, o, u::X)
-    p, v, u, sh, J, J1 = components(o)
+maturity!(f::Maturity, o, u::U) where U = maturity!(f, o, u, has_M(U))
+maturity!(f::Maturity, o, u, ::NoM) = begin
+    p, v, u, sh, J, J1 = unpack(o)
     # TODO: why does rep maintenance stop increasing at M_Vrep?
     # Is this a half finished reproduction model?
-    drain = -(f.κrep * J1[:E,:cat] + -v.j_E_rep_mai * min(u.V, f.M_Vrep))
+    drain = -(f.κrep * J1[:E,:cat] + -f.j_E_rep_mai * v.tempcorr * min(u.V, f.M_Vrep))
     reserve_drain!(o, :rep, drain, v.θE)
     reserve_loss!(o, -drain)
-    return nothing
 end
-
-@traitfn function maturity!{X; StateHasM{X}}(f::Maturity, o, u::X)
-    p, v, u, sh, J, J1 = components(o)
+maturity!(f::Maturity, o, u, ::HasM) = begin
+    p, v, u, sh, J, J1 = unpack(o)
     J[:M,:gro] = f.κrep * J1[:E,:cat]
-    maint = -v.j_E_rep_mai * u.V
+    maint = -f.j_E_rep_mai * v.tempcorr * u.V
     drain = -J[:M,:gro] + maint # min(u.V, f.M_Vrep))
     reserve_drain!(o, :rep, drain, v.θE)
     reserve_loss!(o, -maint)
-    return nothing
 end
 
 """
 Allocates reserve drain due to maintenance.
 """
 function maintenence!(o, u)
-    drain = -o.vars.j_E_mai * u.V
+    drain = -o.params.j_E_mai * o.vars.tempcorr * u.V
     reserve_drain!(o, :mai, drain, o.vars.θE)
     reserve_loss!(o, -drain) # all maintenance is loss
-    nothing
 end
 
 """
 Allocates waste products from growth and maintenance.
 """
 function product!(o, u)
-    p, v, u, sh, J, J1 = components(o)
+    p, v, u, sh, J, J1 = unpack(o)
     J[:P,:gro] = J[:V,:gro] * p.y_P_V
-    J[:P,:mai] = u.V * v.j_P_mai
+    J[:P,:mai] = u.V * p.j_P_mai * v.tempcorr
     # undo the reserve loss from growth: it went to product
     loss_correction = -(J[:P,:gro] + J[:P,:mai])
     reserve_loss!(o, loss_correction)
-    return nothing
 end
 
 
@@ -172,7 +147,6 @@ FIXME this will be broken for organs > 2
 function translocation!(o, on)
     reuse_rejected!(o, on)
     translocate!(o, on)
-    return nothing
 end
 
 """
@@ -193,7 +167,7 @@ function translocate!(o, on)
     # incoming translocation
     transn = κtra(on.params) * o.J1[:E,:cat]
     o.J[:E,:tra] += on.params.y_E_ET * transn
-    return nothing
+    nothing
 end
 
 """
@@ -211,7 +185,7 @@ function reuse_rejected!(o, on)
     on.J[:N,:tra] = p.y_EN_ENT * o.J1[:N,:rej]
     o.J1[:C,:los] += (1 - p.y_EC_ECT) * o.J1[:C,:rej]
     o.J1[:N,:los] += (1 - p.y_EN_ENT) * o.J1[:N,:rej]
-    return nothing
+    nothing
 end
 
 """
@@ -223,7 +197,7 @@ function reserve_drain!(o, col, drain, θE)
     o.J[:C,col] = J_CN/o.shared.y_E_CH_NO
     o.J[:N,col] = J_CN/o.shared.y_E_EN
     o.J[:E,col] = drain * θE
-    return nothing
+    nothing
 end
 
 """
@@ -232,7 +206,7 @@ Generalised reserve loss to track carbon.
 function reserve_loss!(o, loss)
     o.J1[:C,:los] += loss/o.shared.y_E_CH_NO
     o.J1[:N,:los] += loss/o.shared.y_E_EN
-    return nothing
+    nothing
 end
 
 """
@@ -244,9 +218,15 @@ end
 """
 Calculate rate formula. TODO: use Roots.jl for this
 """
-function find_rate(v, args::Tuple{NTuple{N},NTuple{N},Vararg}) where {N}
+function find_rate(v, m, scaled_turnover, args...)
     # bounds = (-10.0oneunit(v.rate), 20.0oneunit(v.rate)) #rate_window(args...) 
-    find_zero(x -> rate_formula(x, args...), 0.1oneunit(v.rate), Order5(); atol=BI_XTOL)
+
+    # Find the type of rate so that diff and units work with the guess and atol
+    one_r = oneunit(eltype(scaled_turnover))
+    # Get rate with a zero finder
+    find_zero(x -> rate_formula(x, m, scaled_turnover, args...), 0.1one_r, Order5(); 
+              atol=BI_XTOL * one_r)
+    # one_r * 0.00001
 end
 
 """
@@ -255,6 +235,7 @@ Function to apply feedback on growth the process, such as autopagy in resource s
 Without a function like this you will likely be occasionally breaking the 
 laws of thermodynamics by introducing negative rates.
 """
+feedback!(o, f::Void, u) = nothing
 feedback!(o, f::Autophagy, u::AbstractState) = begin
     hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
     autophagy = u.V * (oneunit(hs) - hs)
@@ -264,6 +245,9 @@ feedback!(o, f::Autophagy, u::AbstractState) = begin
     nothing
 end
 
+
+set_scaling!(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
+
 """
 """
 scaling(f::KooijmanArea, uV) = begin
@@ -271,7 +255,7 @@ scaling(f::KooijmanArea, uV) = begin
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
 end
 
-scaling(f, uV) = uV
+scaling(f::Void, uV) = 1.0
 
 """
 Check if germination has happened. Independent for each organ,
@@ -283,12 +267,12 @@ germinated(M_V, M_Vgerm) = M_V > M_Vgerm
 """
 """
 allometric_height(f::SqrtAllometry, o) = begin
-    p, v, u, sh = components(o)
+    p, v, u, sh = unpack(o)
     dim = oneunit(u.V * sh.w_V)
-    sqrt((u.P * sh.w_P + u.V * sh.w_V) / dim) * f.scale
+    sqrt((u.P * sh.w_P + u.V * sh.w_V) / dim) * f.size
 end
     
-components(o::Organ) = o.params, o.vars, o.state, o.shared, o.J, o.J1
+unpack(o::Organ) = o.params, o.vars, o.state, o.shared, o.J, o.J1
 
 # J: Flux matrix diagram.
 # Rows: state.

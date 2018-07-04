@@ -3,7 +3,7 @@ Unitful
 SimpleTraits
 Mixers
 Parameters
-MetaParameters
+MetaFields
 Unitful
 AxisArrays
 StaticArrays

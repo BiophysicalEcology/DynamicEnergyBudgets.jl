@@ -1,73 +1,52 @@
-"""
-Outer construtor for defaults, without J and J1
-"""
-Organ(; state = StatePVMCNE(),
-        name = :Shoot,
-        params = Params(),
-        shared = SharedParams(),
-        vars = Vars()
-     ) = begin
+oneunit_flux(params, state) = oneunit(state[1] * params.k_E)
 
-    J = build_flux(fieldnames(state), TRANS)
-    J1 = build_flux(get_state1_names(state), TRANS1)
-    Organ(state, name, params, shared, vars, J, J1)
-end
-
-"""
-Outer construtor for defaults, without J and J1
-"""
-Organism(; time = 0u"hr":1u"hr":1000u"hr",
-           shared = SharedParams(),
-           nodes = (Organ(), Organ(params=Params(assimilation=N_Assimilation()), 
-                                   vars=Vars(assimilation=NitrogenVars())))) = begin
-    records = []
-    for organ in nodes
-        organ.shared = shared
-        push!(records, Records(organ, time))
-    end
-    Organism(tuple(records...), shared, nodes)
-end
-
-" build all required records with the length of the current timespan "
-Records(o::Organ, time) = begin
-    Jrec = build_record(build_J(o.state), time)
-    J1rec = build_record(build_J1(o.state), time)
-    varsrec = build_record(o.vars, time)
-    Records(varsrec, Jrec, J1rec)
-end
-
-build_J(state) = build_flux(fieldnames(state), TRANS)
-build_J1(state) = build_flux(get_state1_names(state), TRANS1)
-
-build_flux(x, y) = begin
-    a = fill(0.0u"mol*hr^-1", length(x), length(y))
+build_J(one_flux, state) = build_flux(one_flux, fieldnames(state), TRANS)
+build_J1(one_flux, state) = build_flux(one_flux, get_state1_names(state), TRANS1)
+build_flux(one_flux, x, y) = begin
+    a = Any[0.0 * one_flux for a in 1:length(x), b in 1:length(y)]
     AxisArray(a, Axis{:state}(x), Axis{:transformations}(y))
 end
 
 build_record(a, time) = AxisArray([deepcopy(a) for i = 1:length(time)], Axis{:time}(time))
 
-" update vars and flux to record for time t "
-set_cur_records!(organ, records::Records, t) = begin
-    organ.vars = records.vars[t] 
-    organ.J = records.J[t]
-    organ.J1 = records.J1[t]
-end
-" Void records so we just stay on the same record "
-set_cur_records!(organ, records::Void, t) = nothing
-
 " copy the diffeq state to organs "
-setstate!(organ, u, offset::Int) = begin
-    for i in 1:length(organ.state) 
-        organ.state[i] = u[i+offset]
-    end
+
+set_state!(o::Organism, u) = offset_apply!(set_state!, o.organs, u, 0)
+set_state!(organ::Organ, u::AbstractArray, offset::Int) = begin
+    typ = typeof(organ.state).name.wrapper
+    organ.state = typ(u[1+offset:length(organ.state)+offset])
     offset + length(organ.state)
 end
 
-" sum flux matrix "
-sumflux!(du, organ, offset::Int) = begin
+" sum flux matrix " 
+sum_flux!(du, o::Organism) = begin
+    offset_apply!(sum_flux!, du, o.organs, 0)
+    du
+end
+sum_flux!(du, organ::Organ, offset::Int) = begin
     for i in 1:size(organ.J, 1) 
         du[i+offset] = sum(organ.J[i,:])
     end
     offset + length(organ.state)
 end
 
+" update vars and flux to record for time t "
+keep_records!(o::Organism, t) = begin
+    apply(keep_records!, o.organs, o.records, t)
+    o
+end
+keep_records!(organ, records::Records, t) = 
+    organ.vars, organ.J, organ.J1 = records.vars[t], records.J[t], records.J1[t]
+keep_records!(organ, records::Void, t) = nothing
+
+set_environment!(o::Organism, t) = apply(apply_environment!, o.organs, o.environment, t)
+
+"Handle dual number or other types in du if needed"
+check_du_type(du, o) = begin
+    du_fill = oneunit_flux(o.organs[1].params, o.organs[1].state)
+    if typeof(du_fill) == eltype(du) 
+        du
+    else
+        fill(du_fill, 12) 
+    end
+end

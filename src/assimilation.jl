@@ -47,10 +47,10 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateC
 end
 
 """
-    assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
+    assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u::AbstractStateCNE)
 Runs nitrogen uptake, and combines N with translocated C.
 """
-function assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
+function assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u::AbstractStateCNE)
     germinated(u.V, o1.params.M_Vgerm) || return nothing
 
     J_N_assim = uptake_nitrogen(f, o1, o2)
@@ -66,6 +66,12 @@ function assimilation!(f::N_Assimilation, o1, o2, u::AbstractStateCNE)
 
     return nothing
 end
+
+"""
+    photosynthesis(f::ConstantCarbonAssimilation, o1, o2)
+Returns a constant rate of carbon assimilation.
+"""
+photosynthesis(f::ConstantCarbonAssimilation, o1, o2) = f.uptake * o1.state.V * o1.vars.scale
 
 """
     photosynthesis(f::C3Photosynthesis, o1, o2)
@@ -98,6 +104,12 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
 
     j_c_intake / (1 + bound_c + bound_o + co_l) * o1.state.V * v.scale
 end
+
+"""
+    uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2)
+Returns constant nitrogen assimilation.
+"""
+uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2) = f.uptake * o1.state.V * o1.vars.scale
 
 """
     uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)

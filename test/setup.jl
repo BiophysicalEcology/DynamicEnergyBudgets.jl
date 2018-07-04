@@ -1,6 +1,6 @@
 using Revise
 using DynamicEnergyBudgets
-using DynamicEnergyBudgets: Records, build_record, build_flux, set_cur_records!, sumflux!, offset_apply!, setstate!
+using DynamicEnergyBudgets: Records, build_record, build_flux, keep_records!, sum_flux!, offset_apply!, set_state!
 using AxisArrays
 using Unitful
 
@@ -12,7 +12,7 @@ end
 
 @testset "build records" begin
     time=0u"hr":1u"hr":10u"hr"
-    a = build_record(build_flux([:one,:two], [:A,:B]), time)
+    a = build_record(build_flux(1.0u"mol/hr", [:one,:two], [:A,:B]), time)
     @test axisnames(a) == (:time,)
     @test axisvalues(a) == (0u"hr":1u"hr":10u"hr",)
     @test axisnames(a[1]) == (:state, :transformations)
@@ -28,9 +28,9 @@ end
 
 @testset "setflux" begin
     o = Organism();
-    apply(set_cur_records!, o.nodes, o.records, 1)
+    apply(keep_records!, o.organs, o.records, 1)
     rec = o.records[1];
-    or = o.nodes[1];
+    or = o.organs[1];
     @test or.J[1,1] == zero(or.J[1,1])
     @test rec.J[1][1,1] == zero(or.J[1,1])
 
@@ -38,7 +38,7 @@ end
     @test or.J[1,1] == 10oneunit(or.J[1,1])
     @test rec.J[1][1,1] == 10oneunit(or.J[1,1])
 
-    apply(set_cur_records!, o.nodes, o.records, 5u"hr")
+    apply(keep_records!, o.organs, o.records, 5u"hr")
     or.J[1,1] = 20oneunit(or.J[1,1])
     @test or.J[1,1] == 20oneunit(or.J[1,1])
     @test rec.J[5u"hr"][1,1] == 20oneunit(or.J[1,1])
@@ -47,25 +47,25 @@ end
     @test rec.J1[5u"hr"][1,1] == 40oneunit(or.J1[1,1])
 end
 
-@testset "sumflux" begin
+@testset "sum_flux" begin
+    du = fill(0.0u"mol/d", 12)
     o = Organism();
-    or1 = o.nodes[1];
-    or2 = o.nodes[2];
+    or1 = o.organs[1];
+    or2 = o.organs[2];
     or1.J .= oneunit(or1.J[1,1]) .* [1,2,3,4,5,6]
     or2.J .= oneunit(or2.J[1,1]) .* [1,2,3,4,5,6] / 2
-    du = fill(0.0u"mol/hr", 12)
-    offset_apply!(sumflux!, du, o.nodes, 0)
+    sum_flux!(du, o)
     du
-    @test du == [6,12,18,24,30,36,3,6,9,12,15,18] .* 1.0u"mol/hr"
+    @test du == [6,12,18,24,30,36,3,6,9,12,15,18] .* u"mol/d" 
 end
 
-@testset "setstate" begin
+@testset "set_state" begin
     u = fill(2.0u"mol", 12)
     o = Organism();
-    or1 = o.nodes[1];
-    or2 = o.nodes[2];
+    or1 = o.organs[1];
+    or2 = o.organs[2];
     @test or1.state[2] == 0.0001u"mol"
-    offset_apply!(setstate!, o.nodes, u, 0)
+    offset_apply!(set_state!, o.organs, u, 0)
     @test or1.state[1] == 2.0u"mol"
     @test or2.state[2] == 2.0u"mol"
     @test sum(or1.state) == 12.0u"mol"

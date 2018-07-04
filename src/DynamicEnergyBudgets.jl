@@ -15,22 +15,28 @@ plant model by Bas Kooijman.
 """
 module DynamicEnergyBudgets
 
-using SimpleTraits,
-      AxisArrays,
+using AxisArrays,
       StaticArrays,
-      DataFrames,
       Unitful,
       Roots,
       OrdinaryDiffEq,
-      Parameters,
       Mixers,
-      MetaParameters,
+      MetaFields,
+      Parameters,
+      Defaults,
       Microclimate,
       Photosynthesis,
+      Chaingang,
+      CompositeFieldVectors,
       DocStringExtensions
 
-@metaparam label ""
-@metaparam range [0.0, 1.0]
+import CompositeFieldVectors.composite
+import Defaults.get_defaults
+
+@metafield composite true
+@metafield label ""
+@metafield units nothing
+@metafield range [0.0, 1.0]
 
 @template TYPES =
     """
@@ -38,11 +44,17 @@ using SimpleTraits,
     $(DOCSTRING)
     """
 
+Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
+    d = default(t, F) 
+    u = units(t, F)
+    (u == nothing || d == nothing) ? d : d * u
+end
+
 Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
 
 const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
 const TRANS1 = [:cat, :rej, :los]
-const BI_XTOL = 1e-10u"d^-1"
+const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
 include("state.jl")
@@ -101,6 +113,8 @@ export AbstractAssimilation,
        KooijmanPhotosynthesis,
        KooijmanSLAPhotosynthesis,
        Kooijman_NH4_NO3_Assimilation,
+       ConstantCarbonAssimilation,
+       ConstantNitrogenAssimilation,
        AbstractStateFeedback,
        Autophagy,
        AbstractTempCorr,

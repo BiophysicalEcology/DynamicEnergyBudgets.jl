@@ -1,7 +1,7 @@
 using Revise
 using Unitful
 using DynamicEnergyBudgets
-using DynamicEnergyBudgets: reuse_rejected!, translocate!, assimilation!, translocation!, sumflux!,
+using DynamicEnergyBudgets: reuse_rejected!, translocate!, assimilation!, translocation!, sum_flux!,
                             scaling, uptake_nitrogen, photosynthesis, Kooijman_NH4_NO3Assimilation
 
 @static if VERSION < v"0.7.0-DEV.2005"
@@ -17,16 +17,16 @@ sum_C_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:
 sum_N_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
 
 function Nfactory()
-    o1 = Organ(vars=Vars(assimilation=NitrogenVars()));;
+    o1 = Organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8), 
+               vars=Vars(assimilation=NitrogenVars()));;
     p1 = o1.params
-    o2 = Organ()
+    o2 = Organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8))
     p2 = o2.params;
     u1 = StatePVMCNE(9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol")
     u2 = StatePVMCNE(9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol")
     u2 .*= 2.7
     du1 = fill(0.0u"mol*hr^-1", 6)
     du2 = fill(0.0u"mol*hr^-1", 6)
-    p1.y_EC_ECT = p1.y_EN_ENT = p2.y_EC_ECT = p2.y_EN_ENT = 0.8
     o1.vars.scale = scaling(o1.params.scaling, o1.state.V)
     o2.vars.scale = scaling(o2.params.scaling, o2.state.V)
     f = N_Assimilation();
@@ -35,16 +35,16 @@ function Nfactory()
 end
 
 function Cfactory()
-    o1 = Organ(vars=Vars(assimilation=CarbonVars()));;
+    o1 = Organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8), 
+               vars=Vars(assimilation=CarbonVars()));;
     p1 = o1.params;
-    o2 = Organ();
+    o2 = Organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8));
     p2 = o2.params;
     u1 = StatePVMCNE(9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol")
     u2 = StatePVMCNE(9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol")
     u2 .*= 1.9
     du1 = fill(0.0u"mol*hr^-1", 6)
     du2 = fill(0.0u"mol*hr^-1", 6)
-    p1.y_EC_ECT = p1.y_EN_ENT = p2.y_EC_ECT = p2.y_EN_ENT = 0.9
     o1.vars.scale = scaling(o1.params.scaling, o1.state.V)
     o2.vars.scale = scaling(o2.params.scaling, o2.state.V)
     f = KooijmanSLAPhotosynthesis();
@@ -98,8 +98,8 @@ end
         @test uptake_nitrogen(f, o1, o2) > 0.0u"μmol/s"
         uptake_nitrogen(f, o1, o2)
         assimilation!(f, o1, o2, u1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1, C1, N1 = sumstate(du1, u1)
         m2, C2, N2 = sumstate(du2, u2)
         @test N1 == o1.J[:N,:ass]
@@ -115,8 +115,8 @@ end
 
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1a, C1a, N1a = sumstate(du1, u1)
         m2a, C2a, N2a = sumstate(du2, u2)
 
@@ -131,8 +131,8 @@ end
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
         assimilation!(f, o1, o2, u1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1, C1, N1 = sumstate(du1, u1)
         m2, C2, N2 = sumstate(du2, u2)
 
@@ -221,8 +221,8 @@ end
         @test photosynthesis(f, o1, o2) > 0.0u"μmol/s"
         photosynthesis(f, o1, o2)
         assimilation!(f, o1, o2, u1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1, C1, N1 = sumstate(du1, u1)
         m2, C2, N2 = sumstate(du2, u2)
         @test C1 == o1.J[:C,:ass]
@@ -239,8 +239,8 @@ end
 
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1a, C1a, N1a = sumstate(du1, u1)
         m2a, C2a, N2a = sumstate(du2, u2)
 
@@ -254,8 +254,8 @@ end
         reuse_rejected!(o2, o1)
         uptake_c = photosynthesis(f, o1, o2)
         assimilation!(f, o1, o2, u1)
-        sumflux!(du1, o1, 0)
-        sumflux!(du2, o2, 0)
+        sum_flux!(du1, o1, 0)
+        sum_flux!(du2, o2, 0)
         m1, C1, N1 = sumstate(du1, u1);
         m2, C2, N2 = sumstate(du2, u2);
 
