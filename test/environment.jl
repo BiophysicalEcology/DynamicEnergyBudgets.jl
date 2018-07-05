@@ -19,13 +19,15 @@ DynamicEnergyBudgets.get_environment(::Type{Val{:relhumidity}}, env, h, i) = 0.7
 DynamicEnergyBudgets.get_environment(::Type{Val{:radiation}}, env, h, i) = 985.0u"W*m^-2"
 DynamicEnergyBudgets.get_environment(::Type{Val{:par}}, env, h, i) = 3130.0u"mol*m^-2*s^-1"
 
+u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
+
 @testset "apply environment to deb vars" begin
     o1 = Organ(params=Params(assimilation=KooijmanSLAPhotosynthesis()), vars=Vars(assimilation=CarbonVars()));
     o2 = Organ(params=Params(assimilation=N_Assimilation()), vars=Vars(assimilation=NitrogenVars()));
     v1 = o1.vars; v2 = o2.vars
     va1 = v1.assimilation; va2 = v2.assimilation
 
-    apply(apply_environment!, (o1, o2), :no_env, 1)
+    apply(apply_environment!, (o1, o2), u, :not_nothing, 1)
     @test v1.temp == 23.7u"°C"
     @test va1.J_L_F == 3130.0u"mol*m^-2*s^-1"
 
@@ -36,8 +38,10 @@ end
 @testset "apply environment to deb vars" begin
     o = Organ(params=Params(assimilation=C3Photosynthesis()), vars=Vars(assimilation=Photosynthesis.PhotoVars()));
     v = o.vars; va = v.assimilation;
-    apply_environment!(o, :no_env, 1)
-    @test v.temp == 23.7u"°C"
+    apply_environment!(o, u, :no_env, 1)
+    @test va.tair == 23.7u"°C" 
+    @test va.tleaf > 30u"°C"
+    @test v.temp == va.tleaf
     @test va.windspeed == 3.7u"m*s^-1"
     @test va.rh == 0.74 
     @test va.rnet == 985.0u"W*m^-2"

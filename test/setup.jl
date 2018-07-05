@@ -1,6 +1,6 @@
 using Revise
 using DynamicEnergyBudgets
-using DynamicEnergyBudgets: Records, build_record, build_flux, keep_records!, sum_flux!, offset_apply!, set_state!
+using DynamicEnergyBudgets: Records, split_state, build_record, build_flux, keep_records!, sum_flux!, offset_apply!, set_state!
 using AxisArrays
 using Unitful
 
@@ -26,26 +26,26 @@ end
     Records(o, time)
 end
 
-@testset "setflux" begin
-    o = Organism();
-    apply(keep_records!, o.organs, o.records, 1)
-    rec = o.records[1];
-    or = o.organs[1];
-    @test or.J[1,1] == zero(or.J[1,1])
-    @test rec.J[1][1,1] == zero(or.J[1,1])
+# @testset "setflux" begin
+#     o = Organism();
+#     apply(keep_records!, o.organs, o.records, 1)
+#     rec = o.records[1];
+#     or = o.organs[1];
+#     @test or.J[1,1] == zero(or.J[1,1])
+#     @test rec.J[1][1,1] == zero(or.J[1,1])
 
-    or.J[1,1] = 10oneunit(or.J[1,1])
-    @test or.J[1,1] == 10oneunit(or.J[1,1])
-    @test rec.J[1][1,1] == 10oneunit(or.J[1,1])
+#     or.J[1,1] = 10oneunit(or.J[1,1])
+#     @test or.J[1,1] == 10oneunit(or.J[1,1])
+#     @test rec.J[1][1,1] == 10oneunit(or.J[1,1])
 
-    apply(keep_records!, o.organs, o.records, 5u"hr")
-    or.J[1,1] = 20oneunit(or.J[1,1])
-    @test or.J[1,1] == 20oneunit(or.J[1,1])
-    @test rec.J[5u"hr"][1,1] == 20oneunit(or.J[1,1])
-    or.J1[1,1] = 40oneunit(or.J1[1,1])
-    @test or.J1[1,1] == 40oneunit(or.J[1,1])
-    @test rec.J1[5u"hr"][1,1] == 40oneunit(or.J1[1,1])
-end
+#     apply(keep_records!, o.organs, o.records, 5u"hr")
+#     or.J[1,1] = 20oneunit(or.J[1,1])
+#     @test or.J[1,1] == 20oneunit(or.J[1,1])
+#     @test rec.J[5u"hr"][1,1] == 20oneunit(or.J[1,1])
+#     or.J1[1,1] = 40oneunit(or.J1[1,1])
+#     @test or.J1[1,1] == 40oneunit(or.J[1,1])
+#     @test rec.J1[5u"hr"][1,1] == 40oneunit(or.J1[1,1])
+# end
 
 @testset "sum_flux" begin
     du = fill(0.0u"mol/d", 12)
@@ -70,4 +70,15 @@ end
     @test or2.state[2] == 2.0u"mol"
     @test sum(or1.state) == 12.0u"mol"
     @test sum(or2.state) == 12.0u"mol"
+end
+
+
+@testset "split_state" begin
+    u = fill(2.0u"mol", 12)
+    o = Organism();
+    us = split_state(o, u)
+    @test us[1][1] == 2.0u"mol"
+    @test us[2][2] == 2.0u"mol"
+    @test sum(us[1]) == 12.0u"mol"
+    @test sum(us[1]) == 12.0u"mol"
 end

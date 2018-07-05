@@ -12,8 +12,8 @@ else
     using Test
 end
 
-sumstate(du, u::StatePVMCNE) = sum(du[[1,2,3,6]]), du[4], du[5]
-sumstate(du, u::StatePVCNE) = sum(du[[1,2,5]]), du[3], du[4]
+sumstate(du, u) = sum(du[[1,2,3,6]]), du[4], du[5]
+# sumstate(du, u) = sum(du[[1,2,5]]), du[3], du[4]
 
 sum_C_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
 sum_N_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
@@ -23,7 +23,7 @@ sum_N_loss(o) = o.J1[:E,:los] + o.J1[:N,:los] * o.shared.y_E_EN
 function factory()
     o = Organ()
     p = o.params
-    u = StatePVMCNE(9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol")
+    u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
     du = fill(0.0u"mol*hr^-1", 6)
     o, p, u, du
 end
@@ -137,7 +137,7 @@ end
     o.vars.rate = 0.1u"d^-1"
     o.vars.θE = 0.621
 
-    metabolism!(o)
+    metabolism!(o, u)
     sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 
@@ -152,7 +152,7 @@ end
     # reset loss because it's additive
     o.J1[:E,:los] = o.J1[:C,:los] = o.J1[:N,:los] = zero(o.J1[:N,:los])
 
-    metabolism!(o)
+    metabolism!(o,u)
     sum_flux!(du, o, 0)
     m, C, N = sumstate(du, u)
 

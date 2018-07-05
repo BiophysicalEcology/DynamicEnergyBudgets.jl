@@ -1,3 +1,4 @@
+using Revise
 using DynamicEnergyBudgets
 
 @static if VERSION < v"0.7.0-DEV.2005"
