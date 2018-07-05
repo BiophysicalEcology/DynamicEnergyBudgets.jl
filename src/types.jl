@@ -23,7 +23,7 @@ end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
 @SLA struct C3Photosynthesis{P} <: AbstractCarbonAssimilation
-    photoparams::P | Photosynthesis.EnergyBalance() | _ | _
+    photoparams::P | Photosynthesis.EnergyBalance() | _ | _ | _
 end
 
 " Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "

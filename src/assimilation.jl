@@ -2,16 +2,16 @@
     assimilation!(o1, o2)
 Runs assimilation methods, depending on formulation and state.
 """
-function assimilation!(o1, o2)
-    assimilation!(o1.params.assimilation, o1, o2, o1.state)
+function assimilation!(o1, o2, u)
+    assimilation!(o1.params.assimilation, o1, o2, u)
 end
 
 """
-    assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCNE)
+    assimilation!(f::AbstractCarbonAssimilation, o1, o2, u)
 Runs nitrogen uptake, and combines N with translocated C.
 """
-function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCNE)
-    germinated(u.V, o1.params.M_Vgerm) || return nothing
+function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u)
+    germinated(u[V], o1.params.M_Vgerm) || return nothing
 
     J1_EC_ass = photosynthesis(f, o1, o2)
 
@@ -24,12 +24,12 @@ function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u::AbstractStateCN
 end
 
 """
-    assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateCNE)
+    assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u)
 Runs nitrogen uptake for nitrate and ammonia, and combines N with translocated C.
 Unused ammonia is discarded.
 """
-function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateCNE)
-    germinated(u.V, o1.params.M_Vgerm) || return nothing
+function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u)
+    germinated(u[V], o1.params.M_Vgerm) || return nothing
 
     (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o1, o2)
 
@@ -47,11 +47,11 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u::AbstractStateC
 end
 
 """
-    assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u::AbstractStateCNE)
+    assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u)
 Runs nitrogen uptake, and combines N with translocated C.
 """
-function assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u::AbstractStateCNE)
-    germinated(u.V, o1.params.M_Vgerm) || return nothing
+function assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u)
+    germinated(u[V], o1.params.M_Vgerm) || return nothing
 
     J_N_assim = uptake_nitrogen(f, o1, o2)
 

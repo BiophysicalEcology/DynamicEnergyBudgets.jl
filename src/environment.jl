@@ -18,16 +18,16 @@ get_environment(::Type{Val{:par}}, env::MicroclimateData, interp, i) =
     lin_interp(env.metout[:SOLR], i) * 4.57u"mol*m^-2*s^-1"
 
 
-apply_environment!(o, env, t) = apply_environment!(o, o.params.assimilation, env, t)
-apply_environment!(o, env::Void, t) = nothing
+apply_environment!(o, u, env, t) = apply_environment!(o.params.assimilation, o, u, env, t)
+apply_environment!(o, u, env::Void, t) = nothing
 
-apply_environment!(o, a::AbstractCarbonAssimilation, env, t) = begin
-    p, v, u = components(o); va = v.assimilation;
+apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin
+    p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o)
+    h = v.height = allometric_height(p.allometry, o, u)
     interp = layer_setup(v.height)
 
-    v.temp = get_environment(Val{:airtemperature}, env, interp, pos)
+    va.tair = get_environment(Val{:airtemperature}, env, interp, pos)
     va.windspeed = get_environment(Val{:windspeed}, env, interp, pos)
     va.rh = get_environment(Val{:relhumidity}, env, interp, pos)
     va.rnet = get_environment(Val{:radiation}, env, interp, pos)
@@ -35,8 +35,8 @@ apply_environment!(o, a::AbstractCarbonAssimilation, env, t) = begin
     va.soilmoist = get_environment(Val{:soilwatercontent}, env, interp, pos)
     va.swp = get_environment(Val{:soilwaterpotential}, env, interp, pos)
 
-    if germinated(u.V, p.M_Vgerm)
-        phototranspiration!(va, va.photoparams)
+    if germinated(u[V], p.M_Vgerm)
+        phototranspiration!(va, p.assimilation.photoparams)
     else
         va.tleaf = v.temp
     end
@@ -45,10 +45,10 @@ apply_environment!(o, a::AbstractCarbonAssimilation, env, t) = begin
     v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
 end
 
-apply_environment!(o, a::KooijmanSLAPhotosynthesis, env, t) = begin
-    p, v, u = components(o); va = v.assimilation;
+apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
+    p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o)
+    h = v.height = allometric_height(p.allometry, o, u)
     interp = layer_setup(v.height)
 
     v.temp = get_environment(Val{:airtemperature}, env, interp, pos)
@@ -56,10 +56,10 @@ apply_environment!(o, a::KooijmanSLAPhotosynthesis, env, t) = begin
     v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
 end
 
-apply_environment!(o, a::AbstractNitrogenAssimilation, env, t) = begin
-    p, v, u = components(o); va = v.assimilation;
+apply_environment!(a::AbstractNitrogenAssimilation, o, u, env, t) = begin
+    p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o)
+    h = v.height = allometric_height(p.allometry, o, u)
     interp = layer_setup(v.height)
 
     v.temp = get_environment(Val{:soiltemperature}, env, interp, pos)

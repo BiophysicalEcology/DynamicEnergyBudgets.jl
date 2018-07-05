@@ -18,6 +18,11 @@ set_state!(organ::Organ, u::AbstractArray, offset::Int) = begin
     offset + length(organ.state)
 end
 
+split_state(o::Organism, u::AbstractArray) = begin
+    ranges = tuple([STATELEN * (i-1) + 1:STATELEN * i for i in 1:length(o.organs)]...)
+    broadcast(view, (u,), ranges)
+end
+
 " sum flux matrix " 
 sum_flux!(du, o::Organism) = begin
     offset_apply!(sum_flux!, du, o.organs, 0)
@@ -39,7 +44,7 @@ keep_records!(organ, records::Records, t) =
     organ.vars, organ.J, organ.J1 = records.vars[t], records.J[t], records.J1[t]
 keep_records!(organ, records::Void, t) = nothing
 
-set_environment!(o::Organism, t) = apply(apply_environment!, o.organs, o.environment, t)
+set_environment!(o::Organism, u, t) = apply(apply_environment!, o.organs, u, o.environment, t)
 
 "Handle dual number or other types in du if needed"
 check_du_type(du, o) = begin

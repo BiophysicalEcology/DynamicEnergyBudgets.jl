@@ -33,6 +33,14 @@ using AxisArrays,
 import CompositeFieldVectors.composite
 import Defaults.get_defaults
 
+P = 1
+V = 2
+M = 3
+C = 4
+N = 5
+E = 6
+STATELEN = 6
+
 @metafield composite true
 @metafield label ""
 @metafield units nothing

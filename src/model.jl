@@ -3,16 +3,23 @@ import CompositeFieldVectors: reconstruct
 """
 Run a DEB organism model.
 """
-(o::Organism)(du, u, p, t::Number; record=false;) = reconstruct(o, p)(du, u, t) 
+(o::Organism)(du, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number; record=false) = begin
+    # Handle unitless inputs
+    du1 = Any[d .* u"mol/hr" for d in du]
+    u1 = u .* u"mol"
+    reconstruct(o, p)(du1, u1, t * u"hr") 
+    du .= ustrip.(du1) 
+    du
+end
 (o::Organism)(du, u, p::Void, t::Number; record=false;) = begin
     record && keep_records!(o, t)
     o(du, u, t) 
 end
 
 function (o::Organism)(du, u, t::Number)
-    set_state!(o, u)
-    set_environment!(o, t)
-    debmodel!(o.organs)
+    u = split_state(o, u)
+    set_environment!(o, u, t)
+    debmodel!(o.organs, u)
     sum_flux!(du, o)
 end
 
@@ -24,37 +31,37 @@ Applies metabolism, translocation and assimilation mehtods to N organs.
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
-function debmodel!(organs::Tuple)
+function debmodel!(organs::Tuple, u::Tuple)
     swapped = (Base.tail(organs)..., organs[1])
-    apply(metabolism!, organs)
+    apply(metabolism!, organs, u)
     apply(translocation!, organs, swapped)
-    apply(assimilation!, organs, swapped)
+    apply(assimilation!, organs, swapped, u)
 end
 
 """
 Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
-function metabolism!(o)
-    set_scaling!(o)
-    catabolism!(o, o.state)
-    dissipation!(o, o.state)
-    feedback!(o, o.shared.feedback, o.state)
+function metabolism!(o, u)
+    set_scaling!(o, u)
+    catabolism!(o, u)
+    dissipation!(o, u)
+    feedback!(o, o.shared.feedback, u)
 end
 
 """
-    catabolism!(o, u::AbstractStateCNE, t::Number)
+    catabolism!(o, u, t::Number)
 Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
-function catabolism!(o, u::AbstractStateCNE)
-    p, v, u, sh, J, J1 = unpack(o); va = v.assimilation;
+function catabolism!(o, u)
+    p, v, sh, J, J1 = unpack(o); va = v.assimilation;
     scaled_turnover = (p.k_EC, p.k_EN, p.k_E) .* v.tempcorr .* v.scale
-    m = (u.C, u.N, u.E) ./ u.V
+    m = (u[C], u[N], u[E]) ./ u[V]
 
     v.rate = find_rate(v, m, scaled_turnover, p.j_E_mai * v.tempcorr, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
     (J1[:C,:cat], J1[:N,:cat], J1[:EE,:cat]) = 
-        catabolic_fluxes((u.C, u.N, u.E), scaled_turnover, v.rate)
+        catabolic_fluxes((u[C], u[N], u[E]), scaled_turnover, v.rate)
 
     (J1[:C,:rej], J1[:N,:rej], J1[:CN,:cat]) =
         synthesizing_unit(J1[:C,:cat], J1[:N,:cat], sh.y_E_CH_NO, sh.y_E_EN)
@@ -79,11 +86,11 @@ end
 Allocates reserves to growth.
 """
 function growth!(o, u)
-    p, v, u, sh, J, J1 = unpack(o)
-    grow = v.rate * u.V
+    p, v, sh, J, J1 = unpack(o)
+    grow = v.rate * u[V]
     J[:V,:gro] = grow 
     drain = -(1/p.y_V_E) * grow 
-    loss = (1/p.y_V_E - 1) * v.rate * u.V
+    loss = (1/p.y_V_E - 1) * v.rate * u[V]
     reserve_drain!(o, :gro, drain, v.θE)
     reserve_loss!(o, loss)
 end
@@ -95,20 +102,20 @@ Stores in M state variable if it exists.
 """
 function maturity!(f, o, u) end
 
-maturity!(f::Maturity, o, u::U) where U = maturity!(f, o, u, has_M(U))
-maturity!(f::Maturity, o, u, ::NoM) = begin
-    p, v, u, sh, J, J1 = unpack(o)
-    # TODO: why does rep maintenance stop increasing at M_Vrep?
-    # Is this a half finished reproduction model?
-    drain = -(f.κrep * J1[:E,:cat] + -f.j_E_rep_mai * v.tempcorr * min(u.V, f.M_Vrep))
-    reserve_drain!(o, :rep, drain, v.θE)
-    reserve_loss!(o, -drain)
-end
-maturity!(f::Maturity, o, u, ::HasM) = begin
-    p, v, u, sh, J, J1 = unpack(o)
+# maturity!(f::Maturity, o, u::U) where U = maturity!(f, o, u, has_M(U))
+# maturity!(f::Maturity, o, u, ::NoM) = begin
+#     p, v, sh, J, J1 = unpack(o)
+#     # TODO: why does rep maintenance stop increasing at M_Vrep?
+#     # Is this a half finished reproduction model?
+#     drain = -(f.κrep * J1[:E,:cat] + -f.j_E_rep_mai * v.tempcorr * min(u[V], f.M_Vrep))
+#     reserve_drain!(o, :rep, drain, v.θE)
+#     reserve_loss!(o, -drain)
+# end
+maturity!(f::Maturity, o, u) = begin
+    p, v, sh, J, J1 = unpack(o)
     J[:M,:gro] = f.κrep * J1[:E,:cat]
-    maint = -f.j_E_rep_mai * v.tempcorr * u.V
-    drain = -J[:M,:gro] + maint # min(u.V, f.M_Vrep))
+    maint = -f.j_E_rep_mai * v.tempcorr * u[V]
+    drain = -J[:M,:gro] + maint # min(u[V], f.M_Vrep))
     reserve_drain!(o, :rep, drain, v.θE)
     reserve_loss!(o, -maint)
 end
@@ -117,7 +124,7 @@ end
 Allocates reserve drain due to maintenance.
 """
 function maintenence!(o, u)
-    drain = -o.params.j_E_mai * o.vars.tempcorr * u.V
+    drain = -o.params.j_E_mai * o.vars.tempcorr * u[V]
     reserve_drain!(o, :mai, drain, o.vars.θE)
     reserve_loss!(o, -drain) # all maintenance is loss
 end
@@ -126,9 +133,9 @@ end
 Allocates waste products from growth and maintenance.
 """
 function product!(o, u)
-    p, v, u, sh, J, J1 = unpack(o)
+    p, v, sh, J, J1 = unpack(o)
     J[:P,:gro] = J[:V,:gro] * p.y_P_V
-    J[:P,:mai] = u.V * p.j_P_mai * v.tempcorr
+    J[:P,:mai] = u[V] * p.j_P_mai * v.tempcorr
     # undo the reserve loss from growth: it went to product
     loss_correction = -(J[:P,:gro] + J[:P,:mai])
     reserve_loss!(o, loss_correction)
@@ -226,7 +233,7 @@ function find_rate(v, m, scaled_turnover, args...)
     # Get rate with a zero finder
     find_zero(x -> rate_formula(x, m, scaled_turnover, args...), 0.1one_r, Order5(); 
               atol=BI_XTOL * one_r)
-    # one_r * 0.00001
+    one_r * 0.00001
 end
 
 """
@@ -236,9 +243,9 @@ Without a function like this you will likely be occasionally breaking the
 laws of thermodynamics by introducing negative rates.
 """
 feedback!(o, f::Void, u) = nothing
-feedback!(o, f::Autophagy, u::AbstractState) = begin
+feedback!(o, f::Autophagy, u) = begin
     hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
-    autophagy = u.V * (oneunit(hs) - hs)
+    autophagy = u[V] * (oneunit(hs) - hs)
     o.J[:C,:gro] += autophagy/o.shared.y_E_CH_NO
     o.J[:N,:gro] += autophagy/o.shared.y_E_EN
     o.J[:V,:gro] -= autophagy
@@ -246,7 +253,7 @@ feedback!(o, f::Autophagy, u::AbstractState) = begin
 end
 
 
-set_scaling!(o) = o.vars.scale = scaling(o.params.scaling, o.state.V)
+set_scaling!(o, u) = o.vars.scale = scaling(o.params.scaling, u[V])
 
 """
 """
@@ -266,13 +273,13 @@ germinated(M_V, M_Vgerm) = M_V > M_Vgerm
 
 """
 """
-allometric_height(f::SqrtAllometry, o) = begin
-    p, v, u, sh = unpack(o)
-    dim = oneunit(u.V * sh.w_V)
-    sqrt((u.P * sh.w_P + u.V * sh.w_V) / dim) * f.size
+allometric_height(f::SqrtAllometry, o, u) = begin
+    p, v, sh = unpack(o)
+    dim = oneunit(u[V] * sh.w_V)
+    sqrt((u[P] * sh.w_P + u[V] * sh.w_V) / dim) * f.size
 end
     
-unpack(o::Organ) = o.params, o.vars, o.state, o.shared, o.J, o.J1
+unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
 
 # J: Flux matrix diagram.
 # Rows: state.
