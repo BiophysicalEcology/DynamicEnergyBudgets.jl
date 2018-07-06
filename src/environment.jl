@@ -18,8 +18,10 @@ get_environment(::Type{Val{:par}}, env::MicroclimateData, interp, i) =
     lin_interp(env.metout[:SOLR], i) * 4.57u"mol*m^-2*s^-1"
 
 
-apply_environment!(o, u, env, t) = apply_environment!(o.params.assimilation, o, u, env, t)
-apply_environment!(o, u, env::Void, t) = nothing
+
+apply_environment!(o::Organism, u, t) = apply(apply_environment!, o.organs, u, o.environment, t)
+apply_environment!(o::Organ, u, env, t) = apply_environment!(o.params.assimilation, o, u, env, t)
+apply_environment!(o::Organ, u, env::Void, t) = nothing
 
 apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
@@ -43,6 +45,7 @@ apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin
 
     v.temp = va.tleaf
     v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    nothing
 end
 
 apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
@@ -54,6 +57,7 @@ apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
     v.temp = get_environment(Val{:airtemperature}, env, interp, pos)
     va.J_L_F = get_environment(Val{:par}, env, interp, pos)
     v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    nothing
 end
 
 apply_environment!(a::AbstractNitrogenAssimilation, o, u, env, t) = begin
@@ -66,4 +70,5 @@ apply_environment!(a::AbstractNitrogenAssimilation, o, u, env, t) = begin
     va.X_H = get_environment(Val{:soilwatercontent}, env, interp, pos) * water_fraction_to_M
 
     v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    nothing
 end

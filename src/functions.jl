@@ -24,10 +24,17 @@ Rate formulas for E, CN or CNE reserves
 function rate_formula(r, ureserve::NTuple{3}, A_turnover::NTuple{3}, 
                       j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
     (j_EC, j_EN, j_E) = catabolic_fluxes(ureserve, A_turnover, r)
-
     j_ECN = stoich_merge(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
+    y_V_E * (κsoma * (j_E + j_ECN) - j_E_mai) - r
+end
 
-    return y_V_E * (κsoma * (j_E + j_ECN) - j_E_mai) - r
+function rate_bracket(ureserve::NTuple{3}, A_turnover::NTuple{3}, 
+                     j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)::NTuple{2}
+    # Calculate the limits of the rate_formula function when C or N → ∞
+    (uEC, uEN, uE) = ureserve
+    (AEC, AEN, AE) = A_turnover
+    lim(y) = (uE * AE + uEC * AEC - j_E_mai/(κsoma * y))/(1/(y_V_E * κsoma * y) + uE + uEC * y)
+    (lim(y_E_EN), lim(y_E_CH_NO))
 end
 
 """

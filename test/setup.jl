@@ -11,19 +11,19 @@ else
 end
 
 @testset "build records" begin
-    time=0u"hr":1u"hr":10u"hr"
-    a = build_record(build_flux(1.0u"mol/hr", [:one,:two], [:A,:B]), time)
-    @test axisnames(a) == (:time,)
-    @test axisvalues(a) == (0u"hr":1u"hr":10u"hr",)
-    @test axisnames(a[1]) == (:state, :transformations)
-    @test axisvalues(a[1]) == (([:one, :two]), ([:A, :B]))
-    @test a[1][:one,:A] == 0.0u"mol/hr"
-    @test a[2][:one,:A] == 0.0u"mol/hr"
-    a[1][:one,:A] = 10.0u"mol/hr"
-    @test a[0.0u"hr"][:one,:A] == 10.0u"mol/hr"
-    @test a[1.0u"hr"][:one,:A] == 0.0u"mol/hr"
-    o = Organ()
-    Records(o, time)
+    # time=0u"hr":1u"hr":10u"hr"
+    # a = build_record(build_flux(1.0u"mol/hr", [:one,:two], [:A,:B]), time)
+    # @test axisnames(a) == (:time,)
+    # @test axisvalues(a) == (0u"hr":1u"hr":10u"hr",)
+    # @test axisnames(a[1]) == (:state, :transformations)
+    # @test axisvalues(a[1]) == (([:one, :two]), ([:A, :B]))
+    # @test a[1][:one,:A] == 0.0u"mol/hr"
+    # @test a[2][:one,:A] == 0.0u"mol/hr"
+    # a[1][:one,:A] = 10.0u"mol/hr"
+    # @test a[0.0u"hr"][:one,:A] == 10.0u"mol/hr"
+    # @test a[1.0u"hr"][:one,:A] == 0.0u"mol/hr"
+    # o = Organ()
+    # Records(o, time)
 end
 
 # @testset "setflux" begin
@@ -74,8 +74,8 @@ end
 
 
 @testset "split_state" begin
-    u = fill(2.0u"mol", 12)
     o = Organism();
+    u = fill(2.0u"mol", 12)
     us = split_state(o, u)
     @test us[1][1] == 2.0u"mol"
     @test us[2][2] == 2.0u"mol"

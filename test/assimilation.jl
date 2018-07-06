@@ -13,10 +13,10 @@ end
 sumstate(du, u::StatePVMCNE) = sum(du[[1,2,3,6]]), du[4], du[5]
 sumstate(du, u::StatePVCNE) = sum(du[[1,2,5]]), du[3], du[4]
 
-sum_C_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:C,:los] + o2.J1[:C,:los]) * o1.shared.y_E_CH_NO
-sum_N_loss(o1, o2) = o1.J1[:E,:los] + o2.J1[:E,:los] + (o1.J1[:N,:los] + o2.J1[:N,:los]) * o1.shared.y_E_EN
+sum_c_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[C,los] + o2.J1[C,los]) * o1.shared.y_E_CH_NO
+sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los]) * o1.shared.y_E_EN
 
-function Nfactory()
+function nfactory()
     o1 = Organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8), 
                vars=Vars(assimilation=NitrogenVars()));;
     p1 = o1.params
@@ -34,7 +34,7 @@ function Nfactory()
     o1, p1, u1, du1, o2, p2, u2, du2, f
 end
 
-function Cfactory()
+function cfactory()
     o1 = Organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8), 
                vars=Vars(assimilation=CarbonVars()));;
     p1 = o1.params;
@@ -100,31 +100,31 @@ end
         assimilation!(f, o1, o2, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, C1, N1 = sumstate(du1, u1)
-        m2, C2, N2 = sumstate(du2, u2)
-        @test N1 == o1.J[:N,:ass]
-        @test N1 == uptake_nitrogen(f, o1, o2)
+        m1, c1, n1 = sumstate(du1, u1)
+        m2, c2, n2 = sumstate(du2, u2)
+        @test n1 == o1.J[N,ass]
+        @test n1 == uptake_nitrogen(f, o1, o2)
     end
 
     @testset "assimilation flux is merged correctly" begin
-        o1, p1, u1, du1, o2, p2, u2, du2, f = Nfactory();
-        o1.J1[:C,:rej] = 2.3oneunit(o1.J1[1,1])
-        o2.J1[:C,:rej] = 2.1oneunit(o2.J1[1,1])
-        o1.J1[:N,:rej] = 1.9oneunit(o1.J1[1,1])
-        o2.J1[:N,:rej] = 22.3oneunit(o2.J1[1,1])
+        o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory();
+        o1.J1[C,rej] = 2.3oneunit(o1.J1[1,1])
+        o2.J1[C,rej] = 2.1oneunit(o2.J1[1,1])
+        o1.J1[N,rej] = 1.9oneunit(o1.J1[1,1])
+        o2.J1[N,rej] = 22.3oneunit(o2.J1[1,1])
 
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1a, C1a, N1a = sumstate(du1, u1)
-        m2a, C2a, N2a = sumstate(du2, u2)
+        m1a, c1a, n1a = sumstate(du1, u1)
+        m2a, c2a, n2a = sumstate(du2, u2)
 
-        o1, p1, u1, du1, o2, p2, u2, du2, f = Nfactory()
-        o1.J1[:C,:rej] = 2.3oneunit(o1.J1[1,1])
-        o2.J1[:C,:rej] = 2.1oneunit(o2.J1[1,1])
-        o1.J1[:N,:rej] = 1.9oneunit(o1.J1[1,1])
-        o2.J1[:N,:rej] = 22.3oneunit(o2.J1[1,1])
+        o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory()
+        o1.J1[C,rej] = 2.3oneunit(o1.J1[1,1])
+        o2.J1[C,rej] = 2.1oneunit(o2.J1[1,1])
+        o1.J1[N,rej] = 1.9oneunit(o1.J1[1,1])
+        o2.J1[N,rej] = 22.3oneunit(o2.J1[1,1])
 
         uptake_n = uptake_nitrogen(f, o1, o2)
 
@@ -133,21 +133,21 @@ end
         assimilation!(f, o1, o2, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, C1, N1 = sumstate(du1, u1)
-        m2, C2, N2 = sumstate(du2, u2)
+        m1, c1, n1 = sumstate(du1, u1)
+        m2, c2, n2 = sumstate(du2, u2)
 
-        @test_broken C1a == C1 # Assimilation should not have added any C
-        @test C2a == C2
-        @test N1a != N1 # Assimilation should have added some N
-        @test N2a == N2
+        @test_broken c1a == c1 # Assimilation should not have added any C
+        @test c2a == c2
+        @test n1a != n1 # Assimilation should have added some N
+        @test n2a == n2
         @test m1 != m1a # Assimilation should have added some reserve
         @test m2 == m2a
 
-        c_loss = sum_C_loss(o1, o2)
-        n_loss = sum_N_loss(o1, o2)
+        c_loss = sum_c_loss(o1, o2)
+        n_loss = sum_n_loss(o1, o2)
         @test -c_loss != zero(c_loss)
-        @test upreferred(m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
-        @test upreferred(m1 + m2 + (N1 + N2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n /o1.shared.n_N_E
+        @test upreferred(m1 + m2 + (c1 + c2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
+        @test upreferred(m1 + m2 + (n1 + n2) * o1.shared.y_E_EN) ≈ -n_loss + uptake_n /o1.shared.n_N_E
 
     end
 end
@@ -155,7 +155,7 @@ end
 
 
 @testset "C assimilation" begin
-    o1, p1, u1, du1, o2, p2, u2, du2, f = Cfactory();
+    o1, p1, u1, du1, o2, p2, u2, du2, f = cfactory();
     photosynthesis(f, o1, o2)
 
     @testset "C assimilation depends on air C concentration sub-linealy" begin
@@ -223,32 +223,32 @@ end
         assimilation!(f, o1, o2, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, C1, N1 = sumstate(du1, u1)
-        m2, C2, N2 = sumstate(du2, u2)
-        @test C1 == o1.J[:C,:ass]
-        @test C1 == photosynthesis(f, o1, o2)
+        m1, c1, n1 = sumstate(du1, u1)
+        m2, c2, n2 = sumstate(du2, u2)
+        @test c1 == o1.J[C,ass]
+        @test c1 == photosynthesis(f, o1, o2)
     end
 
     @testset "C assimilation flux is merged correctly" begin
 
-        o1, p1, u1, du1, o2, p2, u2, du2, f = Cfactory();
-        o1.J1[:C,:rej] = 1.3oneunit(o1.J1[1,1])
-        o2.J1[:C,:rej] = 3.0oneunit(o2.J1[1,1])
-        o1.J1[:N,:rej] = 2.4oneunit(o1.J1[1,1])
-        o2.J1[:N,:rej] = 2.9oneunit(o2.J1[1,1])
+        o1, p1, u1, du1, o2, p2, u2, du2, f = cfactory();
+        o1.J1[C,rej] = 1.3oneunit(o1.J1[1,1])
+        o2.J1[C,rej] = 3.0oneunit(o2.J1[1,1])
+        o1.J1[N,rej] = 2.4oneunit(o1.J1[1,1])
+        o2.J1[N,rej] = 2.9oneunit(o2.J1[1,1])
 
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1a, C1a, N1a = sumstate(du1, u1)
-        m2a, C2a, N2a = sumstate(du2, u2)
+        m1a, c1a, n1a = sumstate(du1, u1)
+        m2a, c2a, n2a = sumstate(du2, u2)
 
-        o1, p1, u1, du1, o2, p2, u2, du2, f = Cfactory();
-        o1.J1[:C,:rej] = 1.3oneunit(o1.J1[1,1])
-        o2.J1[:C,:rej] = 3.0oneunit(o2.J1[1,1])
-        o1.J1[:N,:rej] = 2.4oneunit(o1.J1[1,1])
-        o2.J1[:N,:rej] = 2.9oneunit(o2.J1[1,1])
+        o1, p1, u1, du1, o2, p2, u2, du2, f = cfactory();
+        o1.J1[C,rej] = 1.3oneunit(o1.J1[1,1])
+        o2.J1[C,rej] = 3.0oneunit(o2.J1[1,1])
+        o1.J1[N,rej] = 2.4oneunit(o1.J1[1,1])
+        o2.J1[N,rej] = 2.9oneunit(o2.J1[1,1])
 
         reuse_rejected!(o1, o2)
         reuse_rejected!(o2, o1)
@@ -256,21 +256,21 @@ end
         assimilation!(f, o1, o2, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, C1, N1 = sumstate(du1, u1);
-        m2, C2, N2 = sumstate(du2, u2);
+        m1, c1, n1 = sumstate(du1, u1);
+        m2, c2, n2 = sumstate(du2, u2);
 
-        @test C1a != C1 # Assimilation should have added some C
-        @test C2a == C2
-        @test_broken N1a == N1 # Assimilation shouldnt have added any N
-        @test N2a == N2
+        @test c1a != c1 # assimilation should have added some c
+        @test c2a == c2
+        @test_broken n1a == n1 # Assimilation shouldnt have added any N
+        @test n2a == n2
         @test m1 != m1a # Assimilation should have added some reserve
         @test m2 == m2a
 
-        c_loss = sum_C_loss(o1, o2)
+        c_loss = sum_c_loss(o1, o2)
         n_loss = sum_N_loss(o1, o2)
         @test -c_loss != zero(c_loss)
-        @test upreferred(m1 + m2 + (C1 + C2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss + uptake_c * o1.shared.y_E_CH_NO)
-        @test m1 + m2 + (N1 + N2) * o1.shared.y_E_EN ≈ -n_loss
+        @test upreferred(m1 + m2 + (c1 + c2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss + uptake_c * o1.shared.y_E_CH_NO)
+        @test m1 + m2 + (n1 + n2) * o1.shared.y_E_EN ≈ -n_loss
 
     end
 end

@@ -1,20 +1,36 @@
+# Parameter helper functions
+watts_to_light_mol(watts) = watts * 4.57e-6
+light_mol_to_watts(light_mol) = light_mol / 4.57e-6
+water_content_to_mols_per_litre(wc) = wc * 55.5 # L/L of water to mol/L 
+fraction_per_litre_gas_to_mols(frac) = frac / 22.4
+
+Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
+    d = default(t, F) 
+    u = units(t, F)
+    (u == nothing || d == nothing) ? d : d * u
+end
+
 @chaingang columns @label @range @units @default_kw
+
 
 " Assimilation "
 abstract type AbstractAssimilation end
-" Paraent of all Carbon assimilation types"
+
+" Parent of all Carbon assimilation types"
 abstract type AbstractCarbonAssimilation <: AbstractAssimilation end
-" Paraent of all Nitrogen assimilation types"
+
+" Parent of all Nitrogen assimilation types"
 abstract type AbstractNitrogenAssimilation <: AbstractAssimilation end
+
 " Parent of Ammonia/Nitrate assimilation types"
 abstract type AbstractNH4_NO3Assimilation <: AbstractNitrogenAssimilation end
 
-@units @default_kw struct ConstantCarbonAssimilation{μMoMS} <: AbstractCarbonAssimilation
-    uptake::μMoMS | 10.0 | u"μmol*mol^-1*s^-1"
+@columns struct ConstantCarbonAssimilation{μMoMS} <: AbstractCarbonAssimilation
+    uptake::μMoMS | 10.0 | u"μmol*mol^-1*s^-1" | _ | _
 end
 
-@units @default_kw struct ConstantNitrogenAssimilation{μMoMS} <: AbstractNitrogenAssimilation
-    uptake::μMoMS | 1.0 | u"mol*mol^-1*s^-1"
+@columns struct ConstantNitrogenAssimilation{μMoMS} <: AbstractNitrogenAssimilation
+    uptake::μMoMS | 1.0 | u"mol*mol^-1*s^-1" | _ | _ 
 end
 
 @mix @columns struct SLA{MG}
@@ -158,14 +174,14 @@ end
 end
 
 " Variables for nitgroen assimilation "
-@units @default_kw mutable struct NitrogenVars{F,MoL}
+@columns mutable struct NitrogenVars{F,MoL}
     # TODO work out the naming conventions here
-    soilmoist::F    | 1.0  | _
-    soilpot::F      | 1.0  | _
-    soilpotshade::F | 1.0  | _
-    X_NH::MoL       | 0.005| u"mol*L^-1"  # | "concentration of ammonia"
-    X_NO::MoL       | 0.01 | u"mol*L^-1"  # | "concentration of nitrate see e.g. [_@crawford1998molecular]"
-    X_H::MoL        | 10.0 | u"mol*L^-1"  # | 
+    soilmoist::F    | 1.0  | _           |  _ | _
+    soilpot::F      | 1.0  | _           |  _ | _
+    soilpotshade::F | 1.0  | _           |  _ | _
+    X_NH::MoL       | 0.005| u"mol*L^-1" |  _ | _ # | "concentration of ammonia"
+    X_NO::MoL       | 0.01 | u"mol*L^-1" |  _ | _ # | "concentration of nitrate see e.g. [_@crawford1998molecular]"
+    X_H::MoL        | 10.0 | u"mol*L^-1" |  _ | _ # | 
 end
 
 " Model variables "
@@ -180,8 +196,7 @@ end
 end
 
 " Basic model components. For a plants, organs might be roots, stem and leaves "
-@composite mutable struct Organ{S,P,SH,V,F,F1}
-    state::S     | false
+@flatten mutable struct Organ{S,P,SH,V,F,F1}
     name::Symbol | false
     params::P    | true
     shared::SH   | false
@@ -190,25 +205,19 @@ end
     J1::F1       | false
 end
 "Construtor with keyword argument defaults"
-Organ(; state = StatePVMCNE(),
-        name = :Shoot,
+Organ(; name = :Shoot,
         params = Params(),
         shared = SharedParams(),
         vars = Vars()
      ) = begin
-    Organ(state, name, params, shared, vars)
+    Organ(name, params, shared, vars)
 end
-Organ(state, name::Symbol, params, shared, vars) = begin
-    one_flux = oneunit_flux(params, state)
-    J = build_J(one_flux, state)
-    J1 = build_J1(one_flux, state)
+Organ(name::Symbol, params, shared, vars) = begin
+    one_flux = oneunit_flux(params)
+    J = build_J(one_flux)
+    J1 = build_J1(one_flux)
     Organ(state, name, params, shared, vars, J, J1)
 end
-
-Shoot() = Organ(params=Params(assimilation=ConstantCarbonAssimilation()), 
-                              vars=Vars(assimilation=nothing))
-Root() = Organ(params=Params(assimilation=ConstantNitrogenAssimilation()), 
-                             vars=Vars(assimilation=nothing))
 
 "Records of variables and flux for ploting and analysis"
 struct Records{V,F,F1}
@@ -224,8 +233,16 @@ Records(o::Organ, time) = begin
     Records(varsrec, Jrec, J1rec)
 end
 
+struct Record{V,F,F1}
+    vars::V
+    J::F
+    J1::F1
+end
+Record(recs::Records, t) = Record(recs.vars[t], recs.J[t], recs.J1[t], 
+
+
 "An organism, made up of organs"
-@composite struct Organism{O,S,E,R}
+@flatten struct Organism{O,S,E,R}
     organs::O      | true
     shared::S      | true
     environment::E | false
@@ -246,17 +263,3 @@ Organism(; organs = (Shoot(), Root()),
     end
     Organism(organs, shared, environment, tuple(records...))
 end
-
-UntypedVars(;kwargs...) = default_kw(Vars{Any,Any,Any,Any,Any}; kwargs...)
-UntypedOrgan(state::S, name::N, params::P, shared::Sh, vars::V) where {S,N,P,Sh,V} = begin
-    # Get flux units from params, instead of explicitly.
-    one_flux = oneunit_flux(params, state)
-    J = build_J(one_flux, state; typ = Any)
-    J1 = build_J1(one_flux, state; typ = Any)
-    Organ{S,N,P,Sh,V,typeof(J),typeof(J1)}(state, name, params, shared, vars, J, J1)
-end
-UntypedShoot() = Organ(vars=UntypedVars(assimilation=nothing), 
-                     params=Params(assimilation=ConstantCarbonAssimilation()))
-UntypedRoot() = Organ(vars=UntypedVars(assimilation=nothing), 
-                    params=Params(assimilation=ConstantNitrogenAssimilation()))
-UntypedOrganism() = Organism(time=0:1:1000, organs=(UntypedShoot(), UntypedRoot())) 

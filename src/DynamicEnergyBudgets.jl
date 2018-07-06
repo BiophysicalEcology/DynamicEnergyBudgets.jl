@@ -18,30 +18,24 @@ module DynamicEnergyBudgets
 using AxisArrays,
       StaticArrays,
       Unitful,
-      Roots,
+      SimpleRoots,
       OrdinaryDiffEq,
       Mixers,
       MetaFields,
       Parameters,
       Defaults,
+      ForwardDiff,
       Microclimate,
       Photosynthesis,
       Chaingang,
       CompositeFieldVectors,
       DocStringExtensions
 
-import CompositeFieldVectors.composite
+import CompositeFieldVectors.flatten
 import Defaults.get_defaults
 
-P = 1
-V = 2
-M = 3
-C = 4
-N = 5
-E = 6
-STATELEN = 6
 
-@metafield composite true
+@metafield flatten true
 @metafield label ""
 @metafield units nothing
 @metafield range [0.0, 1.0]
@@ -52,22 +46,40 @@ STATELEN = 6
     $(DOCSTRING)
     """
 
-Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
-    d = default(t, F) 
-    u = units(t, F)
-    (u == nothing || d == nothing) ? d : d * u
-end
-
 Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
+
+const P = 1
+const V = 2
+const M = 3
+const C = 4
+const N = 5
+const E = 6
+
+const EE = 1
+const CN = 2
+
+const STATELEN = 6
+
+const ass = 1
+const gro = 2 
+const rej = 3 
+const mai = 4 
+const rep = 5 
+const tra = 6
+
+const cat = 1
+const los = 2
+const rej = 3
 
 const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
 const TRANS1 = [:cat, :rej, :los]
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
+# include("state.jl")
 include("state.jl")
-include("conversions.jl")
 include("types.jl")
+include("aliases.jl")
 include("environment.jl")
 include("assimilation.jl")
 include("model.jl")

@@ -1,27 +1,44 @@
 export apply
 using Base.tail
 
-apply(f::F, a::Tuple{A,Vararg}, args...) where {F,A} = 
-    (f(a[1], args...), apply(f, tail(a), args...)...)
-apply(f::F, a::Tuple{A,Vararg}, b::Tuple{B,Vararg}, args...) where {F,A,B} = 
-    (f(a[1], b[1], args...), apply(f, tail(a), tail(b), args...)...)
-apply(f::F, a::Tuple{A,Vararg}, b::Tuple{B,Vararg}, c::Tuple{C,Vararg}, args...) where {F,A,B,C} = 
-    (f(a[1], b[1], c[1], args...), apply(f, tail(a), tail(b), tail(c), args...)...)
-apply(f, ::Tuple{}, ::Tuple{}, ::Tuple{}, args...) = tuple()
-apply(f, a, ::Tuple{}, ::Tuple{}, args...) = tuple()
-apply(f, ::Tuple{}, b, ::Tuple{}, args...) = tuple()
-apply(f, a, b, ::Tuple{}, args...) = tuple()
-apply(f, ::Tuple{}, ::Tuple{}, args...) = tuple()
-apply(f, a, ::Tuple{}, args...) = tuple()
-apply(f, ::Tuple{}, args...) = tuple()
+apply(f::F, a::Tuple{A,Vararg}, args...) where {F,A} = begin
+    f(a[1], args...)
+    apply(f, tail(a), args...)
+    nothing
+end
+apply(f::F, a::Tuple{A,Vararg}, b::Tuple{B,Vararg}, args...) where {F,A,B} = begin
+    f(a[1], b[1], args...)
+    apply(f, tail(a), tail(b), args...)
+    nothing
+end
+apply(f::F, a::Tuple{A,Vararg}, b::Tuple{B,Vararg}, c::Tuple{C,Vararg}, args...) where {F,A,B,C} = begin
+    f(a[1], b[1], c[1], args...)
+    apply(f, tail(a), tail(b), tail(c), args...)
+    nothing
+end
+apply(f, ::Tuple{}, ::Tuple{}, ::Tuple{}, args...) = nothing
+apply(f, a, ::Tuple{}, ::Tuple{}, args...) = nothing
+apply(f, ::Tuple{}, b, ::Tuple{}, args...) = nothing
+apply(f, a, b, ::Tuple{}, args...) = nothing
+apply(f, ::Tuple{}, ::Tuple{}, args...) = nothing
+apply(f, a, ::Tuple{}, args...) = nothing
+apply(f, ::Tuple{}, args...) = nothing
 
 offset_apply!(f, o::Tuple{O,Vararg}, a::AbstractArray, offset::Int, args...) where O = begin
     offset = f(o[1], a, offset, args...)
     offset_apply!(f, tail(o), a, offset::Int, args...)
+    nothing
 end
 offset_apply!(f, a::AbstractArray, o::Tuple{O,Vararg}, offset::Int, args...) where O = begin
     offset = f(a, o[1], offset, args...)
     offset_apply!(f, a, tail(o), offset::Int, args...)
+    nothing
 end
+offset_apply!(f, o::Tuple{O,Vararg}, offset::Int, args...) where O = begin
+    offset = f(o[1], offset, args...)
+    offset_apply!(f, tail(o), offset::Int, args...)
+    nothing
+end
+offset_apply!(f, o::Tuple{}, offset::Int, args...) = nothing
 offset_apply!(f, a::AbstractArray, o::Tuple{}, offset::Int, args...) = nothing
 offset_apply!(f, o::Tuple{}, a::AbstractArray, offset::Int, args...) = nothing
