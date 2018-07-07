@@ -1,10 +1,9 @@
 """
-    assimilation!(o1, o2)
+    assimilation!(o1, o2, u)
 Runs assimilation methods, depending on formulation and state.
 """
-function assimilation!(o1, o2, u)
-    assimilation!(o1.params.assimilation, o1, o2, u)
-end
+assimilation!(organs::Tuple, swapped::Tuple, u) = apply(assimilation!, organs, swapped, u)
+assimilation!(o1::Organ, o2::Organ, u) = assimilation!(o1.params.assimilation, o1, o2, u)
 
 """
     assimilation!(f::AbstractCarbonAssimilation, o1, o2, u)
@@ -13,7 +12,7 @@ Runs nitrogen uptake, and combines N with translocated C.
 function assimilation!(f::AbstractCarbonAssimilation, o1, o2, u)
     germinated(u[V], o1.params.M_Vgerm) || return nothing
 
-    J1_EC_ass = photosynthesis(f, o1, o2)
+    J1_EC_ass = photosynthesis(f, o1, o2, u)
 
     o1.J[C,ass] = J1_EC_ass
     # Merge rejected N from root and photosynthesized C into reserves
@@ -31,7 +30,7 @@ Unused ammonia is discarded.
 function assimilation!(f::AbstractNH4_NO3Assimilation, o1, o2, u)
     germinated(u[V], o1.params.M_Vgerm) || return nothing
 
-    (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o1, o2)
+    (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o1, o2, u)
 
     θNH = J_NH_ass/J_N_ass                          # Fraction of ammonia in arriving N-flux
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
@@ -53,7 +52,7 @@ Runs nitrogen uptake, and combines N with translocated C.
 function assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u)
     germinated(u[V], o1.params.M_Vgerm) || return nothing
 
-    J_N_assim = uptake_nitrogen(f, o1, o2)
+    J_N_assim = uptake_nitrogen(f, o1, o2, u)
 
     # Merge rejected C from shoot and uptaken N into reserves
     (o1.J[C,tra], o1.J[N,ass], o1.J[E,ass]) =
@@ -68,24 +67,24 @@ function assimilation!(f::AbstractNitrogenAssimilation, o1, o2, u)
 end
 
 """
-    photosynthesis(f::ConstantCarbonAssimilation, o1, o2)
+    photosynthesis(f::ConstantCarbonAssimilation, o1, o2, u)
 Returns a constant rate of carbon assimilation.
 """
-photosynthesis(f::ConstantCarbonAssimilation, o1, o2) = f.uptake * o1.state.V * o1.vars.scale
+photosynthesis(f::ConstantCarbonAssimilation, o1, o2, u) =
+    f.uptake * u[V] * o1.vars.scale
 
 """
-    photosynthesis(f::C3Photosynthesis, o1, o2)
+    photosynthesis(f::FvCBPhotosynthesis, o1, o2, u)
 Returns carbon assimilated in mols per time.
 """
-function photosynthesis(f::C3Photosynthesis, o1, o2)
-    o1.vars.assimilation.aleaf * f.SLA * o1.params.w_V * o1.state.V
-end
+photosynthesis(f::FvCBPhotosynthesis, o1, o2, u) =
+    o1.vars.assimilation.aleaf * f.SLA * o1.shared.w_V * u[V]
 
 """
-    photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
+    photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2, u)
 Returns carbon assimilated in mols per time.
 """
-function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
+function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2, u)
     v = o1.vars; va = v.assimilation
     mass_area_coef = o1.shared.w_V * f.SLA
     j1_l = half_saturation(f.j_L_Amax, f.J_L_K, va.J_L_F) * mass_area_coef
@@ -102,40 +101,40 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o1, o2)
     co_l = j1_co/j1_l - j1_co/ (j1_l + j1_co)
     # dimless
 
-    j_c_intake / (1 + bound_c + bound_o + co_l) * o1.state.V * v.scale
+    j_c_intake / (1 + bound_c + bound_o + co_l) * u[V] * v.scale
 end
 
 """
-    uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2)
+    uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2, u)
 Returns constant nitrogen assimilation.
 """
-uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2) = f.uptake * o1.state.V * o1.vars.scale
+uptake_nitrogen(f::ConstantNitrogenAssimilation, o1, o2, u) = f.uptake * u[V] * o1.vars.scale
 
 """
-    uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)
+    uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2, u)
 Returns total nitrogen, nitrate and ammonia assimilated in mols per time.
 """
-function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2)
+function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o1, o2, u)
     p = o1.params; v = o1.vars; va = v.assimilation
 
     K1_NH = half_saturation(f.K_NH, f.K_H * v.scale, va.X_H * o2.vars.scale) # Ammonia saturation
     K1_NO = half_saturation(f.K_NO, f.K_H * v.scale, va.X_H * o2.vars.scale) # Nitrate saturation
-    J1_NH_ass = o1.state.V * v.scale * half_saturation(f.j_NH_Amax, K1_NH, va.X_NH) # Arriving ammonia mols.mol⁻¹.s⁻¹
-    J_NO_ass = o1.state.V * v.scale * half_saturation(f.j_NO_Amax, K1_NO, va.X_NO) # Arriving nitrate mols.mol⁻¹.s⁻¹
+    J1_NH_ass = u[V] * v.scale * half_saturation(f.j_NH_Amax, K1_NH, va.X_NH) # Arriving ammonia mols.mol⁻¹.s⁻¹
+    J_NO_ass = u[V] * v.scale * half_saturation(f.j_NO_Amax, K1_NO, va.X_NO) # Arriving nitrate mols.mol⁻¹.s⁻¹
 
     J_N_ass = J1_NH_ass + f.ρNO * J_NO_ass # Total arriving N flux
     return (J_N_ass, J_NO_ass, J1_NH_ass)
 end
 
 """
-    uptake_nitrogen(f::N_Assimilation, o1, o2)
+    uptake_nitrogen(f::N_Assimilation, o1, o2, u)
 Returns nitrogen assimilated in mols per time.
 """
-function uptake_nitrogen(f::N_Assimilation, o1, o2)
+function uptake_nitrogen(f::N_Assimilation, o1, o2, u)
     v = o1.vars; va = v.assimilation
     # Ammonia proportion in soil water
     K1_N = half_saturation(f.K_N, f.K_H * v.scale, va.X_H * o2.vars.scale)
     # Arriving ammonia in mol mol^-1 s^-1
-    o1.state.V * v.scale * half_saturation(f.j_N_Amax, K1_N, va.X_NO)
+    u[V] * v.scale * half_saturation(f.j_N_Amax, K1_N, va.X_NO)
 end
 

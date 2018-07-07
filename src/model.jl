@@ -4,19 +4,19 @@ import CompositeFieldVectors: reconstruct
 Run a DEB organism model.
 """
 (o::Organism)(du, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number; record=false) = begin
-    # Handle unitless inputs
-    # du1 = Any[d .* u"mol/hr" for d in du]
-    # u1 = u .* u"mol"
-    # reconstruct(o, p)(du1, u1, t * u"hr") 
-    # if typeof(du1[1]) <: ForwardDiff.Dual
-        # ustrip.(du1)
-    # else
-        # du2 = ustrip.(du1)
-        # if eltype(du2) == eltype(du)
-            # du .= du2
-        # end
-        # du2
-    # end
+    Handle unitless inputs
+    du1 = Any[d .* u"mol/hr" for d in du]
+    u1 = u .* u"mol"
+    reconstruct(o, p)(du1, u1, t * u"hr") 
+    if typeof(du1[1]) <: ForwardDiff.Dual
+        ustrip.(du1)
+    else
+        du2 = ustrip.(du1)
+        if eltype(du2) == eltype(du)
+            du .= du2
+        end
+        du2
+    end
 end
 (o::Organism)(du, u, p::Void, t::Number; record=false;) = begin
     record && keep_records!(o, t)
@@ -25,7 +25,10 @@ end
 
 function (o::Organism)(du, u, t::Number)
     ux = split_state(o, u)
-    apply_environment!(o, ux, t)
+    organs = o.organs
+    # apply_environment!(o, ux, t)
+    apply_environment!(organs[1].params.assimilation, organs[1], u, o.environment, t)
+    apply_environment!(organs[2].params.assimilation, organs[2], u, o.environment, t)
     debmodel!(o.organs, ux)
     sum_flux!(du, o)
 end
@@ -40,16 +43,17 @@ t is the timestep
 """
 function debmodel!(organs::Tuple, u::Tuple)
     swapped = (Base.tail(organs)..., organs[1])
-    apply(metabolism!, organs, u)
-    apply(translocation!, organs, swapped)
-    apply(assimilation!, organs, swapped, u)
+    metabolism!(organs, u)
+    run_translocation!(organs, swapped)
+    assimilation!(organs, swapped, u)
 end
 
 """
 Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
-function metabolism!(o, u)
+metabolism!(organs::Tuple, u) = apply(metabolism!, organs, u)
+metabolism!(o, u) = begin
     set_scaling!(o, u)
     catabolism!(o, u)
     dissipation!(o, u)
@@ -95,7 +99,7 @@ end
 """
 Allocates reserves to growth.
 """
-function growth!(o::O, u::U) where {O,U}
+function growth!(o, u)
     p, v, sh, J, J1 = unpack(o)
     grow = o.vars.rate * u[V]
     J[V,gro] = grow 
@@ -161,10 +165,15 @@ whichever is not the current organs. Will not run with less than 2 organs.
 
 FIXME this will be broken for organs > 2
 """
-function translocation!(o, on)
+
+translocation!(organs::Tuple{}, swapped) = nothing
+translocation!(organs::NTuple{1}, swapped) = nothing
+translocation!(organs::Tuple, swapped) = apply(translocation!, organs, swapped)
+translocation!(o::Organ, on::Organ) = begin
     reuse_rejected!(o, on)
     translocate!(o, on)
 end
+
 
 """
 Versions for E, CN and CNE reserves.
@@ -311,7 +320,7 @@ unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
 # ┃ES  ┃ J_ES,assS  │ J_ES,groS  │ J_ES,maiS  │ J_ES,repS  │ 0          │ J_ES,traS  ┃ J_ER,assR  │ J_ER,groR  │ J_ER,maiR  │ 0    │ 0          │ J_ER,traR  ┃
 # ┗━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-# J1: Catabolic flux matrix diagrams.
+# J1: Catabolic flux diagram.
 # ┏━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 # ┃     ┃ catS       │ rejS      │ losS      ┃
 # ┣━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫

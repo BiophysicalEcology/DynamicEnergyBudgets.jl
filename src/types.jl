@@ -38,7 +38,7 @@ end
 end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
-@SLA struct C3Photosynthesis{P} <: AbstractCarbonAssimilation
+@SLA struct FvCBPhotosynthesis{P} <: AbstractCarbonAssimilation
     photoparams::P | Photosynthesis.EnergyBalance() | _ | _ | _
 end
 
@@ -126,7 +126,7 @@ end
     allometry::Al   | SqrtAllometry() | _                  | _          | _                                        
     maturity::Ma    | Maturity()      | _                  | _          | _                                        
     κsoma::F        | 0.6             | _                  | [0.1,0.9]  | "reserve flux allocated to growth"       
-    M_Vgerm::Mo     | 0.5             | u"mol"             | [0.0,1.0]  | "structural mass at germination"         
+    M_Vgerm::Mo     | 0.01            | u"mol"             | [0.0,1.0]  | "structural mass at germination"         
     y_P_V::MoMo     | 0.02            | u"mol*mol^-1"      | [0.0,1.0]  | "product formation linked to growth"     
     y_V_E::MoMo     | 0.7             | u"mol*mol^-1"      | [0.0,1.0]  | "from reserve to structure"              
     y_E_ET::MoMo    | 0.8             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated reserve:"                  
@@ -196,7 +196,7 @@ end
 end
 
 " Basic model components. For a plants, organs might be roots, stem and leaves "
-@flatten mutable struct Organ{S,P,SH,V,F,F1}
+@flatten mutable struct Organ{P,SH,V,F,F1}
     name::Symbol | false
     params::P    | true
     shared::SH   | false
@@ -208,15 +208,11 @@ end
 Organ(; name = :Shoot,
         params = Params(),
         shared = SharedParams(),
-        vars = Vars()
+        vars = Vars(),
+        J = build_J(),
+        J1 = build_J1()
      ) = begin
-    Organ(name, params, shared, vars)
-end
-Organ(name::Symbol, params, shared, vars) = begin
-    one_flux = oneunit_flux(params)
-    J = build_J(one_flux)
-    J1 = build_J1(one_flux)
-    Organ(state, name, params, shared, vars, J, J1)
+    Organ(name, params, shared, vars, J, J1)
 end
 
 "Records of variables and flux for ploting and analysis"
@@ -233,14 +229,6 @@ Records(o::Organ, time) = begin
     Records(varsrec, Jrec, J1rec)
 end
 
-struct Record{V,F,F1}
-    vars::V
-    J::F
-    J1::F1
-end
-Record(recs::Records, t) = Record(recs.vars[t], recs.J[t], recs.J1[t], 
-
-
 "An organism, made up of organs"
 @flatten struct Organism{O,S,E,R}
     organs::O      | true
@@ -249,7 +237,8 @@ Record(recs::Records, t) = Record(recs.vars[t], recs.J[t], recs.J1[t],
     records::R     | false
 end
 Organism(organs::O, shared::S, environment::E, records::R) where {O,S,E,R} = begin
-    organs = ([Organ(o.state, o.name, o.params, shared, o.vars) for o in organs]...)
+    # Updates shared field in all organs.
+    organs = ([Organ(o.name, o.params, shared, o.vars, o.J, o.J1) for o in organs]...)
     Organism{typeof(organs),S,E,R}(organs, shared, environment, records)
 end
 "Outer construtor for defaults"

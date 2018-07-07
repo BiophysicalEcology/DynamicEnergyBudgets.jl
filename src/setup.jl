@@ -1,29 +1,29 @@
-oneunit_flux(params, state) = oneunit(state[1] * params.k_E)
 
-build_J(one_flux, state) = build_flux(one_flux, fieldnames(state), TRANS)
-build_J1(one_flux, state) = build_flux(one_flux, fieldnames(state), TRANS1)
-build_flux(one_flux, x, y) = Array(fill(zero(one_flux), length(x), length(y)))
-# build_flux(one_flux, x, y) = begin
-#     a = Any[0.0 * one_flux for a in 1:length(x), b in 1:length(y)]
-#     AxisArray(a, Axis{:state}(x), Axis{:transformations}(y))
-# end
+build_J(;one_flux=1.0u"mol/hr", T=typeof(1.0u"mol/hr")) = 
+    build_flux(one_flux, T, STATE, TRANS)
+build_J1(;one_flux=1.0u"mol/hr", T=typeof(1.0u"mol/hr")) = 
+     build_flux(one_flux, T, STATE1, TRANS1)
+build_flux(one_flux, T, x, y) = 
+    T[zero(one_flux) for a in 1:length(x), b in 1:length(y)]
 
 build_record(a, time) = 
     AxisArray([deepcopy(a) for i = 1:length(time)], Axis{:time}(time))
 
 " copy the diffeq state to organs "
 
-set_state!(o::Organism, u) = offset_apply!(set_state!, o.organs, u, 0)
-set_state!(organ::Organ, u::AbstractArray, offset::Int) = begin
-    typ = typeof(organ.state).name.wrapper
-    organ.state = typ(u[1+offset:length(organ.state)+offset])
-    offset + length(organ.state)
-end
+# set_state!(o::Organism, u) = offset_apply!(set_state!, o.organs, u, 0)
+# set_state!(organ::Organ, u::AbstractArray, offset::Int) = begin
+#     typ = typeof(organ.state).name.wrapper
+#     organ.state = typ(u[1+offset:length(organ.state)+offset])
+#     offset + length(organ.state)
+# end
 
 split_state(o::Organism, u::AbstractArray) = split_state(o.organs, u, 0)
-split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = 
-    (view(u, offset+1:offset+STATELEN), split_state(Base.tail(o), u, offset + STATELEN)...)
-split_state(o::Tuple{}, u::AbstractArray, offset) = tuple()
+split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
+    v = view(u, offset+1:offset+STATELEN)
+    (v, split_state(Base.tail(o), u, offset + STATELEN)...)
+end
+split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 
 " sum flux matrix " 
 sum_flux!(du, o::Organism) = begin

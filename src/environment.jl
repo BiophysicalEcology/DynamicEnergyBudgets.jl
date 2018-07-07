@@ -1,22 +1,22 @@
 const water_fraction_to_M = 1.0u"m^3*m^-3" * 1u"kg*L^-1" / 18.0u"g*mol^-1"
 
-get_environment(::Type{Val{:soiltemperature}}, env::MicroclimateData, interp, i) = 
+get_environment(t::Type{Val{:soiltemperature}}, env::M, interp, i) where M <: MicroclimateTable = 
     layer_interp(interp, env.soil, i) * u"°C"
-get_environment(::Type{Val{:watercontent}}, env::MicroclimateData, interp, i) =
+get_environment(t::Type{Val{:soilwatercontent}}, env::M, interp, i) where M <: MicroclimateTable =
     layer_interp(interp, env.soilmoist, i)
-get_environment(::Type{Val{:waterpotential}}, env::MicroclimateData, interp, i) = 
+get_environment(t::Type{Val{:soilwaterpotential}}, env::M, interp, i) where M <: MicroclimateTable = 
     layer_interp(interp, env.soilmoist, i) * u"Pa"
-get_environment(::Type{Val{:airtemperature}}, env::MicroclimateData, interp, i) =
-    lin_interp(env.metout[:TALOC], i) * u"°C"
-get_environment(::Type{Val{:windspeed}}, env::MicroclimateData, interp, i) =
-    lin_interp(env.metout[:VLOC], i) * u"m*s^-1"
-get_environment(::Type{Val{:relhumidity}}, env::MicroclimateData, interp, i) =
+get_environment(t::Type{Val{:relhumidity}}, env::M, interp, i) where M <: MicroclimateTable =
     layer_interp(interp, env.humid, i)
-get_environment(::Type{Val{:radition}}, env::MicroclimateData, interp, i) =
-    lin_interp(env.metout[:SOLR], i) * u"W*m^-2"
-get_environment(::Type{Val{:par}}, env::MicroclimateData, interp, i) =
-    lin_interp(env.metout[:SOLR], i) * 4.57u"mol*m^-2*s^-1"
 
+get_environment(t::Type{Val{:airtemperature}}, env::M, interp, i) where M <: MicroclimateTable =
+    lin_interp(env.metout, Val{:TALOC}, i) * u"°C"
+get_environment(t::Type{Val{:windspeed}}, env::M, interp, i) where M <: MicroclimateTable =
+    lin_interp(env.metout, Val{:VLOC}, i) * u"m*s^-1"
+get_environment(t::Type{Val{:radiation}}, env::M, interp, i) where M <: MicroclimateTable =
+    lin_interp(env.metout, Val{:SOLR}, i) * u"W*m^-2"
+get_environment(t::Type{Val{:par}}, env::M, interp, i) where M <: MicroclimateTable =
+    lin_interp(env.metout, Val{:SOLR}, i) * 4.57u"mol*m^-2*s^-1"
 
 
 apply_environment!(o::Organism, u, t) = apply(apply_environment!, o.organs, u, o.environment, t)
@@ -27,7 +27,7 @@ apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o, u)
-    interp = layer_setup(v.height)
+    interp = LayerInterp(v.height)
 
     va.tair = get_environment(Val{:airtemperature}, env, interp, pos)
     va.windspeed = get_environment(Val{:windspeed}, env, interp, pos)
@@ -52,7 +52,7 @@ apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o, u)
-    interp = layer_setup(v.height)
+    interp = LayerInterp(v.height)
 
     v.temp = get_environment(Val{:airtemperature}, env, interp, pos)
     va.J_L_F = get_environment(Val{:par}, env, interp, pos)
@@ -64,7 +64,7 @@ apply_environment!(a::AbstractNitrogenAssimilation, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o, u)
-    interp = layer_setup(v.height)
+    interp = LayerInterp(v.height)
 
     v.temp = get_environment(Val{:soiltemperature}, env, interp, pos)
     va.X_H = get_environment(Val{:soilwatercontent}, env, interp, pos) * water_fraction_to_M

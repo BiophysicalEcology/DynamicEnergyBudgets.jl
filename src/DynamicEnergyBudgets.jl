@@ -71,6 +71,8 @@ const cat = 1
 const los = 2
 const rej = 3
 
+const STATE = [:P, :V, :M, :C, :N, :E]
+const STATE1 = [:EE, :CN, :_, :C, :N, :E]
 const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
 const TRANS1 = [:cat, :rej, :los]
 const BI_XTOL = 1e-10
