@@ -147,8 +147,8 @@ end
     # n_N_P::MoMo   | 0.0u"mol*mol^-1"        | _         | "N/C in product (wood)"
     # n_N_V::MoMo   | 0.15u"mol*mol^-1"       | _         | "N/C in structure" # Shouldnt this be identical to the reserve?
     # n_N_C::MoMo   | 0.0u"mol*mol^-1"        | _         | "N/C in C-reserve"
-    # n_N_N::MoMo   | 10.0u"mol*mol^-1"       | _         | "N/C in N-reserve"
-    n_N_E::MoMo     | 0.2  | u"mol*mol^-1" | [0.0, 2.0]   | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
+    n_N_N::MoMo     | 10.0u"mol*mol^-1"   | _  | _         | "N/C in N-reserve"
+    # n_N_E::MoMo   | 0.2  | u"mol*mol^-1" | [0.0, 1.0]   | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
     w_P::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot product (wood)"
     w_V::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot structure"
     w_C::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot C-reserve"

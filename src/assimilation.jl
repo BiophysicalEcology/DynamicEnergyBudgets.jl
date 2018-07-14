@@ -55,14 +55,16 @@ function assimilation!(f::AbstractNitrogenAssimilation, o, u)
 
     J_N_assim = uptake_nitrogen(f, o, u)
 
-    # Merge rejected C from shoot and uptaken N into reserves
-    (o.J[C,tra], o.J[N,ass], o.J[E,ass]) =
-        stoich_merge(o.J[C,tra], J_N_assim, o.shared.y_E_CH_NO, 1/o.shared.n_N_E)
-
     # This was not in the orignal model, but is needed to balance C. N reserve is part C
-    # but incoming N is just N. C is being generated from nowhere in equation above.
-    # TODO: But this could end up with a negative C reserve!
-    # o.J[C,ass] = -J_N_assim / o.shared.n_N_E
+    # but incoming N is just N. C was being generated from nowhere in the equation, 
+    # specifically in the N returned to N reserves by the synthesizing unit.
+    # TODO: could this end up with a negative C reserve?
+    o.J[C,ass] += -J_N_assim / o.shared.n_N_N
+
+    # Merge rejected C from shoot and uptaken N into reserves
+    # treating N as N reserve now carbon has been incorporated.
+    (o.J[C,tra], o.J[N,ass], o.J[E,ass]) =
+        stoich_merge(o.J[C,tra], J_N_assim, o.shared.y_E_CH_NO, o.shared.y_E_CH_NO)
 
     return nothing
 end

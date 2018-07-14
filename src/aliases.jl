@@ -43,7 +43,7 @@ FvCBNoRoots(;kwargs...) = Organism(;params=(FvCBShoot()), kwargs...)
 FvCBPlant(;kwargs...) = Organism(;params=(FvCBShootParams(), FvCBRootParams()),
                                   vars=(FvCBShootVars(), FvCBRootVars()), kwargs...)
 FvCBPlant3(;kwargs...) = Organism(;params=(FvCBLeafParams(), FvCBStemParams(), FvCBRootParams()), 
-                              vars=(LeafVars(), StemVars(), RootVars()), kwargs...)
+                              vars=(FvCBLeafVars(), FvCBStemVars(), FvCBRootVars()), kwargs...)
 
 ConstantShoot(;kwargs...) = Organ(name=:shoot, params=Params(assimilation=ConstantCarbonAssimilation()), kwargs...)
 ConstantRoot(;kwargs...) = Organ(name=:root, params=Params(assimilation=ConstantNitrogenAssimilation()), kwargs...)

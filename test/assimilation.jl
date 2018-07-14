@@ -119,8 +119,8 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
             c_loss = sum_c_loss(o1, o2)
             n_loss = sum_n_loss(o1, o2)
             @test -c_loss != zero(c_loss)
-            @test upreferred(m1 + m2 + (c1 + c2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
-            @test_broken upreferred(m1 + m2 + (n1 + n2) * o1.shared.y_E_EN) ≈ upreferred(-n_loss + uptake_n / o1.shared.n_N_E)
+            @test upreferred(m1 + m2 + (c1 + c2 + (uptake_n / o1.shared.n_N_N)) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
+            @test upreferred(m1 + m2 + (n1 + n2) * o1.shared.y_E_EN) + n_loss ≈ upreferred(uptake_n * o1.shared.y_E_EN)
         end
     end
 end
@@ -172,7 +172,7 @@ end
     end
 
     # @testset "C assimilation does not depend on root scaling, but maybe it should" begin
-    #     # Most stomatatl conducance models incorporate root water uptake. 
+    #     # Most stomatatal conducance models incorporate root water uptake. 
     #     # Less water means closed stomata, and less CO2. 
     #     # That is not considered in this model.
 
@@ -248,6 +248,7 @@ end
         end
 
         @testset "C assimilation should balance when converted to cmols" begin
+            # TODO actually use cmols insteda of reserve mols
             c_loss = sum_c_loss(o1, o2)
             n_loss = sum_n_loss(o1, o2)
             @test -c_loss != zero(c_loss)
