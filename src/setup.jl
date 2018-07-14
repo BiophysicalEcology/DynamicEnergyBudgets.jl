@@ -11,14 +11,13 @@ fraction_per_litre_gas_to_mols(frac) = frac / 22.4
 Defaults.get_default(t::Type) = begin 
     d = default(t) 
     u = units(t)
-    combine.(u, d)
+    add_units.(d, u)
 end
 
-combine(::Void, ::Void) = nothing
-combine(a, ::Void) = a
-combine(::Void, b) = b
-combine(a, b) = a * b
-
+add_units(::Void, u) = nothing
+add_units(x, ::Void) = x
+add_units(::Void, ::Void) = nothing
+add_units(x::Number, u::Unitful.Units) = x * u
 
 build_record(a, time) = [deepcopy(a) for i = 1:length(time)]
 build_J(one_flux, T) = build_flux(one_flux, T, STATE, TRANS)

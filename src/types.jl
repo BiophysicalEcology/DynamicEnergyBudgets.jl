@@ -4,12 +4,6 @@ light_mol_to_watts(light_mol) = light_mol / 4.57e-6
 water_content_to_mols_per_litre(wc) = wc * 55.5 # L/L of water to mol/L 
 fraction_per_litre_gas_to_mols(frac) = frac / 22.4
 
-Base.@pure Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
-    d = default(t, F) 
-    u = units(t, F)
-    d * u
-end
-
 @chain columns @label @range @units @default_kw
 
 
@@ -141,8 +135,8 @@ end
     k_EN::MoMoD       | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "N-reserve turnover rate"                
 end
 
-@flattenable @columns struct Translocation{D,P} 
-    destnames::D   | false | (:leaf,)        | _ | _         | "the organ/s translocated to"
+@columns @flattenable struct Translocation{D,P} 
+    destnames::D   | false | (:leaf,)| _ | _         | "the organ/s translocated to"
     proportions::P | true  | (1.0,) | _  | [0.0,1.0] | "the proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
 end
 

@@ -139,27 +139,27 @@ translocation!(organs::Tuple) = translocation!(organs, organs)
 
 # Recurse through all organs. A loop would not be type-stable.
 translocation!(organs::Tuple, destorgans::Tuple) = begin
-    props = buildprops(organ[1])
-    translocation(organs[1], organs, organ[1].params.translocation.destnames, props)     
-    translocation(tail(organs), organs)     
+    props = buildprops(organs[1])
+    translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)     
+    translocation!(tail(organs), destorgans)     
 end
 translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
 
-translocation!(organ, destorgans, destnames::Symbol, props) = 
+translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
     translocation!(organ, destorgans, (destnames,), props)
 
 # Translocate to organs with names in the destnames list
-translocation!(organ::Organ, destorgans::Tuple, destnames::Tuple, props::Tuple) = begin
-    for i = 1:destnames
-        if destorgans[1].name == destnames[i]
+translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
+    for i = 1:length(destnames)
+        if destorgans[1].params.name == destnames[i]
             reuse_rejected!(organ, destorgans[1], props[i])
             translocate!(organ, destorgans[1], props[i])
             break
         end
     end
-    translocation(organ, tail(organs), destnames, props)
+    translocation!(organ, tail(destorgans), destnames, props)
 end
-translocation!(organ::Organ, destorgans::Tuple{}, destnames::Tuple) = nothing
+translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
 
 # Add the last remainder proportion (so that its not a model parameter)
 buildprops(o::Organ) = buildprops(o.params.translocation.proportions)
@@ -267,13 +267,11 @@ feedback!(o, f::Autophagy, u) = begin
 end
 
 
-set_scaling!(o, u) = begin
-    o.vars.scale = scaling(o.params.scaling, u[V])
-end
+set_scaling!(o, u) = o.vars.scale = scaling(o.params.scaling, u[V])
 
 scaling(f::KooijmanArea, uV) = begin
     # This should actually be an error, how can uV be less than zero??
-    uV > zero(uV) || return 0.0
+    # uV > zero(uV) || return 0.0
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
 end
 scaling(f::Void, uV) = 1.0

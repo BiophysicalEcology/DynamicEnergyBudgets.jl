@@ -4,6 +4,7 @@ Runs assimilation methods, depending on formulation and state.
 """
 assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
 assimilation!(o::Organ, u) = assimilation!(o.params.assimilation, o, u)
+assimilation!(::Void, o::Organ, u) = nothing
 
 """
     assimilation!(f::AbstractCarbonAssimilation, o, u)
