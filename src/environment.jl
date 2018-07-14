@@ -19,8 +19,18 @@ get_environment(t::Type{Val{:par}}, env::M, interp, i) where M <: MicroclimateTa
     lin_interp(env.metout, Val{:SOLR}, i) * 4.57u"mol*m^-2*s^-1"
 
 
-apply_environment!(o::Organism, u, t) = apply(apply_environment!, o.organs, u, o.environment, t)
-apply_environment!(o::Organ, u, env, t) = apply_environment!(o.params.assimilation, o, u, env, t)
+apply_environment!(organs::Tuple{O,Vararg}, ux::Tuple{U,Vararg}, env, t) where {U,O} = begin
+    env == nothing && return nothing
+    apply_environment!(organs[1], ux[1], env, t)
+    apply_environment!(tail(organs), tail(ux), env, t)
+    nothing
+end
+apply_environment!(organs::Tuple{}, ux::Tuple{}, env, t) = nothing
+
+apply_environment!(o::Organ, u, env, t) = begin
+    apply_environment!(o.params.assimilation, o, u, env, t)
+    nothing
+end
 apply_environment!(o::Organ, u, env::Void, t) = nothing
 
 apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin

@@ -15,27 +15,22 @@ plant model by Bas Kooijman.
 """
 module DynamicEnergyBudgets
 
-using AxisArrays,
-      StaticArrays,
-      Unitful,
-      SimpleRoots,
+using Unitful,
       OrdinaryDiffEq,
+      ForwardDiff,
+      DocStringExtensions,
       Mixers,
       MetaFields,
-      Parameters,
+      SimpleRoots,
       Defaults,
-      ForwardDiff,
       Microclimate,
       Photosynthesis,
-      Chaingang,
-      CompositeFieldVectors,
-      DocStringExtensions
+      CompositeFieldVectors
 
-import CompositeFieldVectors.flatten
+import CompositeFieldVectors: flatten, flattenable
 import Defaults.get_defaults
 
 
-@metafield flatten true
 @metafield label ""
 @metafield units nothing
 @metafield range [0.0, 1.0]
@@ -79,7 +74,6 @@ const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
 # include("state.jl")
-include("state.jl")
 include("types.jl")
 include("aliases.jl")
 include("environment.jl")
@@ -156,12 +150,8 @@ export AbstractAssimilation,
        Params,
        SharedParams,
        Vars,
-       StateData,
        Organ,
        Organism,
-       Scenario,
-       OrganState,
-       OrganismState,
-       ScenarioState
+       Records
 
 end # module

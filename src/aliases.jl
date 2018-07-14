@@ -1,36 +1,48 @@
-Shoot(;kwargs...) = Organ(;params=Params(assimilation=KooijmanSLAPhotosynthesis()), 
-                              vars=Vars(assimilation=nothing), kwargs...)
-Root(;kwargs...) = Organ(;params=Params(assimilation=N_Assimilation()), 
-                             vars=Vars(assimilation=nothing), kwargs...)
-Plant(;kwargs...) = Organism(;organs=(Shoot(), Root))
+FLUX = 1.0u"mol/hr"
 
-
-ConstantShoot(;kwargs...) = Organ(;params=Params(assimilation=ConstantCarbonAssimilation()), 
-                        vars=Vars(assimilation=nothing), kwargs...)
-ConstantRoot(;kwargs...) = Organ(;params=Params(assimilation=ConstantNitrogenAssimilation()), 
-                       vars=Vars(assimilation=nothing), kwargs...)
-ConstantPlant(;kwargs...) = Organism(; organs=(ConstantShoot(), ConstantRoot()), kwargs...) 
-
-
-UntypedVars(;kwargs...) = default_kw(Vars{Any,Any,Any,Any,Any}; kwargs...)
-UntypedOrgan(name::N, params::P, shared::Sh, vars::V) where {N,P,Sh,V} = begin
-    # Get flux units from params, instead of explicitly.
-    J = build_J(;one_flux=1.0, typ = Any)
-    J1 = build_J1(;one_flux=1.0, typ = Any)
-    Organ{N,P,Sh,V,typeof(J),typeof(J1)}(name, params, shared, vars, J, J1)
+ShootParams(;kwargs...) = Params(name=:shoot, assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
+RootParams(;kwargs...) = Params(name=:root, assimilation=N_Assimilation(), kwargs...)
+ShootVars(;kwargs...) = Vars(assimilation=CarbonVars(), kwargs...)
+RootVars(;kwargs...) = Vars(assimilation=NitrogenVars(), kwargs...)
+Records(params; vars=(ShootVars(), RootVars()), t=1:1:1, val=FLUX) = begin
+    (Records(params[1], vars[1], t, val, typeof(val)), 
+     Records(params[2], vars[2], t, val, typeof(val)))
 end
-UntypedShoot(;kwargs...) = Organ(params=Params(assimilation=ConstantCarbonAssimilation()), 
-                                 vars=UntypedVars(assimilation=nothing), kwargs...)
-UntypedRoot(;kwargs...) = Organ(params=Params(assimilation=ConstantNitrogenAssimilation()), 
-                                vars=UntypedVars(assimilation=nothing), kwargs...)
-UntypedPlant(;kwargs...) = Organism(time=0:1:1000, organs=(UntypedShoot(), UntypedRoot()), kwargs...) 
+Plant(;kwargs...) = Organism(;params=(ShootParams(), RootParams()), vars=(ShootVars(), RootVars()), kwargs...)
 
+UntypedShootVars(;kwargs...) = 
+    default_kw(Vars{Any,Any,Any,Any,Any}; assimilation=default_kw(CarbonVars{Any,Any}), kwargs...)
+UntypedRootVars(;kwargs...) = 
+    default_kw(Vars{Any,Any,Any,Any,Any}; assimilation=default_kw(NitrogenVars{Any,Any}), kwargs...)
+UntypedRecords(params; vars=(UntypedShootVars(), UntypedRootVars()), t=1:1:1, val=FLUX, typ=ANY) = begin
+    (Records(params[1], vars[1], t, FLUX, typ), 
+     Records(params[2], vars[2], t, FLUX, typ))
+end
+"Outer construtor for defaults"
+UntypedPlant(; params = (ShootParams(), RootParams()),
+           vars = (UntypedShootVars(), UntypedRootVars()),
+           shared = SharedParams(),
+           environment = nothing,                       
+           time = 0u"hr":1u"hr":1000u"hr") = begin
+    records = UntypedRecords(params; vars=vars)
+    Organism(params, shared, records, environment)
+end
 
-FvCBShootParams(;kwargs...) = Params(;assimilation=FvCBPhotosynthesis(), kwargs...)
-FvCBRootParams(;kwargs...) = Params(;assimilation=N_Assimilation(), kwargs...)
-FvCBShootVars(;kwargs...) = Vars(;assimilation=Photosynthesis.PhotoVars(), kwargs...)
+FvCBShootParams(;kwargs...) = Params(name=:shoot, assimilation=FvCBPhotosynthesis(), kwargs...)
+FvCBRootParams(;kwargs...) = Params(name=:root, assimilation=N_Assimilation(), kwargs...)
+FvCBShootVars(;kwargs...) = Vars(assimilation=Photosynthesis.PhotoVars(), kwargs...)
 FvCBRootVars(;kwargs...) = Vars(;assimilation=NitrogenVars(), kwargs...)
-FvCBShoot(;kwargs...) = Organ(;params=FvCBShootParams(), vars=FvCBShootVars(), kwargs...)
-FvCBRoot(;kwargs...) = Organ(;params=FvCBRootParams(), vars=FvCBRootVars(), kwargs...)
-FvCBPlant(;kwargs...) = Organism(;organs=(FvCBShoot(), FvCBRoot()), kwargs...) 
-FvCBNoRoots(;kwargs...) = Organism(;organs=(FvCBShoot()), kwargs...) 
+FvCBPlant(;kwargs...) = Organism(;params=(FvCBShootParams(), FvCBRootParams()),
+                                  vars=(FvCBShootVars(), FvCBRootVars()), kwargs...)
+FvCBNoRoots(;kwargs...) = Organism(;params=(FvCBShoot()), kwargs...)
+
+ConstantShoot(;kwargs...) = Organ(name=:shoot, params=Params(assimilation=ConstantCarbonAssimilation()), kwargs...)
+ConstantRoot(;kwargs...) = Organ(name=:root, params=Params(assimilation=ConstantNitrogenAssimilation()), kwargs...)
+ConstantPlant(;kwargs...) = Organism(; params=(ConstantShootParams(), ConstantRootParams()), kwargs...)
+
+LeafParams(;kwargs...) = Params(name=:leaf, translocation=ShootTrans(dest=:stem), 
+                                assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
+StemParams(;kwargs...) = Params(name=:stem, translocation=RootTrans(dest=(:leaf, :root), prop=0.5), 
+                                assimilation=N_Assimilation(), kwargs...)
+RootParams3(;kwargs...) = Params(name=:root, translocation=RootTrans(dest=:stem), 
+                                 assimilation=N_Assimilation(), kwargs...)

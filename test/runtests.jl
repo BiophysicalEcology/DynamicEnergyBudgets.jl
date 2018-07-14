@@ -11,6 +11,7 @@ else
     using Test
 end
 
+include("helpers.jl")
 include("setup.jl")
 include("math.jl")
 include("assimilation.jl")

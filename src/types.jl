@@ -4,13 +4,13 @@ light_mol_to_watts(light_mol) = light_mol / 4.57e-6
 water_content_to_mols_per_litre(wc) = wc * 55.5 # L/L of water to mol/L 
 fraction_per_litre_gas_to_mols(frac) = frac / 22.4
 
-Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
+Base.@pure Defaults.get_default(t::Type, f::Type{Val{F}}) where F = begin 
     d = default(t, F) 
     u = units(t, F)
-    (u == nothing || d == nothing) ? d : d * u
+    d * u
 end
 
-@chaingang columns @label @range @units @default_kw
+@chain columns @label @range @units @default_kw
 
 
 " Assimilation "
@@ -120,23 +120,30 @@ abstract type AbstractScaling end
 end
 
 " Model parameters that vary between organs "
-@columns struct Params{A,S,Al,Ma,F,Mo,MoMoD,MoMo}
-    assimilation::A | ConstantCarbonAssimilation() | _     | _          | _                                        
-    scaling::S      | KooijmanArea()  | _                  | _          | _                                        
-    allometry::Al   | SqrtAllometry() | _                  | _          | _                                        
-    maturity::Ma    | Maturity()      | _                  | _          | _                                        
-    κsoma::F        | 0.6             | _                  | [0.1,0.9]  | "reserve flux allocated to growth"       
-    M_Vgerm::Mo     | 0.01            | u"mol"             | [0.0,1.0]  | "structural mass at germination"         
-    y_P_V::MoMo     | 0.02            | u"mol*mol^-1"      | [0.0,1.0]  | "product formation linked to growth"     
-    y_V_E::MoMo     | 0.7             | u"mol*mol^-1"      | [0.0,1.0]  | "from reserve to structure"              
-    y_E_ET::MoMo    | 0.8             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated reserve:"                  
-    y_EC_ECT::MoMo  | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated C-reserve"                 
-    y_EN_ENT::MoMo  | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated N-reserve"                 
-    j_E_mai::MoMoD  | 0.001           | u"mol*mol^-1*d^-1" | [0.0,0.01] | "spec somatic maint costs."              
-    j_P_mai::MoMoD  | 0.01            | u"mol*mol^-1*d^-1" | [0.0,0.1]  | "product formation linked to maintenance"
-    k_E::MoMoD      | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "reserve turnover rate"                  
-    k_EC::MoMoD     | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "C-reserve turnover rate"                
-    k_EN::MoMoD     | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "N-reserve turnover rate"                
+@columns struct Params{A,S,Al,Ma,Tr,F,Mo,MoMoD,MoMo}
+    name::Symbol      | :organ          | _                  | _          | _ 
+    assimilation::A   | ConstantCarbonAssimilation() | nothing | _        | _                                        
+    scaling::S        | KooijmanArea()  | _                  | _          | _                                        
+    allometry::Al     | SqrtAllometry() | _                  | _          | _                                        
+    maturity::Ma      | Maturity()      | _                  | _          | _                                        
+    translocation::Tr | nothing         | _                  | _          | _                                        
+    κsoma::F          | 0.6             | _                  | [0.1,0.9]  | "reserve flux allocated to growth"       
+    M_Vgerm::Mo       | 0.01            | u"mol"             | [0.0,1.0]  | "structural mass at germination"         
+    y_P_V::MoMo       | 0.02            | u"mol*mol^-1"      | [0.0,1.0]  | "product formation linked to growth"     
+    y_V_E::MoMo       | 0.7             | u"mol*mol^-1"      | [0.0,1.0]  | "from reserve to structure"              
+    y_E_ET::MoMo      | 0.8             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated reserve:"                  
+    y_EC_ECT::MoMo    | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated C-reserve"                 
+    y_EN_ENT::MoMo    | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated N-reserve"                 
+    j_E_mai::MoMoD    | 0.001           | u"mol*mol^-1*d^-1" | [0.0,0.01] | "spec somatic maint costs."              
+    j_P_mai::MoMoD    | 0.01            | u"mol*mol^-1*d^-1" | [0.0,0.1]  | "product formation linked to maintenance"
+    k_E::MoMoD        | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "reserve turnover rate"                  
+    k_EC::MoMoD       | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "C-reserve turnover rate"                
+    k_EN::MoMoD       | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "N-reserve turnover rate"                
+end
+
+@flattenable @columns struct Translocation{D,P} 
+    destnames::D   | false | (:leaf,)        | _ | _         | "the organ/s translocated to"
+    proportions::P | true  | (1.0,) | _  | [0.0,1.0] | "the proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
 end
 
 " Model parameters shared between organs "
@@ -196,59 +203,48 @@ end
 end
 
 " Basic model components. For a plants, organs might be roots, stem and leaves "
-@flatten mutable struct Organ{P,SH,V,F,F1}
-    name::Symbol | false
-    params::P    | true
-    shared::SH   | false
-    vars::V      | false
-    J::F         | false
-    J1::F1       | false
-end
-"Construtor with keyword argument defaults"
-Organ(; name = :Shoot,
-        params = Params(),
-        shared = SharedParams(),
-        vars = Vars(),
-        J = build_J(),
-        J1 = build_J1()
-     ) = begin
-    Organ(name, params, shared, vars, J, J1)
+struct Organ{P,S,V,F,F1}
+    params::P
+    shared::S
+    vars::V
+    J::F
+    J1::F1
 end
 
-"Records of variables and flux for ploting and analysis"
+"Records of mutable variables and flux for ploting and analysis"
 struct Records{V,F,F1}
     vars::V
     J::F
     J1::F1
 end
 "Constructor for records. Arrays use the length of the current timespan"
-Records(o::Organ, time) = begin
-    varsrec = build_record(o.vars, time)
-    Jrec = build_record(o.J, time)
-    J1rec = build_record(o.J1, time)
+Records(params::Params, vars::Vars, time, val, typ) = begin
+    varsrec = build_record(vars, time)
+    Jrec = build_record(build_J(val, typ), time)
+    J1rec = build_record(build_J1(val, typ), time)
     Records(varsrec, Jrec, J1rec)
 end
 
 "An organism, made up of organs"
-@flatten struct Organism{O,S,E,R}
-    organs::O      | true
+@flattenable struct Organism{O,S,R,E}
+    params::O      | true
     shared::S      | true
-    environment::E | false
     records::R     | false
-end
-Organism(organs::O, shared::S, environment::E, records::R) where {O,S,E,R} = begin
-    # Updates shared field in all organs.
-    organs = ([Organ(o.name, o.params, shared, o.vars, o.J, o.J1) for o in organs]...)
-    Organism{typeof(organs),S,E,R}(organs, shared, environment, records)
+    environment::E | false
 end
 "Outer construtor for defaults"
-Organism(; organs = (Shoot(), Root()),
+Organism(; params = (ShootParams(), RootParams()),
+           vars = (ShootVars(), RootVars()),
            shared = SharedParams(),
+           records = nothing,
            environment = nothing,                       
            time = 0u"hr":1u"hr":1000u"hr") = begin
-    records = []
-    for organ in organs
-        push!(records, Records(organ, time))
+    if records == nothing
+        recarray = []
+        for i = 1:length(params)
+            push!(recarray, Records(params[i], vars[i], time, 1.0u"mol/hr", typeof(1.0u"mol/hr")))
+        end
+        records = (recarray...)
     end
-    Organism(organs, shared, environment, tuple(records...))
+    Organism(params, shared, records, environment)
 end

@@ -1,36 +1,12 @@
-import CompositeFieldVectors: reconstruct
-
 """
 Run a DEB organism model.
 """
-(o::Organism)(du, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number; record=false) = begin
-    Handle unitless inputs
-    du1 = Any[d .* u"mol/hr" for d in du]
-    u1 = u .* u"mol"
-    reconstruct(o, p)(du1, u1, t * u"hr") 
-    if typeof(du1[1]) <: ForwardDiff.Dual
-        ustrip.(du1)
-    else
-        du2 = ustrip.(du1)
-        if eltype(du2) == eltype(du)
-            du .= du2
-        end
-        du2
-    end
-end
-(o::Organism)(du, u, p::Void, t::Number; record=false;) = begin
-    record && keep_records!(o, t)
-    o(du, u, t) 
-end
 
-function (o::Organism)(du, u, t::Number)
-    ux = split_state(o, u)
-    organs = o.organs
-    # apply_environment!(o, ux, t)
-    apply_environment!(organs[1].params.assimilation, organs[1], u, o.environment, t)
-    apply_environment!(organs[2].params.assimilation, organs[2], u, o.environment, t)
-    debmodel!(o.organs, ux)
-    sum_flux!(du, o)
+function (o::Organism)(du, u, t::Number, organs)
+    ux = split_state(organs, u)
+    apply_environment!(organs, ux, o.environment, t)
+    debmodel!(organs, ux)
+    sum_flux!(du, organs)
 end
 
 """
@@ -42,10 +18,9 @@ settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
 function debmodel!(organs::Tuple, u::Tuple)
-    swapped = (Base.tail(organs)..., organs[1])
     metabolism!(organs, u)
-    run_translocation!(organs, swapped)
-    assimilation!(organs, swapped, u)
+    translocation!(organs)
+    assimilation!(organs, u)
 end
 
 """
@@ -67,18 +42,16 @@ Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u)
     p, v, sh, J, J1 = unpack(o); va = v.assimilation;
-    rate = v.rate
     tempscaling = v.tempcorr .* v.scale
 
-    scaled_turnover = (p.k_EC, p.k_EN, p.k_E) .* tempscaling
+    turnover = (p.k_EC, p.k_EN, p.k_E) .* tempscaling
     m = (u[C], u[N], u[E]) ./ u[V]
     j_E_mai = p.j_E_mai * v.tempcorr
-    v.rate = find_rate(m, scaled_turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
+    v.rate = find_rate(m, turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
 
-    (J1[C,cat], J1[N,cat], J1[EE,cat]) = 
-        catabolic_fluxes((u[C], u[N], u[E]), scaled_turnover, rate)
+    (J1[C,cat], J1[N,cat], J1[EE,cat]) = catabolic_flux((u[C], u[N], u[E]), turnover, v.rate)
     (J1[C,rej], J1[N,rej], J1[CN,cat]) =
-        synthesizing_unit(J1[C,cat], J1[N,cat], sh.y_E_CH_NO, sh.y_E_EN)
+        stoich_merge(J1[C,cat], J1[N,cat], sh.y_E_CH_NO, sh.y_E_EN)
 
     J1[E,cat] = J1[EE,cat] + J1[CN,cat] # Total catabolic flux
     v.θE = J1[EE,cat]/J1[E,cat] # Proportion of general reserve flux in total catabolic flux
@@ -91,7 +64,7 @@ Growth, maturity and maintenence are grouped as dissipative processes.
 """
 function dissipation!(o, u)
     growth!(o, u)
-    maturity!(o.params.maturity, o, u)
+    maturity!(o, u)
     maintenence!(o, u)
     product!(o, u)
 end
@@ -114,6 +87,7 @@ end
 Allocates reserve drain due to maturity maintenance.
 Stores in M state variable if it exists.
 """
+maturity!(o, u) = maturity!(o.params.maturity, o, u)
 maturity!(f::Maturity, o, u) = begin
     p, v, sh, J, J1 = unpack(o)
     J[M,gro] = f.κrep * J1[E,cat]
@@ -122,17 +96,7 @@ maturity!(f::Maturity, o, u) = begin
     reserve_drain!(o, rep, drain, v.θE)
     reserve_loss!(o, -maint)
 end
-
-# function maturity!(f, o, u) end
-# maturity!(f::Maturity, o, u::U) where U = maturity!(f, o, u, has_M(U))
-# maturity!(f::Maturity, o, u, ::NoM) = begin
-#     p, v, sh, J, J1 = unpack(o)
-#     # TODO: why does rep maintenance stop increasing at M_Vrep?
-#     # Is this a half finished reproduction model?
-#     drain = -(f.κrep * J1[E,cat] + -f.j_E_rep_mai * v.tempcorr * min(u[V], f.M_Vrep))
-#     reserve_drain!(o, rep, drain, v.θE)
-#     reserve_loss!(o, -drain)
-# end
+maturity!(f::Void, o, u) = nothing
 
 """
 Allocates reserve drain due to maintenance.
@@ -157,42 +121,67 @@ end
 
 
 """
-Versions for E, CN and CNE reserves.
-
-Translocation is occurs between adjacent organs. 
+Translocation occurs between adjacent organs. 
 This function is identical both directiono, so on represents
-whichever is not the current organs. Will not run with less than 2 organs.
+whichever is not the current organs. 
 
-FIXME this will be broken for organs > 2
+Will not run with less than 2 organs.
 """
-
-translocation!(organs::Tuple{}, swapped) = nothing
-translocation!(organs::NTuple{1}, swapped) = nothing
-translocation!(organs::Tuple, swapped) = apply(translocation!, organs, swapped)
-translocation!(o::Organ, on::Organ) = begin
-    reuse_rejected!(o, on)
-    translocate!(o, on)
+translocation!(organs::Tuple{}) = nothing
+translocation!(organs::Tuple{Organ}) = nothing
+translocation!(organs::Tuple{Organ, Organ}) = begin
+    reuse_rejected!(organs[1], organs[2], 1.0)
+    reuse_rejected!(organs[2], organs[1], 1.0)
+    translocate!(organs[1], organs[2], 1.0)
+    translocate!(organs[2], organs[1], 1.0)
 end
+translocation!(organs::Tuple) = translocation!(organs, organs)
 
+# Recurse through all organs. A loop would not be type-stable.
+translocation!(organs::Tuple, destorgans::Tuple) = begin
+    props = buildprops(organ[1])
+    translocation(organs[1], organs, organ[1].params.translocation.destnames, props)     
+    translocation(tail(organs), organs)     
+end
+translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
+
+translocation!(organ, destorgans, destnames::Symbol, props) = 
+    translocation!(organ, destorgans, (destnames,), props)
+
+# Translocate to organs with names in the destnames list
+translocation!(organ::Organ, destorgans::Tuple, destnames::Tuple, props::Tuple) = begin
+    for i = 1:destnames
+        if destorgans[1].name == destnames[i]
+            reuse_rejected!(organ, destorgans[1], props[i])
+            translocate!(organ, destorgans[1], props[i])
+            break
+        end
+    end
+    translocation(organ, tail(organs), destnames, props)
+end
+translocation!(organ::Organ, destorgans::Tuple{}, destnames::Tuple) = nothing
+
+# Add the last remainder proportion (so that its not a model parameter)
+buildprops(o::Organ) = buildprops(o.params.translocation.proportions)
+buildprops(x::Void) = (1.0)
+buildprops(x::Number) = (x, 1 - x)
+buildprops(xs::Tuple) = (xs..., 1 - sum(xs))
 
 """
 Versions for E, CN and CNE reserves.
 
 Translocation is occurs between adjacent organs. 
-This function is identical both directiono, so on represents
+This function is identical both directiono, and ox represents
 whichever is not the current organs. Will not run with less than 2 organs.
-
-FIXME this will be broken for organs > 2
 """
-function translocate!(o, on)
-    p = o.params
-    trans = κtra(p) * o.J1[E,cat]
-    loss = (1 - p.y_E_ET) * trans
-    reserve_drain!(o, tra, -trans, o.vars.θE)
-    reserve_loss!(o, loss)
+function translocate!(source, dest, prop)
+    trans = κtra(source) * prop * source.J1[E,cat]
+    loss = (1 - source.params.y_E_ET) * trans
+    reserve_drain!(source, tra, -trans, source.vars.θE)
+    reserve_loss!(source, loss)
     # incoming translocation
-    transn = κtra(on.params) * o.J1[E,cat]
-    o.J[E,tra] += on.params.y_E_ET * transn
+    transx = κtra(dest) * source.J1[E,cat]
+    source.J[E,tra] += dest.params.y_E_ET * transx
     nothing
 end
 
@@ -202,15 +191,15 @@ Reallocate state rejected from synthesizing units.
 TODO add a 1-organs method
 Also how does this interact with assimilation?
 """
-function reuse_rejected!(o, on)
-    p = o.params
+function reuse_rejected!(source, dest, prop)
+    p = source.params
     # rejected reserves are translocated and used in assimilation.
-    o.J[C,rej] = -o.J1[C,rej]
-    o.J[N,rej] = -o.J1[N,rej]
-    on.J[C,tra] = p.y_EC_ECT * o.J1[C,rej]
-    on.J[N,tra] = p.y_EN_ENT * o.J1[N,rej]
-    o.J1[C,los] += (1 - p.y_EC_ECT) * o.J1[C,rej]
-    o.J1[N,los] += (1 - p.y_EN_ENT) * o.J1[N,rej]
+    source.J[C,rej] = -source.J1[C,rej]
+    source.J[N,rej] = -source.J1[N,rej]
+    dest.J[C,tra] = p.y_EC_ECT * source.J1[C,rej]
+    dest.J[N,tra] = p.y_EN_ENT * source.J1[N,rej]
+    source.J1[C,los] += (1 - p.y_EC_ECT) * source.J1[C,rej]
+    source.J1[N,los] += (1 - p.y_EN_ENT) * source.J1[N,rej]
     nothing
 end
 
@@ -238,21 +227,25 @@ end
 """
 κtra is the difference paramsbetween κsoma and κrep
 """
-κtra(params) = 1.0 - params.κsoma - κrep(params)
-κrep(params) = params.maturity.κrep
+
+κtra(o) = (1.0 - o.params.κsoma - κrep(o)) 
+
+κrep(o::Organ) = κrep(o.params.maturity)
+κrep(maturity::Maturity) = maturity.κrep
+κrep(maturity::Void) = 0.0
 
 """
 Calculate rate formula. TODO: use Roots.jl for this
 """
-function find_rate(m, scaled_turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
+function find_rate(m, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
     # bounds = (-10.0oneunit(v.rate), 20.0oneunit(v.rate)) #rate_window(args...) 
 
     # Find the type of rate so that diff and units work with the guess and atol
-    one_r = oneunit(eltype(scaled_turnover))
+    one_r = oneunit(eltype(turnover))
     # Get rate with a zero finder
-    let m=m, scaled_turnover=scaled_turnover, j_E_mai=j_E_mai, y_E_CH_NO=y_E_CH_NO, y_E_EN=y_E_EN, y_V_E=y_V_E, κsoma=κsoma
+    let m=m, turnover=turnover, j_E_mai=j_E_mai, y_E_CH_NO=y_E_CH_NO, y_E_EN=y_E_EN, y_V_E=y_V_E, κsoma=κsoma
         find_zero((-2one_r, 1one_r), Secant(), one_r*1e-10, 100) do x
-            rate_formula(x, m, scaled_turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
+            rate_formula(x, m, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
         end
     end
 end
@@ -278,18 +271,16 @@ set_scaling!(o, u) = begin
     o.vars.scale = scaling(o.params.scaling, u[V])
 end
 
-"""
-"""
 scaling(f::KooijmanArea, uV) = begin
+    # This should actually be an error, how can uV be less than zero??
     uV > zero(uV) || return 0.0
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
 end
-
 scaling(f::Void, uV) = 1.0
 
 """
 Check if germination has happened. Independent for each organ,
-although this may not make sense.
+although this may not make sense. A curve could be better for this too.
 """
 germinated(M_V, M_Vgerm) = M_V > M_Vgerm 
 

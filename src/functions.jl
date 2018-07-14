@@ -23,8 +23,8 @@ Rate formulas for E, CN or CNE reserves
 """
 function rate_formula(r, ureserve::NTuple{3}, A_turnover::NTuple{3}, 
                       j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
-    (j_EC, j_EN, j_E) = catabolic_fluxes(ureserve, A_turnover, r)
-    j_ECN = stoich_merge(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
+    (j_EC, j_EN, j_E) = catabolic_flux(ureserve, A_turnover, r)
+    j_ECN = synthesizing_unit(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
     y_V_E * (κsoma * (j_E + j_ECN) - j_E_mai) - r
 end
 
@@ -38,11 +38,11 @@ function rate_bracket(ureserve::NTuple{3}, A_turnover::NTuple{3},
 end
 
 """
-    catabolic_fluxes(ureserve, A_turnover, r)
+    catabolic_flux(ureserve, A_turnover, r)
 Returns the current catabolic flux at rate r,
 or the flux as a proportion of u[V], depending on ureserve values.
 """
-catabolic_fluxes(ureserve, A_turnover, r) = ureserve .* (A_turnover .- r)
+catabolic_flux(ureserve, A_turnover, r) = ureserve .* (A_turnover .- r)
 
 """
     half_saturation(max, half, x)
@@ -51,21 +51,21 @@ Half satration curve.
 half_saturation(max, half, x) = max/(oneunit(half/x) + half/x) 
 
 """
-    stoich_merge(a, b)
-Merge two inputs stoichiometrically. The minimum value is limiting,
-and stochasticity of pairing is simulated so that for any a, b 
-stoich_merge(a, b) < a, to the limit b → ∞ where stoich_merge(a, b) = a   
-"""
-stoich_merge(a, b) = 1.0/(1.0/a + 1.0/b - 1.0/(a + b))
-
-"""
-    synthesizing_unit(Ja, Jb, ya, yb)
+    stoich_merge(Ja, Jb, ya, yb)
 Merge fluxes stoichiometrically into general reserve Eab based on yeild 
 fractions ya and yb. The remainder is returned as unmixed reserves Ea and Eb.
 """
-synthesizing_unit(Ja, Jb, ya, yb) = begin
-    JEab = stoich_merge(Ja * ya, Jb * yb) 
+stoich_merge(Ja, Jb, ya, yb) = begin
+    JEab = synthesizing_unit(Ja * ya, Jb * yb) 
     JEa = Ja - JEab/ya                        
     JEb = Jb - JEab/yb                     
     (JEa, JEb, JEab)
 end
+
+"""
+    synthesizing_unit(a, b)
+Merge two inputs stoichiometrically. The minimum value is limiting,
+and stochasticity of pairing is simulated so that for any a, b 
+stoich_merge(a, b) < a, to the limit b → ∞ where stoich_merge(a, b) = a   
+"""
+synthesizing_unit(a, b) = 1.0/(1.0/a + 1.0/b - 1.0/(a + b))
