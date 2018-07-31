@@ -1,6 +1,4 @@
-using Revise
-using Unitful
-using DynamicEnergyBudgets
+using Revise, Unitful, DynamicEnergyBudgets
 
 @static if VERSION < v"0.7.0-DEV.2005"
     using Base.Test
@@ -8,7 +6,7 @@ else
     using Test
 end
 
-import DynamicEnergyBudgets.get_environment
+import DynamicEnergyBudgets: get_environment, define_organs
 
 DynamicEnergyBudgets.get_environment(::Type{Val{:soiltemperature}}, env, h, i) = 15.4u"°C"
 DynamicEnergyBudgets.get_environment(::Type{Val{:soilwatercontent}}, env, h, i) = 0.7

@@ -1,7 +1,5 @@
 using OrdinaryDiffEq
 
-Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
-
 @testset "diffeq works" begin
     environment = nothing
     u0 = [0.0u"mol", 1e-4u"mol", 0.0u"mol", 1e-4u"mol", 1e-4u"mol", 1e-4u"mol", 0.0u"mol", 

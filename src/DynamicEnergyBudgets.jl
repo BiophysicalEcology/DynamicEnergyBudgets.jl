@@ -8,31 +8,25 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to
 abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiple models - potentially any organism.
-
-Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M)
-plant model by Bas Kooijman.
-"""
-module DynamicEnergyBudgets
-
+for multiple models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets 
 using Unitful,
       OrdinaryDiffEq,
       ForwardDiff,
       DocStringExtensions,
+      Distributions,
+      SimpleRoots,
       Mixers,
       MetaFields,
-      SimpleRoots,
       Defaults,
       Microclimate,
       Photosynthesis,
-      CompositeFieldVectors
-
-import CompositeFieldVectors: flatten, flattenable
-import Defaults.get_defaults
+      Flatten
 
 
-@metafield label ""
-@metafield units nothing
+import Flatten.flattenable
+import Defaults.get_default
+import MetaFieldBase: @prior, @default, @label, @units, prior, default, label, units
+
 @metafield range [0.0, 1.0]
 
 @template TYPES =
@@ -41,7 +35,7 @@ import Defaults.get_defaults
     $(DOCSTRING)
     """
 
-Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
+# Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
 
 const P = 1
 const V = 2
@@ -61,6 +55,7 @@ const rej = 3
 const mai = 4 
 const rep = 5 
 const tra = 6
+const fbk = 7
 
 const cat = 1
 const los = 2
@@ -68,7 +63,7 @@ const rej = 3
 
 const STATE = [:P, :V, :M, :C, :N, :E]
 const STATE1 = [:EE, :CN, :_, :C, :N, :E]
-const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra]
+const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra, :fbk]
 const TRANS1 = [:cat, :rej, :los]
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
@@ -82,6 +77,7 @@ include("model.jl")
 include("functions.jl")
 include("apply.jl")
 include("setup.jl")
+include("sensitivity.jl")
 
 export tempcorr,
        rate_bracket,
@@ -120,17 +116,17 @@ export AbstractState,
        StatePVCNE,
        StatePVMCNE
 
-export AbstractAssimilation,
-       AbstractCarbonAssimilation,
-       AbstractNitrogenAssimilation,
-       NH4_NO3_Assimilation,
-       N_Assimilation,
+export AbstractAssim,
+       AbstractCAssim,
+       AbstractNAssim,
+       NH4_NO3Assim,
+       NAssim,
        C3Photosynthesis,
        KooijmanPhotosynthesis,
        KooijmanSLAPhotosynthesis,
-       Kooijman_NH4_NO3_Assimilation,
-       ConstantCarbonAssimilation,
-       ConstantNitrogenAssimilation,
+       KooijmanNH4_NO3Assim,
+       ConstantCAssim,
+       ConstantNAssim,
        AbstractStateFeedback,
        Autophagy,
        AbstractTempCorr,
@@ -139,12 +135,7 @@ export AbstractAssimilation,
        TempCorrLowerUpper,
        AbstractScaling,
        KooijmanArea,
-       Structure,
-       Products,
        Maturity,
-       CarbonReserve,
-       NitrogenReserve,
-       GeneralReserve,
        CarbonVars,
        NitrogenVars,
        Params,

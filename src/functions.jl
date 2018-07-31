@@ -51,18 +51,6 @@ Half satration curve.
 half_saturation(max, half, x) = max/(oneunit(half/x) + half/x) 
 
 """
-    stoich_merge(Ja, Jb, ya, yb)
-Merge fluxes stoichiometrically into general reserve Eab based on yeild 
-fractions ya and yb. The remainder is returned as unmixed reserves Ea and Eb.
-"""
-stoich_merge(Ja, Jb, ya, yb) = begin
-    JEab = synthesizing_unit(Ja * ya, Jb * yb) 
-    JEa = Ja - JEab/ya                        
-    JEb = Jb - JEab/yb                     
-    (JEa, JEb, JEab)
-end
-
-"""
     synthesizing_unit(a, b)
 Merge two inputs stoichiometrically. The minimum value is limiting,
 and stochasticity of pairing is simulated so that for any a, b 

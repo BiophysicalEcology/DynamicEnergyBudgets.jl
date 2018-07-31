@@ -1,85 +1,91 @@
 # Parameter helper functions
-watts_to_light_mol(watts) = watts * 4.57e-6
-light_mol_to_watts(light_mol) = light_mol / 4.57e-6
-water_content_to_mols_per_litre(wc) = wc * 55.5 # L/L of water to mol/L 
-fraction_per_litre_gas_to_mols(frac) = frac / 22.4
+const parconv = 4.57e-6
+const gas_molpL = 22.4
 
-@chain columns @label @range @units @default_kw
+@chain columns @label @range @prior @units @default_kw
 
+############################################################################################
+# Parameters
 
 " Assimilation "
-abstract type AbstractAssimilation end
+abstract type AbstractAssim end
 
 " Parent of all Carbon assimilation types"
-abstract type AbstractCarbonAssimilation <: AbstractAssimilation end
+abstract type AbstractCAssim <: AbstractAssim end
 
 " Parent of all Nitrogen assimilation types"
-abstract type AbstractNitrogenAssimilation <: AbstractAssimilation end
+abstract type AbstractNAssim <: AbstractAssim end
 
 " Parent of Ammonia/Nitrate assimilation types"
-abstract type AbstractNH4_NO3Assimilation <: AbstractNitrogenAssimilation end
+abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 
-@columns struct ConstantCarbonAssimilation{μMoMS} <: AbstractCarbonAssimilation
-    uptake::μMoMS | 10.0 | u"μmol*mol^-1*s^-1" | _ | _
+@columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
+    uptake::μMoMS | 10.0 | u"μmol*mol^-1*s^-1" | _ | _ | _
 end
 
-@columns struct ConstantNitrogenAssimilation{μMoMS} <: AbstractNitrogenAssimilation
-    uptake::μMoMS | 1.0 | u"mol*mol^-1*s^-1" | _ | _ 
+@columns struct ConstantNAssim{μMoMS} <: AbstractNAssim
+    uptake::μMoMS | 1.0 | u"mol*mol^-1*s^-1" | _ | _ | _
 end
 
 @mix @columns struct SLA{MG}
-    SLA::MG | 9.10 | u"m^2*g^-1" | [5.0, 30.0] | "Ferns 17.4 Forbs 26.2 Graminoids 24.0 Shrubs 9.10 Trees 8.30"
+    # Field | Default | Unit        | Prior            | Range       | Description
+    SLA::MG | 9.10    | u"m^2*g^-1" | Gamma(10.0, 1.0) | [5.0, 30.0] | "Ferns 17.4 Forbs 26.2 Graminoids 24.0 Shrubs 9.10 Trees 8.30"
 end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
-@SLA struct FvCBPhotosynthesis{P} <: AbstractCarbonAssimilation
-    photoparams::P | Photosynthesis.EnergyBalance() | _ | _ | _
+@SLA struct FvCBPhotosynthesis{P} <: AbstractCAssim
+    photoparams::P | Photosynthesis.EnergyBalance() | _ | _ | _ | _ 
 end
 
 " Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "
-@SLA struct KooijmanSLAPhotosynthesis{MoMoS,MoL,MoMoS,μMoMS,MoMS} <: AbstractCarbonAssimilation
-    k_C_binding::MoMoS | 1.0 | u"mol*mol^-1*s^-1"                 | [0.1, 10.0] | "scaling rate for carbon dioxide"
-    k_O_binding::MoMoS | 1.0 | u"mol*mol^-1*s^-1"                 | [0.1, 10.0] | "scaling rate for oxygen"
-    K_C::MoL           | fraction_per_litre_gas_to_mols(40.0/1e6) | u"mol*L^-1"  | [0.1, 10.0] | "half-saturation concentration of carbon dioxide"
-    K_O::MoL           | fraction_per_litre_gas_to_mols(0.0021) | u"mol*L^-1"    | [0.1, 10.0] | "half-saturation concentration of oxygen"
-    J_L_K::MoMS        | watts_to_light_mol(300.0) | u"mol*m^-2*s^-1" | [0.1, 10.0]  | "half-saturation flux of useful photons"
-    j_L_Amax::μMoMS    | 20.0  | u"μmol*m^-2*s^-1"                    | [0.1, 10.0]  | "max spec uptake of useful photons"
-    j_C_Amax::μMoMS    | 90.0  | u"μmol*m^-2*s^-1"                    | [0.1, 10.0]  | "max spec uptake of carbon dioxide"
-    j_O_Amax::μMoMS    | 0.001 | u"μmol*m^-2*s^-1"                    | [0.1, 10.0]  | "max spec uptake of oxygen"
+@SLA struct KooijmanSLAPhotosynthesis{MoMoS,MoL,MoMoS,μMoMS,MoMS} <: AbstractCAssim
+    # Field            | Default           | Unit               | Prior           | Range       | Description
+    k_C_binding::MoMoS | 1.0               | u"mol*mol^-1*s^-1" | Gamma(2.0, 2.0) | [0.1, 10.0] | "scaling rate for carbon dioxide"
+    k_O_binding::MoMoS | 1.0               | u"mol*mol^-1*s^-1" | Gamma(2.0, 2.0) | [0.1, 10.0] | "scaling rate for oxygen"
+    K_C::MoL           | 400*1e-6/gas_molpL| u"mol*L^-1"        | Gamma(2.0, 2.0) | [0.1, 10.0] | "half-saturation concentration of carbon dioxide"
+    K_O::MoL           | 0.0021/gas_molpL  | u"mol*L^-1"        | Gamma(2.0, 2.0) | [0.1, 10.0] | "half-saturation concentration of oxygen"
+    J_L_K::MoMS        | 300.0 * parconv   | u"mol*m^-2*s^-1"   | Gamma(2.0, 2.0) | [0.1, 10.0] | "half-saturation flux of useful photons"
+    j_L_Amax::μMoMS    | 20.0              | u"μmol*m^-2*s^-1"  | Gamma(2.0, 2.0) | [0.1, 10.0] | "max spec uptake of useful photons"
+    j_C_Amax::μMoMS    | 90.0              | u"μmol*m^-2*s^-1"  | Gamma(2.0, 2.0) | [0.1, 10.0] | "max spec uptake of carbon dioxide"
+    j_O_Amax::μMoMS    | 0.001             | u"μmol*m^-2*s^-1"  | Gamma(2.0, 2.0) | [0.1, 10.0] | "max spec uptake of oxygen"
 end
 
 " Parameters for Ammonia/Nitrate assimilation "
-@columns struct Kooijman_NH4_NO3Assimilation{μMoMS,F,MoMo,MoL} <: AbstractNH4_NO3Assimilation
-    j_NH_Amax::μMoMS | 50.0 | u"μmol*mol^-1*s^-1" | [0.1, 1000.0] | "max spec uptake of ammonia"
-    j_NO_Amax::μMoMS | 50.0 | u"μmol*mol^-1*s^-1" | [0.1, 1000.0] | "max spec uptake of nitrate"
-    ρNO::F           | 0.7  | _                   | [0.0, 1.0]    | "weights preference for nitrate relative to ammonia." # 1 or less but why?
-    y_E_CH_NH::MoMo  | 1.25 | u"mol*mol^-1"       | [0.0, 1.0]    | "from roots C-reserve to reserve using ammonia"
-    K_NH::MoL        | 0.01 | u"mol*L^-1"         | [5.0, 20.0]   | "half-saturation concentration of ammonia"
-    K_NO::MoL        | 0.01 | u"mol*L^-1"         | [5.0, 20.0]   | "half-saturation concentration of nitrate"
-    K_H::MoL         | 10.0 | u"mol*L^-1"         | [5.0, 20.0]   | "half-saturation concentration of water"
+@columns struct KooijmanNH4_NO3Assim{μMoMS,F,MoMo,MoL} <: AbstractNH4_NO3Assim
+    #Field           | Default | Unit                | Prior            | Range         | Description
+    j_NH_Amax::μMoMS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "max spec uptake of ammonia"
+    j_NO_Amax::μMoMS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "max spec uptake of nitrate"
+    ρNO::F           | 0.7     | _                   | Beta(0.7, 1.0)   | [0.0, 1.0]    | "weights preference for nitrate relative to ammonia." # 1 or less but why?
+    y_E_CH_NH::MoMo  | 1.25    | u"mol*mol^-1"       | Gamma(1.25, 1.0) | [0.0, 2.0]    | "from roots C-reserve to reserve using ammonia"
+    K_NH::MoL        | 0.01    | u"mol*L^-1"         | Gamma(0.01, 1.0) | [5.0, 20.0]   | "half-saturation concentration of ammonia"
+    K_NO::MoL        | 0.01    | u"mol*L^-1"         | Gamma(0.01, 1.0) | [5.0, 20.0]   | "half-saturation concentration of nitrate"
+    K_H::MoL         | 10.0    | u"mol*L^-1"         | Gamma(10.0, 1.0) | [5.0, 20.0]   | "half-saturation concentration of water"
 end
 
 " Parameters for lumped Nitrogen assimilation "
-@columns struct N_Assimilation{μMoS,MoL} <: AbstractNitrogenAssimilation
-    j_N_Amax::μMoS | 50.0 | u"μmol*mol^-1*s^-1" | [0.1, 1000.0] | "max spec uptake of ammonia"
-    K_N::MoL       | 0.01 | u"mol*L^-1"         | [0.0, 1.0]    | "half-saturation concentration of nitrate"
-    K_H::MoL       | 10.0 | u"mol*L^-1"         | [0.0, 1.0]    | "half-saturation concentration of water"
+@columns struct NAssim{μMoS,MoL} <: AbstractNAssim
+    # Field        | Default | Unit                | Prior            | Range         | Description
+    j_N_Amax::μMoS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "max spec uptake of ammonia"
+    K_N::MoL       | 0.01    | u"mol*L^-1"         | Gamma(0.01, 1.0) | [0.0, 1.0]    | "half-saturation concentration of nitrate"
+    K_H::MoL       | 10.0    | u"mol*L^-1"         | Gamma(10.0, 1.0) | [0.0, 1.0]    | "half-saturation concentration of water"
 end
+
 
 " Temperature correction parameters"
 abstract type AbstractTempCorr{K} end
 
 @mix @columns struct Tbase{K}
-    reftemp::K    | 310.0   | u"K" | [273.0, 325.0]     | "Reference temperature for all rate parameters"
-    arrtemp::K    | 2000.0  | u"K" | [200.0, 4000.0]    | "Arrhenius temperature"
+    # Field       | Default | Unit | Prior               | Range              | Description
+    reftemp::K    | 310.0   | u"K" | Gamma(310.0, 1.0)   | [273.0, 325.0]     | "Reference temperature for all rate parameters"
+    arrtemp::K    | 2000.0  | u"K" | Gamma(2000.0, 1.0)  | [200.0, 4000.0]    | "Arrhenius temperature"
 end
 @mix @columns struct Tlow{K}
-    lowerbound::K | 280.0   | u"K" | [273.0, 325.0]     | "Lower boundary of tolerance range"
-    arrlower::K   | 20000.0 | u"K" | [2000.0, 40000.0]  | "Arrhenius temperature for lower boundary"
+    lowerbound::K | 280.0   | u"K" | Gamma(280.0, 1.0)   | [273.0, 325.0]     | "Lower boundary of tolerance range"
+    arrlower::K   | 20000.0 | u"K" | Gamma(20000.0, 1.0) | [2000.0, 40000.0]  | "Arrhenius temperature for lower boundary"
 end
 @mix @columns struct Tup{K}
-    upperbound::K | 315.0   | u"K" | [273.0, 325.0]     | "Upper boundary of tolerance range"
-    arrupper::K   | 70000.0 | u"K" | [7000.0, 140000.0] | "Arrhenius temperature for upper boundary"
+    upperbound::K | 315.0   | u"K" | Gamma(315.0, 1.0)   | [273.0, 325.0]     | "Upper boundary of tolerance range"
+    arrupper::K   | 70000.0 | u"K" | Gamma(70000, 1.0)   | [7000.0, 140000.0] | "Arrhenius temperature for upper boundary"
 end
 
 " Simple temperature correction parameters "
@@ -89,100 +95,115 @@ end
 " Temperature correction with lower and upper bound parameters"
 @Tbase @Tlow @Tup struct TempCorrLowerUpper{K} <: AbstractTempCorr{K} end
 
+
 " State feedback parameters. These modfy state based on state. "
 abstract type AbstractStateFeedback end
 
 " Autophagy. Parameters for self reabsorbtion when metabolic rates fall "
 @columns struct Autophagy{Mo} <: AbstractStateFeedback
-    K_autophagy::Mo | 0.000001 | u"mol" | [0.0000001, 0.00001] | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
+    # Field         | Default  | Unit   | Prior           | Range                | Description
+    K_autophagy::Mo | 0.000001 | u"mol" | Beta(2.0, 2.0)  | [0.0000001, 0.00001] | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
 end
+
 
 " Allometry. Scaling rules to relate size to mass. "
 abstract type AbstractAllometry end
 
 @columns struct SqrtAllometry{M} <: AbstractAllometry
-    size::M | 0.1 | u"m" | [0.0, 1.0] | " allometry "
+    # Field | Default | Unit | Prior           | Range      | Description
+    size::M | 0.1     | u"m" | Gamma(2.0, 0.2) | [0.0, 1.0] | " allometry "
 end
+
 
 " Surface area scaling rules "
 abstract type AbstractScaling end
 
 " Surface areai scaling curve. Simulates growth and shade crowding later in life. "
 @columns struct KooijmanArea{Mo} <: AbstractScaling
-    M_Vref::Mo     | 4.0   | u"mol"   | [0.4, 20.0]    | "shoots scaling reference"
-    M_Vscaling::Mo | 400.0 | u"mol"   | [40.0, 2000.0] | "shoots scaling mass"
+    M_Vref::Mo     | 4.0     | u"mol" | Gamma(2.0, 0.2) | [0.4, 20.0]    | "shoots scaling reference"
+    M_Vscaling::Mo | 400.0   | u"mol" | Gamma(2.0, 0.2) | [40.0, 2000.0] | "shoots scaling mass"
+end
+
+
+@columns @flattenable struct Translocation{D,P}
+    destnames::D   | NotFlat() | (:leaf,)| _    | _              |_         | "the organ/s translocated to"
+    proportions::P | Flat()    | (1.0,)  | _    | Beta(2.0, 2.0) |[0.0,1.0] | "the proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
+end
+
+
+" Maturity parameters. Seperated to make maturity modeling optional, reducing complexity "
+@columns struct Maturity{MoMoD,F,Mo,GMo,MoMo}
+    # Field            | Default         | Unit               | Prior           | Range        | Description
+    j_E_rep_mai::MoMoD | 0.001           | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0, 0.01]  | "shoots spec maturity maint costs "
+    κrep::F            | 0.05            | _                  | Beta(2.0, 2.0)  | [0.0, 1.0]   | "shoots reserve flux allocated to development/reprod."
+    M_Vrep::Mo         | 10.0            | u"mol"             | Beta(2.0, 2.0)  | [0.0, 1.0]   | "shoots structural mass at start reproduction" # TODO: isn't this variable/seasonally triggered?
+    w_M::GMo           | 25.0            | u"g*mol^-1"        | Beta(2.0, 2.0)  | [0.0, 1.0]   | "mol-weight of shoot maturity reserve:"
+    n_N_M::MoMo        | 10.0            | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0, 1.0]   | "N/C in M-reserve"
 end
 
 " Model parameters that vary between organs "
 @columns struct Params{A,S,Al,Ma,Tr,F,Mo,MoMoD,MoMo}
-    name::Symbol      | :organ          | _                  | _          | _ 
-    assimilation::A   | ConstantCarbonAssimilation() | nothing | _        | _                                        
-    scaling::S        | KooijmanArea()  | _                  | _          | _                                        
-    allometry::Al     | SqrtAllometry() | _                  | _          | _                                        
-    maturity::Ma      | Maturity()      | _                  | _          | _                                        
-    translocation::Tr | nothing         | _                  | _          | _                                        
-    κsoma::F          | 0.6             | _                  | [0.1,0.9]  | "reserve flux allocated to growth"       
-    M_Vgerm::Mo       | 0.01            | u"mol"             | [0.0,1.0]  | "structural mass at germination"         
-    y_P_V::MoMo       | 0.02            | u"mol*mol^-1"      | [0.0,1.0]  | "product formation linked to growth"     
-    y_V_E::MoMo       | 0.7             | u"mol*mol^-1"      | [0.0,1.0]  | "from reserve to structure"              
-    y_E_ET::MoMo      | 0.8             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated reserve:"                  
-    y_EC_ECT::MoMo    | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated C-reserve"                 
-    y_EN_ENT::MoMo    | 1.0             | u"mol*mol^-1"      | [0.0,1.0]  | "translocated N-reserve"                 
-    j_E_mai::MoMoD    | 0.001           | u"mol*mol^-1*d^-1" | [0.0,0.01] | "spec somatic maint costs."              
-    j_P_mai::MoMoD    | 0.01            | u"mol*mol^-1*d^-1" | [0.0,0.1]  | "product formation linked to maintenance"
-    k_E::MoMoD        | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "reserve turnover rate"                  
-    k_EC::MoMoD       | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "C-reserve turnover rate"                
-    k_EN::MoMoD       | 0.2             | u"mol*mol^-1*d^-1" | [0.0,1.0]  | "N-reserve turnover rate"                
-end
-
-@columns @flattenable struct Translocation{D,P} 
-    destnames::D   | false | (:leaf,)| _ | _         | "the organ/s translocated to"
-    proportions::P | true  | (1.0,) | _  | [0.0,1.0] | "the proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
+    # Field            | Default         | Unit               | Prior           | Range        | Description
+    name::Symbol       | :organ          | _                  | _               | _            | _
+    assimilation::A    | ConstantCAssim()| _                  | _               | _            | _ 
+    scaling::S         | KooijmanArea()  | _                  | _               | _            | _
+    allometry::Al      | SqrtAllometry() | _                  | _               | _            | _
+    maturity::Ma       | Maturity()      | _                  | _               | _            | _
+    translocation::Tr  | nothing         | _                  | _               | _            | _
+    M_Vgerm::Mo        | 0.01            | u"mol"             | Gamma(2.0, 2.0) | [0.0,1.0]    | "structural mass at germination"
+    κsoma::F           | 0.6             | _                  | Beta(2.0, 2.0)  | [0.1,0.9]    | "reserve flux allocated to growth"
+    y_P_V::MoMo        | 0.02            | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "product formation linked to growth"
+    y_V_E::MoMo        | 0.7             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "from reserve to structure"
+    y_E_ET::MoMo       | 0.8             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "translocated reserve:"
+    y_EC_ECT::MoMo     | 1.0             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "translocated C-reserve"
+    y_EN_ENT::MoMo     | 1.0             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "translocated N-reserve"
+    j_E_mai::MoMoD     | 0.001           | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0,0.01]   | "spec somatic maint costs."
+    j_P_mai::MoMoD     | 0.01            | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0,0.1]    | "product formation linked to maintenance"
+    k_E::MoMoD         | 0.2             | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0,1.0]    | "reserve turnover rate"
+    k_EC::MoMoD        | 0.2             | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0,1.0]    | "C-reserve turnover rate"
+    k_EN::MoMoD        | 0.2             | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0,1.0]    | "N-reserve turnover rate"
 end
 
 " Model parameters shared between organs "
 @columns struct SharedParams{Fb,C,MoMo,GMo}
-    feedback::Fb    | nothing             | _ | _         | _
-    tempcorr::C     | nothing             | _ | _         | _
-    # n_N_P::MoMo   | 0.0u"mol*mol^-1"        | _         | "N/C in product (wood)"
-    # n_N_V::MoMo   | 0.15u"mol*mol^-1"       | _         | "N/C in structure" # Shouldnt this be identical to the reserve?
-    # n_N_C::MoMo   | 0.0u"mol*mol^-1"        | _         | "N/C in C-reserve"
-    n_N_N::MoMo     | 10.0u"mol*mol^-1"   | _  | _         | "N/C in N-reserve"
-    # n_N_E::MoMo   | 0.2  | u"mol*mol^-1" | [0.0, 1.0]   | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
-    w_P::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot product (wood)"
-    w_V::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot structure"
-    w_C::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot C-reserve"
-    w_N::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot N-reserve"
-    w_E::GMo        | 25.0 | u"g*mol^-1"   | [10.0, 40.0] | "mol-weight of shoot reserve" 
-    y_E_CH_NO::MoMo | 1.5  | u"mol*mol^-1" | [0.0, 2.0]   | "from C-reserve to reserve, using nitrate"
-    y_E_EN::MoMo    | 1.5  | u"mol*mol^-1" | [0.0, 2.0]   | "from N-reserve to reserve"
+    # Field            | Default         | Unit               | Prior           | Range        | Description
+    feedback::Fb       | nothing         | _                  | Gamma(2.0, 2.0) | _            | _
+    tempcorr::C        | nothing         | _                  | Gamma(2.0, 2.0) | _            | _
+    # n_N_P::MoMo      | 0.0             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | _            | "N/C in product (wood)"
+    # n_N_V::MoMo      | 0.15            | u"mol*mol^-1"      | Gamma(2.0, 2.0) | _            | "N/C in structure" # Shouldnt this be identical to the reserve?
+    # n_N_C::MoMo      | 0.0             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | _            | "N/C in C-reserve"
+    n_N_N::MoMo        | 10.0            | u"mol*mol^-1"      | Gamma(2.0, 2.0) | _            | "N/C in N-reserve"
+    # n_N_E::MoMo      | 0.2             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | [0.0, 1.0]   | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
+    w_P::GMo           | 25.0            | u"g*mol^-1"        | Gamma(2.0, 2.0) | [10.0, 40.0] | "mol-weight of shoot product (wood)"
+    w_V::GMo           | 25.0            | u"g*mol^-1"        | Gamma(2.0, 2.0) | [10.0, 40.0] | "mol-weight of shoot structure"
+    w_C::GMo           | 25.0            | u"g*mol^-1"        | Gamma(2.0, 2.0) | [10.0, 40.0] | "mol-weight of shoot C-reserve"
+    w_N::GMo           | 25.0            | u"g*mol^-1"        | Gamma(2.0, 2.0) | [10.0, 40.0] | "mol-weight of shoot N-reserve"
+    w_E::GMo           | 25.0            | u"g*mol^-1"        | Gamma(2.0, 2.0) | [10.0, 40.0] | "mol-weight of shoot reserve"
+    y_E_CH_NO::MoMo    | 1.5             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | [0.0, 2.0]   | "from C-reserve to reserve, using nitrate"
+    y_E_EN::MoMo       | 1.5             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | [0.0, 2.0]   | "from N-reserve to reserve"
 end
 
-" Maturity parameters. Seperated to make maturity modeling optional, reducing complexity "
-@columns struct Maturity{MoMoD,F,Mo,GMo,MoMo}
-    j_E_rep_mai::MoMoD | 0.001 | u"mol*mol^-1*d^-1" | [0.0, 0.01] | "shoots spec maturity maint costs "
-    κrep::F            | 0.05  | _                  | [0.0, 1.0]  | "shoots reserve flux allocated to development/reprod."
-    M_Vrep::Mo         | 10.0  | u"mol"             | [0.0, 1.0]  | "shoots structural mass at start reproduction" # TODO: isn't this variable/seasonally triggered?
-    w_M::GMo           | 25.0  | u"g*mol^-1"        | [0.0, 1.0]  | "mol-weight of shoot maturity reserve:"
-    n_N_M::MoMo        | 10.0  | u"mol*mol^-1"      | [0.0, 1.0]  | "N/C in M-reserve"
-end
+
+
+###########################################################################################
+# Variables
 
 " Variables for carbon assimilation "
 @units @default_kw mutable struct CarbonVars{MoMS,MoL}
     J_L_F::MoMS | watts_to_light_mol(800.0)                 | u"mol*m^-2*s^-1" #| "flux of useful photons"
-    X_C::MoL    | fraction_per_litre_gas_to_mols(400.0/1e6) | u"mol*L^-1"      #| "carbon dioxide @ 400ppm"
-    X_O::MoL    | fraction_per_litre_gas_to_mols(0.21)      | u"mol*L^-1"      #| "oxygen (21% volume in air) "
+    X_C::MoL    | (400.0/1e6) | u"mol*L^-1"      #| "carbon dioxide @ 400ppm"
+    X_O::MoL    | 0.21 * gas_molpL | u"mol*L^-1"      #| "oxygen (21% volume in air) "
 end
 
 " Variables for nitgroen assimilation "
 @columns mutable struct NitrogenVars{F,MoL}
     # TODO work out the naming conventions here
-    soilmoist::F    | 1.0  | _           |  _ | _
-    soilpot::F      | 1.0  | _           |  _ | _
-    soilpotshade::F | 1.0  | _           |  _ | _
-    X_NH::MoL       | 0.005| u"mol*L^-1" |  _ | _ # | "concentration of ammonia"
-    X_NO::MoL       | 0.01 | u"mol*L^-1" |  _ | _ # | "concentration of nitrate see e.g. [_@crawford1998molecular]"
-    X_H::MoL        | 10.0 | u"mol*L^-1" |  _ | _ # | 
+    soilmoist::F    | 1.0  | _           |  _ | _ | _
+    soilpot::F      | 1.0  | _           |  _ | _ | _
+    soilpotshade::F | 1.0  | _           |  _ | _ | _
+    X_NH::MoL       | 0.005| u"mol*L^-1" |  _ | _ | "concentration of ammonia"
+    X_NO::MoL       | 0.01 | u"mol*L^-1" |  _ | _ | "concentration of nitrate see e.g. [_@crawford1998molecular]"
+    X_H::MoL        | 10.0 | u"mol*L^-1" |  _ | _ | _
 end
 
 " Model variables "
@@ -221,17 +242,18 @@ end
 
 "An organism, made up of organs"
 @flattenable struct Organism{O,S,R,E}
-    params::O      | true
-    shared::S      | true
-    records::R     | false
-    environment::E | false
+    params::O      | Flat()  
+    shared::S      | Flat()  
+    records::R     | NotFlat() 
+    environment::E | NotFlat() 
 end
+
 "Outer construtor for defaults"
 Organism(; params = (ShootParams(), RootParams()),
-           vars = (ShootVars(), RootVars()),
            shared = SharedParams(),
+           vars = (ShootVars(), RootVars()),
            records = nothing,
-           environment = nothing,                       
+           environment = nothing,
            time = 0u"hr":1u"hr":1000u"hr") = begin
     if records == nothing
         recarray = []

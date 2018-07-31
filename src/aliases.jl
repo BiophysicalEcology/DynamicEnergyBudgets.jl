@@ -1,7 +1,7 @@
 FLUX = 1.0u"mol/hr"
 
 ShootParams(;kwargs...) = Params(name=:shoot, assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
-RootParams(;kwargs...) = Params(name=:root, assimilation=N_Assimilation(), kwargs...)
+RootParams(;kwargs...) = Params(name=:root, assimilation=NAssim(), kwargs...)
 ShootVars(;kwargs...) = Vars(assimilation=CarbonVars(), kwargs...)
 RootVars(;kwargs...) = Vars(assimilation=NitrogenVars(), kwargs...)
 Records(params; vars=(ShootVars(), RootVars()), t=1:1:1, val=FLUX) = begin
@@ -34,7 +34,7 @@ FvCBLeafParams(;kwargs...) = Params(;name=:shoot, assimilation=FvCBPhotosynthesi
 FvCBStemParams(;kwargs...) = Params(;name=:shoot, assimilation=nothing, 
                                     translocation=Translocation((:leaf,:root), 0.5), kwargs...)
 FvCBRootParams(;kwargs...) = Params(;name=:root, translocation=Translocation(destnames=:stem), 
-                                    assimilation=N_Assimilation(), kwargs...)
+                                    assimilation=NAssim(), kwargs...)
 FvCBShootVars(;kwargs...) = Vars(;assimilation=Photosynthesis.PhotoVars(), kwargs...)
 FvCBStemVars(;kwargs...) = Vars(;assimilation=nothing, kwargs...)
 FvCBLeafVars(;kwargs...) = Vars(;assimilation=Photosynthesis.PhotoVars(), kwargs...)
@@ -45,8 +45,8 @@ FvCBPlant(;kwargs...) = Organism(;params=(FvCBShootParams(), FvCBRootParams()),
 FvCBPlant3(;kwargs...) = Organism(;params=(FvCBLeafParams(), FvCBStemParams(), FvCBRootParams()), 
                               vars=(FvCBLeafVars(), FvCBStemVars(), FvCBRootVars()), kwargs...)
 
-ConstantShoot(;kwargs...) = Organ(name=:shoot, params=Params(assimilation=ConstantCarbonAssimilation()), kwargs...)
-ConstantRoot(;kwargs...) = Organ(name=:root, params=Params(assimilation=ConstantNitrogenAssimilation()), kwargs...)
+ConstantShoot(;kwargs...) = Organ(name=:shoot, params=Params(assimilation=ConstantCAssim()), kwargs...)
+ConstantRoot(;kwargs...) = Organ(name=:root, params=Params(assimilation=ConstantNAssim()), kwargs...)
 ConstantPlant(;kwargs...) = Organism(; params=(ConstantShootParams(), ConstantRootParams()), kwargs...)
 
 LeafParams(;kwargs...) = Params(;name=:leaf, translocation=Translocation(dest=:stem), 
@@ -54,7 +54,7 @@ LeafParams(;kwargs...) = Params(;name=:leaf, translocation=Translocation(dest=:s
 StemParams(;kwargs...) = Params(;name=:stem, translocation=Translocation(dest=(:leaf, :root), proportions=0.5), 
                                 assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
 RootParams3(;kwargs...) = Params(;name=:root, translocation=Translocation(dest=:stem), 
-                                 assimilation=N_Assimilation(), kwargs...)
+                                 assimilation=NAssim(), kwargs...)
 LeafVars(;kwargs...) = Vars(;assimilation=CarbonVars(), kwargs...)
 StemVars(;kwargs...) = Vars(;assimilation=nothing, kwargs...)
 Plant3(;kwargs...) = Organism(;params=(LeafParams(), StemParams(), RootParams()), 

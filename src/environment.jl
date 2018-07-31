@@ -33,7 +33,7 @@ apply_environment!(o::Organ, u, env, t) = begin
 end
 apply_environment!(o::Organ, u, env::Void, t) = nothing
 
-apply_environment!(a::AbstractCarbonAssimilation, o, u, env, t) = begin
+apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o, u)
@@ -70,7 +70,7 @@ apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
     nothing
 end
 
-apply_environment!(a::AbstractNitrogenAssimilation, o, u, env, t) = begin
+apply_environment!(a::AbstractNAssim, o, u, env, t) = begin
     p, v = unpack(o); va = v.assimilation;
     pos = ustrip(t) + 1
     h = v.height = allometric_height(p.allometry, o, u)

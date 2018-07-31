@@ -27,13 +27,13 @@ end
 # end
 
 @testset "sum_flux" begin
-    du = fill(0.0u"mol/d", 12)
+    du = fill(0.0u"mol/hr", 12)
     o = Organism();
     or1, or2 = define_organs(o, 1);
     or1.J .= [1.0,2.0,3.0,4.0,5.0,6.0]oneunit(or1.J[1,1])
     or2.J .= [1.0,2.0,3.0,4.0,5.0,6.0]oneunit(or2.J[1,1]) / 2
     sum_flux!(du, (or1, or2))
-    @test du == [6.0,12.0,18.0,24.0,30.0,36.0,3.0,6.0,9.0,12.0,15.0,18.0] .* u"mol/hr" 
+    @test du == [7.0,14.0,21.0,28.0,35.0,42.0,3.5,7.0,10.5,14.0,17.5,21.0] .* u"mol/hr" 
 end
 
 @testset "split_state" begin

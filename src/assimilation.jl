@@ -7,28 +7,29 @@ assimilation!(o::Organ, u) = assimilation!(o.params.assimilation, o, u)
 assimilation!(::Void, o::Organ, u) = nothing
 
 """
-    assimilation!(f::AbstractCarbonAssimilation, o, u)
+    assimilation!(f::AbstractAassim, o, u)
 Runs nitrogen uptake, and combines N with translocated C.
 """
-function assimilation!(f::AbstractCarbonAssimilation, o, u)
+function assimilation!(f::AbstractCAssim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
 
     J1_EC_ass = photosynthesis(f, o, u)
 
     o.J[C,ass] = J1_EC_ass
     # Merge rejected N from root and photosynthesized C into reserves
-    (o.J[C,ass], o.J[N,tra], o.J[E,ass]) =
+    (o.J[C,ass], o.J[N,tra], o.J[E,ass], lossC, lossN) =
         stoich_merge(J1_EC_ass, o.J[N,tra], o.shared.y_E_CH_NO, o.shared.y_E_EN)
+    o.J[C,los] += lossC; o.J[N,los] += lossN
 
     return nothing
 end
 
 """
-    assimilation!(f::AbstractNH4_NO3Assimilation, o, u)
+    assimilation!(f::AbstractNH4_NO3Assim, o, u)
 Runs nitrogen uptake for nitrate and ammonia, and combines N with translocated C.
 Unused ammonia is discarded.
 """
-function assimilation!(f::AbstractNH4_NO3Assimilation, o, u)
+function assimilation!(f::AbstractNH4_NO3Assim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
 
     (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o, u)
@@ -38,8 +39,9 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o, u)
     y_E_CH = θNH * f.y_E_CH_NH + θNO * o.shared.y_E_CH_NO  # Yield coefficient from C-reserve to reserve
 
     # Merge rejected C from shoot and uptaken N into reserves
-    (o.J[C,tra], o.J[N,ass], o.J[E,ass]) =
+    (o.J[C,tra], o.J[N,ass], o.J[E,ass], lossC, lossN) =
         stoich_merge(o.J[C,tra], J_N_ass, y_E_CH, 1/o.shared.n_N_E)
+    o.J[C,los] += lossC; o.J[N,los] += lossN
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     o.J[N,ass] = (J_NO_ass - θNO * o.shared.n_N_E * o.J[E,ass]) * 1/o.shared.n_N_EN
@@ -47,33 +49,34 @@ function assimilation!(f::AbstractNH4_NO3Assimilation, o, u)
 end
 
 """
-    assimilation!(f::AbstractNitrogenAssimilation, o, u)
+    assimilation!(f::AbstractNAssim, o, u)
 Runs nitrogen uptake, and combines N with translocated C.
 """
-function assimilation!(f::AbstractNitrogenAssimilation, o, u)
+function assimilation!(f::AbstractNAssim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
 
     J_N_assim = uptake_nitrogen(f, o, u)
 
     # This was not in the orignal model, but is needed to balance C. N reserve is part C
-    # but incoming N is just N. C was being generated from nowhere in the equation, 
+    # but incoming N is just N. C was being generated from nowhere, 
     # specifically in the N returned to N reserves by the synthesizing unit.
-    # TODO: could this end up with a negative C reserve?
+    # TODO: could this end up with a negative C reserve overall?
     o.J[C,ass] += -J_N_assim / o.shared.n_N_N
 
     # Merge rejected C from shoot and uptaken N into reserves
     # treating N as N reserve now carbon has been incorporated.
-    (o.J[C,tra], o.J[N,ass], o.J[E,ass]) =
+    (o.J[C,tra], o.J[N,ass], o.J[E,ass], lossC, lossN) =
         stoich_merge(o.J[C,tra], J_N_assim, o.shared.y_E_CH_NO, o.shared.y_E_CH_NO)
+    o.J[C,los] += lossC; o.J[N,los] += lossN
 
     return nothing
 end
 
 """
-    photosynthesis(f::ConstantCarbonAssimilation, o, u)
+    photosynthesis(f::ConstantCAssim, o, u)
 Returns a constant rate of carbon assimilation.
 """
-photosynthesis(f::ConstantCarbonAssimilation, o, u) =
+photosynthesis(f::ConstantCAssim, o, u) =
     f.uptake * u[V] * o.vars.scale
 
 """
@@ -108,16 +111,16 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
 end
 
 """
-    uptake_nitrogen(f::ConstantNitrogenAssimilation, o, u)
+    uptake_nitrogen(f::ConstantNAssim, o, u)
 Returns constant nitrogen assimilation.
 """
-uptake_nitrogen(f::ConstantNitrogenAssimilation, o, u) = f.uptake * u[V] * o.vars.scale
+uptake_nitrogen(f::ConstantNAssim, o, u) = f.uptake * u[V] * o.vars.scale
 
 """
-    uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o, u)
+    uptake_nitrogen(f::KooijmanNH4_NO3Assim, o, u)
 Returns total nitrogen, nitrate and ammonia assimilated in mols per time.
 """
-function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o, u)
+function uptake_nitrogen(f::KooijmanNH4_NO3Assim, o, u)
     p = o.params; v = o.vars; va = v.assimilation
 
     K1_NH = half_saturation(f.K_NH, f.K_H * v.scale, va.X_H) # Ammonia saturation. va.X_H was multiplied by ox.scaling. But that makes no sense.
@@ -130,10 +133,10 @@ function uptake_nitrogen(f::Kooijman_NH4_NO3Assimilation, o, u)
 end
 
 """
-    uptake_nitrogen(f::N_Assimilation, o, u)
+    uptake_nitrogen(f::NAssim, o, u)
 Returns nitrogen assimilated in mols per time.
 """
-function uptake_nitrogen(f::N_Assimilation, o, u)
+function uptake_nitrogen(f::NAssim, o, u)
     v = o.vars; va = v.assimilation
     # Ammonia proportion in soil water
     K1_N = half_saturation(f.K_N, f.K_H * v.scale, va.X_H)

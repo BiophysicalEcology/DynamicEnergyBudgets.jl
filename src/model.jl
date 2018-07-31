@@ -1,6 +1,7 @@
 """
 Run a DEB organism model.
 """
+(o::Organism)(du, u, p::Void, t::Number) = o(du, u, t, define_organs(o, t))
 
 function (o::Organism)(du, u, t::Number, organs)
     ux = split_state(organs, u)
@@ -32,7 +33,7 @@ metabolism!(o, u) = begin
     set_scaling!(o, u)
     catabolism!(o, u)
     dissipation!(o, u)
-    feedback!(o, o.shared.feedback, u)
+    feedback!(o.shared.feedback, o, u)
 end
 
 """
@@ -42,15 +43,14 @@ Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u)
     p, v, sh, J, J1 = unpack(o); va = v.assimilation;
-    tempscaling = v.tempcorr .* v.scale
-
-    turnover = (p.k_EC, p.k_EN, p.k_E) .* tempscaling
+    turnover = (p.k_EC, p.k_EN, p.k_E) .* v.tempcorr .* v.scale
     m = (u[C], u[N], u[E]) ./ u[V]
     j_E_mai = p.j_E_mai * v.tempcorr
+
     v.rate = find_rate(m, turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
 
     (J1[C,cat], J1[N,cat], J1[EE,cat]) = catabolic_flux((u[C], u[N], u[E]), turnover, v.rate)
-    (J1[C,rej], J1[N,rej], J1[CN,cat]) =
+    (J1[C,rej], J1[N,rej], J1[CN,cat], o.J1[C,los], o.J1[N,los]) =
         stoich_merge(J1[C,cat], J1[N,cat], sh.y_E_CH_NO, sh.y_E_EN)
 
     J1[E,cat] = J1[EE,cat] + J1[CN,cat] # Total catabolic flux
@@ -115,7 +115,7 @@ function product!(o, u)
     J[P,gro] = J[V,gro] * p.y_P_V
     J[P,mai] = u[V] * p.j_P_mai * v.tempcorr
     # undo the reserve loss from growth: it went to product
-    loss_correction = -(J[P,gro] + J[P,mai])
+    loss_correction = (J[P,gro] + J[P,mai])
     reserve_loss!(o, loss_correction)
 end
 
@@ -144,10 +144,8 @@ translocation!(organs::Tuple, destorgans::Tuple) = begin
     translocation!(tail(organs), destorgans)     
 end
 translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
-
 translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
     translocation!(organ, destorgans, (destnames,), props)
-
 # Translocate to organs with names in the destnames list
 translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
     for i = 1:length(destnames)
@@ -219,9 +217,26 @@ end
 Generalised reserve loss to track carbon. 
 """
 function reserve_loss!(o, loss)
-    o.J1[C,los] += loss/o.shared.y_E_CH_NO
-    o.J1[N,los] += loss/o.shared.y_E_EN
+    o.J1[E,los] += loss
     nothing
+end
+
+reserve_loss!(o, ::Type{Val{:C}}, loss) = o.J1[C,los] += loss
+# reserve_loss!(o, ::Type{Val{:N}}, loss) = o.J1[N,los] += loss/o.shared
+
+"""
+    stoich_merge(Ja, Jb, ya, yb)
+Merge fluxes stoichiometrically into general reserve Eab based on yeild 
+fractions ya and yb. An unmixed proportion is returned as unmixed reserves Ea and Eb.
+Losses are also calculated.
+"""
+stoich_merge(Ja, Jb, ya, yb) = begin
+    JEab = synthesizing_unit(Ja * ya, Jb * yb) 
+    JEa = Ja - JEab/ya                        
+    JEb = Jb - JEab/yb                     
+    lossa = Ja + Jb - JEa - JEb - JEab
+    lossb = zero(lossa)
+    (JEa, JEb, JEab, lossa, lossb)
 end
 
 """
@@ -256,16 +271,14 @@ Function to apply feedback on growth the process, such as autopagy in resource s
 Without a function like this you will likely be occasionally breaking the 
 laws of thermodynamics by introducing negative rates.
 """
-feedback!(o, f::Void, u) = nothing
-feedback!(o, f::Autophagy, u) = begin
+feedback!(f::Void, o, u) = nothing
+autophagy!(f::Autophagy, o, u) = begin
     hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
-    autophagy = u[V] * (oneunit(hs) - hs)
-    o.J[C,gro] += autophagy/o.shared.y_E_CH_NO
-    o.J[N,gro] += autophagy/o.shared.y_E_EN
-    o.J[V,gro] -= autophagy
-    nothing
+    aph = u[V] * (oneunit(hs) - hs)
+    # TODO this should be a lossy process
+    o.J[E,fbk] += aph
+    o.J[V,fbk] -= aph
 end
-
 
 set_scaling!(o, u) = o.vars.scale = scaling(o.params.scaling, u[V])
 

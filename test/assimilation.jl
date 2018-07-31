@@ -2,7 +2,7 @@ using Revise
 using Unitful
 using DynamicEnergyBudgets
 using DynamicEnergyBudgets: reuse_rejected!, translocate!, assimilation!, translocation!, sum_flux!,
-                            scaling, uptake_nitrogen, photosynthesis, Kooijman_NH4_NO3Assimilation,
+                            scaling, uptake_nitrogen, photosynthesis,
                             P, V, M, C, N, E, ass, rej, los
 
 @static if VERSION < v"0.7.0-DEV.2005"
@@ -11,9 +11,7 @@ else
     using Test
 end
 
-sumstate(du, u) = sum(du[[P,V,M,E]]), du[C], du[N]
-
-sum_c_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[C,los] + o2.J1[C,los]) * o1.shared.y_E_CH_NO
+sum_c_loss(o1, o2) = sum(o1.J1[:,los]) + sum(o2.J1[:,los])
 sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los]) * o1.shared.y_E_EN
 
 @testset "N assimilation" begin
@@ -63,16 +61,16 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
         assimilation!(f, o1, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, c1, n1 = sumstate(du1, u1)
-        m2, c2, n2 = sumstate(du2, u2)
-        @test n1 == o1.J[N,ass]
-        @test n1 == uptake_nitrogen(f, o1, u1)
+        c1 = sum(du)
+        c2 = sum(du)
+        # @test n1 == o1.J[N,ass]
+        # @test n1 == uptake_nitrogen(f, o1, u1)
     end
 
     @testset "N assimilation flux is merged correctly" begin
 
         # run without assimilation
-        o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory();
+        o1, p1, u1, du1a, o2, p2, u2, du2a, f = nfactory();
         o1.J1[C,rej] = 2.3oneunit(o1.J1[1,1])
         o2.J1[C,rej] = 2.1oneunit(o2.J1[1,1])
         o1.J1[N,rej] = 1.9oneunit(o1.J1[1,1])
@@ -80,10 +78,10 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
 
         reuse_rejected!(o1, o2, 1.0)
         reuse_rejected!(o2, o1, 1.0)
-        sum_flux!(du1, o1, 0)
-        sum_flux!(du2, o2, 0)
-        m1a, c1a, n1a = sumstate(du1, u1)
-        m2a, c2a, n2a = sumstate(du2, u2)
+        sum_flux!(du1a, o1, 0)
+        sum_flux!(du2a, o2, 0)
+        c1a = sum(du1a)
+        c2a = sum(du2a)
 
         # run with assimilation
         o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory()
@@ -98,29 +96,29 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
         assimilation!(f, o1, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, c1, n1 = sumstate(du1, u1)
-        m2, c2, n2 = sumstate(du2, u2)
+        c1 = sum(du1)
+        c2 = sum(du2)
         
         # compare
-        @testset "N assimilation should have moved some C to general, but only in o1" begin
-            @test c1a > c1 
+        @testset "N assimilation should have lost C and moved some to general" begin
+            @test du1a[C] > du1[C] 
+            @test du2a[C] == du2[C]
+        end
+        @testset "N assimilation should have added N" begin
+            @test du1a[N] < du1[N] 
+            @test du2a[N] == du2[N] 
+        end
+        @testset "N assimilation should have reduced total cmols" begin
+            @test_broken c1a > c1 
             @test c2a == c2
         end
-        @testset "N assimilation should have added some N, but only in o1" begin
-            @test n1a < n1 
-            @test n2a == n2
-        end
-        @testset "N assimilation should have added some reserve, but only in o1" begin
-            @test m1a < m1 
-            @test m2a == m2
-        end
 
-        @testset "N assimilation should balance when converted to cmols" begin
+        @testset "N assimilation should balance" begin
             c_loss = sum_c_loss(o1, o2)
             n_loss = sum_n_loss(o1, o2)
             @test -c_loss != zero(c_loss)
-            @test upreferred(m1 + m2 + (c1 + c2 + (uptake_n / o1.shared.n_N_N)) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss)
-            @test upreferred(m1 + m2 + (n1 + n2) * o1.shared.y_E_EN) + n_loss ≈ upreferred(uptake_n * o1.shared.y_E_EN)
+            @test_broken c1 + c2 + (uptake_n / o1.shared.n_N_N) ≈ -c_loss
+            @test_broken upreferred(n1 + n2 * o1.shared.y_E_EN) + n_loss ≈ upreferred(uptake_n * o1.shared.y_E_EN)
         end
     end
 end
@@ -204,7 +202,7 @@ end
     @testset "C assimilation flux is merged correctly" begin
 
         # run without assimilation
-        o1, p1, u1, du1, o2, p2, u2, du2, f = cfactory();
+        o1, p1, u1, du1a, o2, p2, u2, du2a, f = cfactory();
         o1.J1[C,rej] = 1.3oneunit(o1.J1[1,1])
         o2.J1[C,rej] = 3.0oneunit(o2.J1[1,1])
         o1.J1[N,rej] = 2.4oneunit(o1.J1[1,1])
@@ -214,8 +212,8 @@ end
         reuse_rejected!(o2, o1, 1.0)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1a, c1a, n1a = sumstate(du1, u1)
-        m2a, c2a, n2a = sumstate(du2, u2)
+        c1a = sum(du1a)
+        c2a = sum(du2a)
 
         # run with assimilation
         o1, p1, u1, du1, o2, p2, u2, du2, f = cfactory();
@@ -230,30 +228,29 @@ end
         assimilation!(f, o1, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        m1, c1, n1 = sumstate(du1, u1);
-        m2, c2, n2 = sumstate(du2, u2);
+        c1 = sum(du1)
+        c2 = sum(du2)
 
         # compare
-        @testset "C assimilation should have added some C, but only in o1" begin
-            @test c1a < c1
-            @test c2a == c2
+        @testset "C assimilation should have added some C, while N assimilation should have lost some" begin
+            @test du1a[C] < du1[C]
+            @test du2a[C] > du2[C]
         end
         @testset "C assimilation should have moved some N to general, but only in o1" begin
-            @test n1a > n1
-            @test n2a == n2
+            @test du1a[N] > du1[N]
+            @test_broken du2a[N] == du2[N]
         end
-        @testset "C assimilation should have added some general reserve, but only in o1" begin
-            @test m1a < m1 # Assimilation should have added some reserve
-            @test m2a == m2
+        @testset "C assimilation should have gained total cmols, while N should have lost some" begin
+            @test c1a < c1 # Assimilation should have added some reserve
+            @test c2a > c2
         end
 
         @testset "C assimilation should balance when converted to cmols" begin
-            # TODO actually use cmols insteda of reserve mols
             c_loss = sum_c_loss(o1, o2)
             n_loss = sum_n_loss(o1, o2)
             @test -c_loss != zero(c_loss)
-            @test upreferred(m1 + m2 + (c1 + c2) * o1.shared.y_E_CH_NO) ≈ upreferred(-c_loss + uptake_c * o1.shared.y_E_CH_NO)
-            @test m1 + m2 + (n1 + n2) * o1.shared.y_E_EN ≈ -n_loss
+            @test upreferred(c1 + c2) ≈ upreferred(-c_loss + uptake_c)
+            # @test m1 + m2 + (n1 + n2) * o1.shared.y_E_EN ≈ -n_loss
         end
 
     end

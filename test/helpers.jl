@@ -1,4 +1,14 @@
-using DynamicEnergyBudgets: build_J, build_J1
+using Revise, Unitful, DynamicEnergyBudgets
+using DynamicEnergyBudgets: reuse_rejected!, dissipation!, translocate!, product!, 
+                            maintenence!, growth!, sum_flux!, reserve_drain!, reserve_loss!,
+                            maturity!, metabolism!, catabolism!, assimilation!, translocation!,
+                            scaling, P, V, M, C, N, E, EE, CN, STATELEN, ass, gro, mai, rep, rej, tra, cat, rej, los, 
+                            build_J, build_J1
+@static if VERSION < v"0.7.0-DEV.2005"
+    using Base.Test
+else
+    using Test
+end
 
 construct_organ(; params=Params(), shared=SharedParams(), vars=Vars(),
       J=build_J(1.0u"mol/hr", typeof(1.0u"mol/hr")),
@@ -27,7 +37,7 @@ function nfactory()
     du2 = fill(0.0u"mol*hr^-1", 6)
     o1.vars.scale = scaling(o1.params.scaling, u1[V])
     o2.vars.scale = scaling(o2.params.scaling, u2[V])
-    f = N_Assimilation();
+    f = NAssim();
 
     o1, p1, u1, du1, o2, p2, u2, du2, f
 end
