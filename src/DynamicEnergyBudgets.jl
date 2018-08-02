@@ -8,7 +8,7 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to
 abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiple models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets 
+for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets 
 using Unitful,
       OrdinaryDiffEq,
       ForwardDiff,
@@ -25,7 +25,7 @@ using Unitful,
 
 import Flatten.flattenable
 import Defaults.get_default
-import MetaFieldBase: @prior, @default, @label, @units, prior, default, label, units
+import MetaFields: @prior, @default, @label, @units, prior, default, label, units
 
 @metafield range [0.0, 1.0]
 
@@ -34,8 +34,6 @@ import MetaFieldBase: @prior, @default, @label, @units, prior, default, label, u
     $(TYPEDEF)
     $(DOCSTRING)
     """
-
-# Base.muladd(a::Quantity, b::Quantity, c::Quantity) = a * b + c
 
 const P = 1
 const V = 2
