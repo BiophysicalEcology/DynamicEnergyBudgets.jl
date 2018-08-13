@@ -1,12 +1,4 @@
-using Revise, Unitful, DynamicEnergyBudgets
-
-@static if VERSION < v"0.7.0-DEV.2005"
-    using Base.Test
-else
-    using Test
-end
-
-import DynamicEnergyBudgets: get_environment, define_organs
+import DynamicEnergyBudgets: get_environment, temp
 
 DynamicEnergyBudgets.get_environment(::Type{Val{:soiltemperature}}, env, h, i) = 15.4u"°C"
 DynamicEnergyBudgets.get_environment(::Type{Val{:soilwatercontent}}, env, h, i) = 0.7
@@ -31,10 +23,10 @@ end
     va1 = v1.assimilation; va2 = v2.assimilation
 
     apply(apply_environment!, (o1, o2), u, :not_nothing, 1)
-    @test v1.temp == 23.7u"°C"
+    @test temp(v1) == 23.7u"°C"
     @test va1.J_L_F == 3130.0u"mol*m^-2*s^-1"
 
-    @test v2.temp == 15.4u"°C"
+    @test temp(v2) == 15.4u"°C"
     @test upreferred(va2.X_H) ≈ 0.7 * 1.0u"m^3*m^-3" * 1u"kg*L^-1" / 18.0u"g*mol^-1"
 end
 
@@ -45,7 +37,7 @@ end
     apply_environment!(o1, u, :no_env, 1)
     @test va.tair == 23.7u"°C" 
     @test va.tleaf > va.tair
-    @test v.temp == va.tleaf
+    @test temp(v) == va.tleaf
     @test va.windspeed == 3.7u"m*s^-1"
     @test va.rh == 0.74 
     @test va.rnet == 985.0u"W*m^-2"

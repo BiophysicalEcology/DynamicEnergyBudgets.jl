@@ -1,8 +1,4 @@
-using Revise
-using DynamicEnergyBudgets
-using DynamicEnergyBudgets: Records, define_organs, split_state, build_record, build_flux, sum_flux!, offset_apply!
-using AxisArrays
-using Unitful
+using DynamicEnergyBudgets: STATELEN, Records, define_organs, split_state, sum_flux!, offset_apply!
 
 @static if VERSION < v"0.7.0-DEV.2005"
     using Base.Test
@@ -39,10 +35,10 @@ end
 @testset "split_state" begin
     o = Organism();
     os = define_organs(o, 1);
-    u = fill(2.0u"mol", 12)
+    u = [1.0:12.0...]u"mol"
     us = split_state(os, u)
-    @test us[1][1] == 2.0u"mol"
-    @test us[2][2] == 2.0u"mol"
-    @test sum(us[1]) == 12.0u"mol"
-    @test sum(us[1]) == 12.0u"mol"
+    @test us[1][1] == 1.0u"mol"
+    @test us[2][1] == 7.0u"mol"
+    @test sum(us[1]) == sum(1:6) .* u"mol"
+    @test sum(us[2]) == sum(7:12) .* u"mol"
 end

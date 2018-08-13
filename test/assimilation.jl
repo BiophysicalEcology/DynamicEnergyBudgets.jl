@@ -61,8 +61,8 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
         assimilation!(f, o1, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o2, 0)
-        c1 = sum(du)
-        c2 = sum(du)
+        c1 = sum(du1)
+        c2 = sum(du2)
         # @test n1 == o1.J[N,ass]
         # @test n1 == uptake_nitrogen(f, o1, u1)
     end
@@ -193,8 +193,8 @@ end
         assimilation!(f, o1, u1)
         sum_flux!(du1, o1, 0)
         sum_flux!(du2, o1, 0)
-        m1, c1, n1 = sumstate(du1, u1)
-        m2, c2, n2 = sumstate(du2, u2)
+        c1 = sum(du1)
+        c2 = sum(du2)
         @test c1 == o1.J[C,ass]
         @test c1 == photosynthesis(f, o1, u1)
     end

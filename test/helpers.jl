@@ -3,17 +3,15 @@ using DynamicEnergyBudgets: reuse_rejected!, dissipation!, translocate!, product
                             maintenence!, growth!, sum_flux!, reserve_drain!, reserve_loss!,
                             maturity!, metabolism!, catabolism!, assimilation!, translocation!,
                             scaling, P, V, M, C, N, E, EE, CN, STATELEN, ass, gro, mai, rep, rej, tra, cat, rej, los, 
-                            build_J, build_J1
+                            define_organs, default, units, set_var!
 @static if VERSION < v"0.7.0-DEV.2005"
     using Base.Test
 else
     using Test
 end
 
-construct_organ(; params=Params(), shared=SharedParams(), vars=Vars(),
-      J=build_J(1.0u"mol/hr", typeof(1.0u"mol/hr")),
-      J1=build_J1(1.0u"mol/hr", typeof(1.0u"mol/hr"))) = begin
-    Organ(params, shared, vars, J, J1)
+construct_organ(; params=Params(), shared=SharedParams(), vars=Vars()) = begin
+    define_organs(Organism(params=(params,), vars=(vars,), shared=shared), 1)[1]
 end
 
 function factory()
@@ -30,13 +28,13 @@ function nfactory()
     p1 = o1.params
     o2 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8))
     p2 = o2.params;
-    u1 = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
-    u2 = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
+    u1 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u2 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
     u2 .*= 2.7
     du1 = fill(0.0u"mol*hr^-1", 6)
     du2 = fill(0.0u"mol*hr^-1", 6)
-    o1.vars.scale = scaling(o1.params.scaling, u1[V])
-    o2.vars.scale = scaling(o2.params.scaling, u2[V])
+    set_var!(o1.vars, :scale, scaling(o1.params.scaling, u1[V]))
+    set_var!(o2.vars, :scale, scaling(o2.params.scaling, u2[V]))
     f = NAssim();
 
     o1, p1, u1, du1, o2, p2, u2, du2, f
@@ -48,13 +46,13 @@ function cfactory()
     p1 = o1.params;
     o2 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8));
     p2 = o2.params;
-    u1 = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
-    u2 = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
+    u1 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u2 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
     u2 .*= 1.9
     du1 = fill(0.0u"mol*hr^-1", 6)
     du2 = fill(0.0u"mol*hr^-1", 6)
-    o1.vars.scale = scaling(o1.params.scaling, u1[V])
-    o2.vars.scale = scaling(o2.params.scaling, u2[V])
+    set_var!(o1.vars, :scale, scaling(o1.params.scaling, u1[V]))
+    set_var!(o2.vars, :scale, scaling(o2.params.scaling, u2[V]))
     f = KooijmanSLAPhotosynthesis();
 
     o1, p1, u1, du1, o2, p2, u2, du2, f
