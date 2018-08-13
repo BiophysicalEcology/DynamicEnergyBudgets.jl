@@ -52,6 +52,13 @@ end
     end
     du2
 end
+(o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::Void, t::Number) = begin 
+    t = t * u"hr"
+    du1 = du .* u"mol/hr"
+    u1 = u .* u"mol"
+    o(du1, u1, t, define_organs(o, t))
+    du .= ustrip.(du1)
+end
 
 function deb_function(sol)
    tot_loss = 0.0

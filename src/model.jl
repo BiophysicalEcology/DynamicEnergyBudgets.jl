@@ -42,19 +42,22 @@ Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u)
-    p, v, sh, J, J1 = unpack(o); va = v.assimilation;
-    turnover = (p.k_EC, p.k_EN, p.k_E) .* v.tempcorr .* v.scale
+    p, v, sh, J, J1 = unpack(o); va = assimilation(v);
+
+    turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* scale(v)
     m = (u[C], u[N], u[E]) ./ u[V]
-    j_E_mai = p.j_E_mai * v.tempcorr
+    j_E_mai = p.j_E_mai * tempcorrection(v)
 
-    v.rate = find_rate(m, turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
+    rate = find_rate(m, turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
+    set_var!(v, :rate, rate)
+    # rate > zero(rate) || error("rate is less than zero, thermodyamics disagrees")
 
-    (J1[C,cat], J1[N,cat], J1[EE,cat]) = catabolic_flux((u[C], u[N], u[E]), turnover, v.rate)
+    (J1[C,cat], J1[N,cat], J1[EE,cat]) = catabolic_flux((u[C], u[N], u[E]), turnover, rate)
     (J1[C,rej], J1[N,rej], J1[CN,cat], o.J1[C,los], o.J1[N,los]) =
         stoich_merge(J1[C,cat], J1[N,cat], sh.y_E_CH_NO, sh.y_E_EN)
 
     J1[E,cat] = J1[EE,cat] + J1[CN,cat] # Total catabolic flux
-    v.θE = J1[EE,cat]/J1[E,cat] # Proportion of general reserve flux in total catabolic flux
+    θE(v) = J1[EE,cat]/J1[E,cat] # Proportion of general reserve flux in total catabolic flux
     nothing
 end
 
@@ -74,11 +77,11 @@ Allocates reserves to growth.
 """
 function growth!(o, u)
     p, v, sh, J, J1 = unpack(o)
-    grow = o.vars.rate * u[V]
+    grow = rate(v) * u[V]
     J[V,gro] = grow 
     drain = -(1/p.y_V_E) * grow 
-    loss = (1/p.y_V_E - 1) * v.rate * u[V]
-    reserve_drain!(o, gro, drain, v.θE)
+    loss = (1/p.y_V_E - 1) * rate(v) * u[V]
+    reserve_drain!(o, gro, drain, θE(v))
     reserve_loss!(o, loss)
 end
 
@@ -90,10 +93,10 @@ Stores in M state variable if it exists.
 maturity!(o, u) = maturity!(o.params.maturity, o, u)
 maturity!(f::Maturity, o, u) = begin
     p, v, sh, J, J1 = unpack(o)
-    J[M,gro] = f.κrep * J1[E,cat]
-    maint = -f.j_E_rep_mai * v.tempcorr * u[V]
-    drain = -J[M,gro] + maint # min(u[V], f.M_Vrep))
-    reserve_drain!(o, rep, drain, v.θE)
+    J[M,gro] = f.κmat * J1[E,cat]
+    maint = -f.j_E_mat_mai * tempcorrection(v) * u[V]
+    drain = -J[M,gro] + maint # min(u[V], f.M_Vmat))
+    reserve_drain!(o, mat, drain, θE(v))
     reserve_loss!(o, -maint)
 end
 maturity!(f::Void, o, u) = nothing
@@ -102,8 +105,8 @@ maturity!(f::Void, o, u) = nothing
 Allocates reserve drain due to maintenance.
 """
 function maintenence!(o, u)
-    drain = -o.params.j_E_mai * o.vars.tempcorr * u[V]
-    reserve_drain!(o, mai, drain, o.vars.θE)
+    drain = -o.params.j_E_mai * tempcorrection(o.vars) * u[V]
+    reserve_drain!(o, mai, drain, θE(o.vars))
     reserve_loss!(o, -drain) # all maintenance is loss
 end
 
@@ -113,7 +116,7 @@ Allocates waste products from growth and maintenance.
 function product!(o, u)
     p, v, sh, J, J1 = unpack(o)
     J[P,gro] = J[V,gro] * p.y_P_V
-    J[P,mai] = u[V] * p.j_P_mai * v.tempcorr
+    J[P,mai] = u[V] * p.j_P_mai * tempcorrection(v)
     # undo the reserve loss from growth: it went to product
     loss_correction = (J[P,gro] + J[P,mai])
     reserve_loss!(o, loss_correction)
@@ -135,29 +138,29 @@ translocation!(organs::Tuple{Organ, Organ}) = begin
     translocate!(organs[1], organs[2], 1.0)
     translocate!(organs[2], organs[1], 1.0)
 end
-translocation!(organs::Tuple) = translocation!(organs, organs)
+# translocation!(organs::Tuple) = translocation!(organs, organs)
 
 # Recurse through all organs. A loop would not be type-stable.
-translocation!(organs::Tuple, destorgans::Tuple) = begin
-    props = buildprops(organs[1])
-    translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)     
-    translocation!(tail(organs), destorgans)     
-end
-translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
-translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
-    translocation!(organ, destorgans, (destnames,), props)
-# Translocate to organs with names in the destnames list
-translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
-    for i = 1:length(destnames)
-        if destorgans[1].params.name == destnames[i]
-            reuse_rejected!(organ, destorgans[1], props[i])
-            translocate!(organ, destorgans[1], props[i])
-            break
-        end
-    end
-    translocation!(organ, tail(destorgans), destnames, props)
-end
-translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
+# translocation!(organs::Tuple, destorgans::Tuple) = begin
+#     props = buildprops(organs[1])
+#     translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)     
+#     translocation!(tail(organs), destorgans)     
+# end
+# translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
+# translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
+#     translocation!(organ, destorgans, (destnames,), props)
+# # Translocate to organs with names in the destnames list
+# translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
+#     for i = 1:length(destnames)
+#         if destorgans[1].params.name == destnames[i]
+#             reuse_rejected!(organ, destorgans[1], props[i])
+#             translocate!(organ, destorgans[1], props[i])
+#             break
+#         end
+#     end
+#     translocation!(organ, tail(destorgans), destnames, props)
+# end
+# translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
 
 # Add the last remainder proportion (so that its not a model parameter)
 buildprops(o::Organ) = buildprops(o.params.translocation.proportions)
@@ -175,7 +178,7 @@ whichever is not the current organs. Will not run with less than 2 organs.
 function translocate!(source, dest, prop)
     trans = κtra(source) * prop * source.J1[E,cat]
     loss = (1 - source.params.y_E_ET) * trans
-    reserve_drain!(source, tra, -trans, source.vars.θE)
+    reserve_drain!(source, tra, -trans, θE(source.vars))
     reserve_loss!(source, loss)
     # incoming translocation
     transx = κtra(dest) * source.J1[E,cat]
@@ -192,10 +195,15 @@ Also how does this interact with assimilation?
 function reuse_rejected!(source, dest, prop)
     p = source.params
     # rejected reserves are translocated and used in assimilation.
-    source.J[C,rej] = -source.J1[C,rej]
-    source.J[N,rej] = -source.J1[N,rej]
-    dest.J[C,tra] = p.y_EC_ECT * source.J1[C,rej]
-    dest.J[N,tra] = p.y_EN_ENT * source.J1[N,rej]
+    if typeof(source.params.assimilation) <: AbstractCAssim 
+        # source.J[C,rej] = -source.J1[C,rej]
+        # dest.J[C,tra] = p.y_EC_ECT * source.J1[C,rej]
+        # source.J[N,rej] = source.J1[C,rej]
+    elseif typeof(source.params.assimilation) <: AbstractNAssim 
+        source.J[N,rej] = -source.J1[N,rej]
+        dest.J[N,tra] = p.y_EN_ENT * source.J1[N,rej]
+        # source.J[C,rej] = source.J1[C,rej]
+    end
     source.J1[C,los] += (1 - p.y_EC_ECT) * source.J1[C,rej]
     source.J1[N,los] += (1 - p.y_EN_ENT) * source.J1[N,rej]
     nothing
@@ -240,14 +248,14 @@ stoich_merge(Ja, Jb, ya, yb) = begin
 end
 
 """
-κtra is the difference paramsbetween κsoma and κrep
+κtra is the difference paramsbetween κsoma and κmat
 """
 
-κtra(o) = (1.0 - o.params.κsoma - κrep(o)) 
+κtra(o) = (1.0 - o.params.κsoma - κmat(o)) 
 
-κrep(o::Organ) = κrep(o.params.maturity)
-κrep(maturity::Maturity) = maturity.κrep
-κrep(maturity::Void) = 0.0
+κmat(o::Organ) = κmat(o.params.maturity)
+κmat(maturity::Maturity) = maturity.κmat
+κmat(maturity::Void) = 0.0
 
 """
 Calculate rate formula. TODO: use Roots.jl for this
@@ -272,19 +280,18 @@ Without a function like this you will likely be occasionally breaking the
 laws of thermodynamics by introducing negative rates.
 """
 feedback!(f::Void, o, u) = nothing
-autophagy!(f::Autophagy, o, u) = begin
-    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
+feedback!(f::Autophagy, o, u) = begin
+    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
     aph = u[V] * (oneunit(hs) - hs)
     # TODO this should be a lossy process
     o.J[E,fbk] += aph
     o.J[V,fbk] -= aph
 end
 
-set_scaling!(o, u) = o.vars.scale = scaling(o.params.scaling, u[V])
+set_scaling!(o, u) = set_var!(o.vars, :scale, scaling(o.params.scaling, u[V]))
 
 scaling(f::KooijmanArea, uV) = begin
-    # This should actually be an error, how can uV be less than zero??
-    # uV > zero(uV) || return 0.0
+    uV > zero(uV) || return 1.0 # || error("Mass is less than zero, I think its dead...") 
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
 end
 scaling(f::Void, uV) = 1.0
@@ -301,7 +308,7 @@ germinated(M_V, M_Vgerm) = M_V > M_Vgerm
 allometric_height(f::SqrtAllometry, o, u) = begin
     p, v, sh = unpack(o)
     dim = oneunit(u[V] * sh.w_V)
-    sqrt((u[P] * sh.w_P + u[V] * sh.w_V) / dim) * f.size
+    sqrt((u[P] * sh.w_P + u[V] * sh.w_V) / dim) * f.allometry
 end
     
 unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
@@ -310,16 +317,16 @@ unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
 # Rows: state.
 # Columns: transformations
 # ┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-# ┃    ┃ assS       │ groS       │ maiS       │ repS       │ rejS       │ traS       ┃ assR       │ groR       │ maiR       │ repR │ rejR       │ traR       ┃
+# ┃    ┃ assS       │ groS       │ maiS       │ matS       │ rejS       │ traS       ┃ assR       │ groR       │ maiR       │ ratR │ rejR       │ traR       ┃
 # ┣━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
 # ┃    ┃ JSS SubArray                                                                ┃ JRR SubArray                                                          ┃
 # ┃    ┃                                                                             ┃                                                                       ┃
 # ┃PS  ┃ 0          │ J_PS,groS  │ J_PS,maiS  │ 0          │ 0          │ 0          ┃ 0          │ J_PR,groR  │ J_PR,maiR  │ 0    │ 0          │ 0          ┃
 # ┃VS  ┃ 0          │ J_VS,groS  │ 0          │ 0          │ 0          │ 0          ┃ 0          │ J_VR,groR  │ 0          │ 0    │ 0          │ 0          ┃
 # ┃RS  ┃ 0          │ 0          │ 0          │ J_MS,groS  │ 0          │ 0          ┃ 0          │ 0          │ 0          │ 0    │ 0          │ 0          ┃
-# ┃ECS ┃ J_ECS,assS │ J_ECS,groS │ J_ECS,maiS │ J_ECS,repS │ J_ECS,rejS │ J_ECS,traS ┃ J_ECR,assR │ J_ECR,groR │ J_ECR,maiR │ 0    │ J_ECS,rejR │ J_ECR,traR ┃
-# ┃ENS ┃ J_ENS,assS │ J_ENS,groS │ J_ENS,maiS │ J_ENS,repS │ J_ENS,rejS │ J_ENS,traS ┃ J_ENR,assR │ J_ENR,groR │ J_ENR,maiR │ 0    │ J_ENS,rejR │ J_ENR,traR ┃
-# ┃ES  ┃ J_ES,assS  │ J_ES,groS  │ J_ES,maiS  │ J_ES,repS  │ 0          │ J_ES,traS  ┃ J_ER,assR  │ J_ER,groR  │ J_ER,maiR  │ 0    │ 0          │ J_ER,traR  ┃
+# ┃ECS ┃ J_ECS,assS │ J_ECS,groS │ J_ECS,maiS │ J_ECS,matS │ J_ECS,rejS │ J_ECS,traS ┃ J_ECR,assR │ J_ECR,groR │ J_ECR,maiR │ 0    │ J_ECS,rejR │ J_ECR,traR ┃
+# ┃ENS ┃ J_ENS,assS │ J_ENS,groS │ J_ENS,maiS │ J_ENS,matS │ J_ENS,rejS │ J_ENS,traS ┃ J_ENR,assR │ J_ENR,groR │ J_ENR,maiR │ 0    │ J_ENS,rejR │ J_ENR,traR ┃
+# ┃ES  ┃ J_ES,assS  │ J_ES,groS  │ J_ES,maiS  │ J_ES,matS  │ 0          │ J_ES,traS  ┃ J_ER,assR  │ J_ER,groR  │ J_ER,maiR  │ 0    │ 0          │ J_ER,traR  ┃
 # ┗━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 # J1: Catabolic flux diagram.

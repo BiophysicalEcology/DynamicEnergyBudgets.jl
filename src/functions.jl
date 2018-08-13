@@ -12,10 +12,9 @@ tempcorr(t, t1, a, l, al, h, ah) =
     exp(a/t1 - a/t) * (1.0 + exp(al/t1 - al/l) + exp(ah/h - ah/t1)) / 
     (1.0 + exp(al/t - al/l) + exp(ah/h - ah/t))
 tempcorr(t, tc::Void) = 1.0
-tempcorr(t, tc::AbstractTempCorr{K}) where K <: Unitful.Quantity = 
-    tempcorr(t |> u"K", getfield.(tc, fieldnames(tc))...)
-tempcorr(t, tc::AbstractTempCorr) = 
-    tempcorr(t - 273.15, getfield.(tc, fieldnames(tc))...)
+tempcorr(t, tc::TempCorr) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp)
+tempcorr(t, tc::TempCorrLower) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
+tempcorr(t, tc::TempCorrLowerUpper) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)
 
 """
     rate_formula(r, ureserve::NTuple, A_turnover::NTuple, j_E_mai, y_V_E, κsoma)

@@ -51,7 +51,7 @@ const ass = 1
 const gro = 2 
 const rej = 3 
 const mai = 4 
-const rep = 5 
+const mat = 5 
 const tra = 6
 const fbk = 7
 
@@ -61,7 +61,7 @@ const rej = 3
 
 const STATE = [:P, :V, :M, :C, :N, :E]
 const STATE1 = [:EE, :CN, :_, :C, :N, :E]
-const TRANS = [:ass, :gro, :mai, :rep, :rej, :tra, :fbk]
+const TRANS = [:ass, :gro, :mai, :mat, :rej, :tra, :fbk]
 const TRANS1 = [:cat, :rej, :los]
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100

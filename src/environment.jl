@@ -20,7 +20,7 @@ get_environment(t::Type{Val{:par}}, env::M, interp, i) where M <: MicroclimateTa
 
 
 apply_environment!(organs::Tuple{O,Vararg}, ux::Tuple{U,Vararg}, env, t) where {U,O} = begin
-    env == nothing && return nothing
+    env == nothing && return 
     apply_environment!(organs[1], ux[1], env, t)
     apply_environment!(tail(organs), tail(ux), env, t)
     nothing
@@ -33,11 +33,12 @@ apply_environment!(o::Organ, u, env, t) = begin
 end
 apply_environment!(o::Organ, u, env::Void, t) = nothing
 
-apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
-    p, v = unpack(o); va = v.assimilation;
+apply_environment!(a::FvCBPhotosynthesis, o, u, env, t) = begin
+    p, v = unpack(o); va = assimilation(v);
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o, u)
-    interp = LayerInterp(v.height)
+    h = allometric_height(p.allometry, o, u)
+    set_var!(v, :height, h)
+    interp = LayerInterp(height(v))
 
     va.tair = get_environment(Val{:airtemperature}, env, interp, pos)
     va.windspeed = get_environment(Val{:windspeed}, env, interp, pos)
@@ -50,35 +51,37 @@ apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
     if germinated(u[V], p.M_Vgerm)
         phototranspiration!(va, p.assimilation.photoparams)
     else
-        va.tleaf = v.temp
+        va.tleaf = temp(v)
     end
 
-    v.temp = va.tleaf
-    v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    set_var!(v, :temp, va.tleaf)
+    set_var!(v, :tempcorrection, tempcorr(temp(v), o.shared.tempcorr))
     nothing
 end
 
-apply_environment!(a::KooijmanSLAPhotosynthesis, o, u, env, t) = begin
-    p, v = unpack(o); va = v.assimilation;
+apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
+    p, v = unpack(o); va = assimilation(v);
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o, u)
-    interp = LayerInterp(v.height)
+    h = allometric_height(p.allometry, o, u)
+    set_var!(v, :height, h)
+    interp = LayerInterp(h)
 
-    v.temp = get_environment(Val{:airtemperature}, env, interp, pos)
+    set_var!(v, :temp, get_environment(Val{:airtemperature}, env, interp, pos))
     va.J_L_F = get_environment(Val{:par}, env, interp, pos)
-    v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    set_var!(v, :tempcorrection,  tempcorr(temp(v), o.shared.tempcorr))
     nothing
 end
 
 apply_environment!(a::AbstractNAssim, o, u, env, t) = begin
-    p, v = unpack(o); va = v.assimilation;
+    p, v = unpack(o); va = assimilation(v);
     pos = ustrip(t) + 1
-    h = v.height = allometric_height(p.allometry, o, u)
-    interp = LayerInterp(v.height)
+    h = allometric_height(p.allometry, o, u)
+    set_var!(v, :height, h)
+    interp = LayerInterp(h)
 
-    v.temp = get_environment(Val{:soiltemperature}, env, interp, pos)
+    set_var!(v, :temp, get_environment(Val{:soiltemperature}, env, interp, pos))
     va.X_H = get_environment(Val{:soilwatercontent}, env, interp, pos) * water_fraction_to_M
 
-    v.tempcorr = tempcorr(v.temp, o.shared.tempcorr)
+    set_var!(v, :tempcorrection,  tempcorr(temp(v), o.shared.tempcorr))
     nothing
 end
