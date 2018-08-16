@@ -72,6 +72,18 @@ apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
     nothing
 end
 
+apply_environment!(a::Void, o, u, env, t) = begin
+    p, v = unpack(o); va = assimilation(v);
+    pos = ustrip(t) + 1
+    h = allometric_height(p.allometry, o, u)
+    set_var!(v, :height, h)
+    interp = LayerInterp(h)
+
+    set_var!(v, :temp, get_environment(Val{:airtemperature}, env, interp, pos))
+    set_var!(v, :tempcorrection,  tempcorr(temp(v), o.shared.tempcorr))
+    nothing
+end
+
 apply_environment!(a::AbstractNAssim, o, u, env, t) = begin
     p, v = unpack(o); va = assimilation(v);
     pos = ustrip(t) + 1
