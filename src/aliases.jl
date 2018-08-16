@@ -39,11 +39,11 @@ ConstantRootParams(;kwargs...) = Params(assimilation=ConstantNAssim())
 ConstantPlant(;kwargs...) = Organism(; params=(ConstantShootParams(), ConstantRootParams()), kwargs...)
 
     
-LeafParams(;kwargs...) = Params(;name=:leaf, translocation=Translocation(dest=:stem), 
+LeafParams(;kwargs...) = Params(;name=:leaf, translocation=Translocation(destnames=:stem), 
                                 assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
-StemParams(;kwargs...) = Params(;name=:stem, translocation=Translocation(dest=(:leaf, :root), proportions=0.5), 
+StemParams(;kwargs...) = Params(;name=:stem, translocation=Translocation(destnames=(:leaf, :root), proportions=0.5), 
                                 assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
-RootParams3(;kwargs...) = Params(;name=:root, translocation=Translocation(dest=:stem), 
+RootParams3(;kwargs...) = Params(;name=:root, translocation=Translocation(destnames=:stem), 
                                  assimilation=NAssim(), kwargs...)
 LeafVars(;kwargs...) = Vars(;assimilation=CarbonVars(), kwargs...)
 StemVars(;kwargs...) = Vars(;assimilation=nothing, kwargs...)
