@@ -31,7 +31,7 @@ apply_environment!(o::Organ, u, env, t) = begin
     apply_environment!(o.params.assimilation, o, u, env, t)
     nothing
 end
-apply_environment!(o::Organ, u, env::Void, t) = nothing
+apply_environment!(o::Organ, u, env::Nothing, t) = nothing
 
 apply_environment!(a::FvCBPhotosynthesis, o, u, env, t) = begin
     p, v = unpack(o); va = assimilation(v);
@@ -72,7 +72,7 @@ apply_environment!(a::AbstractCAssim, o, u, env, t) = begin
     nothing
 end
 
-apply_environment!(a::Void, o, u, env, t) = begin
+apply_environment!(a::Nothing, o, u, env, t) = begin
     p, v = unpack(o); va = assimilation(v);
     pos = ustrip(t) + 1
     h = allometric_height(p.allometry, o, u)

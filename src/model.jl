@@ -1,7 +1,7 @@
 """
 Run a DEB organism model.
 """
-(o::Organism)(du, u, p::Void, t::Number) = o(du, u, t, define_organs(o, t))
+(o::Organism)(du, u, p::Nothing, t::Number) = o(du, u, t, define_organs(o, t))
 
 function (o::Organism)(du, u, t::Number, organs)
     ux = split_state(organs, u)
@@ -43,7 +43,6 @@ Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 function catabolism!(o, u)
     p, v, sh, J, J1 = unpack(o); va = assimilation(v);
-
     turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* scale(v)
     m = (u[C], u[N], u[E]) ./ u[V]
     j_E_mai = p.j_E_mai * tempcorrection(v)
@@ -99,7 +98,7 @@ maturity!(f::Maturity, o, u) = begin
     reserve_drain!(o, mat, drain, θE(v))
     reserve_loss!(o, -maint)
 end
-maturity!(f::Void, o, u) = nothing
+maturity!(f::Nothing, o, u) = nothing
 
 """
 Allocates reserve drain due to maintenance.
@@ -138,33 +137,33 @@ translocation!(organs::Tuple{Organ, Organ}) = begin
     translocate!(organs[1], organs[2], 1.0)
     translocate!(organs[2], organs[1], 1.0)
 end
-# translocation!(organs::Tuple) = translocation!(organs, organs)
+translocation!(organs::Tuple) = translocation!(organs, organs)
 
 # Recurse through all organs. A loop would not be type-stable.
-# translocation!(organs::Tuple, destorgans::Tuple) = begin
-#     props = buildprops(organs[1])
-#     translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)     
-#     translocation!(tail(organs), destorgans)     
-# end
-# translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
-# translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
-#     translocation!(organ, destorgans, (destnames,), props)
-# # Translocate to organs with names in the destnames list
-# translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
-#     for i = 1:length(destnames)
-#         if destorgans[1].params.name == destnames[i]
-#             reuse_rejected!(organ, destorgans[1], props[i])
-#             translocate!(organ, destorgans[1], props[i])
-#             break
-#         end
-#     end
-#     translocation!(organ, tail(destorgans), destnames, props)
-# end
-# translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
+translocation!(organs::Tuple, destorgans::Tuple) = begin
+    props = buildprops(organs[1])
+    translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)     
+    translocation!(tail(organs), destorgans)     
+end
+translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
+translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) = 
+    translocation!(organ, destorgans, (destnames,), props)
+# Translocate to organs with names in the destnames list
+translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
+    for i = 1:length(destnames)
+        if destorgans[1].params.name == destnames[i]
+            reuse_rejected!(organ, destorgans[1], props[i])
+            translocate!(organ, destorgans[1], props[i])
+            break
+        end
+    end
+    translocation!(organ, tail(destorgans), destnames, props)
+end
+translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
 
 # Add the last remainder proportion (so that its not a model parameter)
 buildprops(o::Organ) = buildprops(o.params.translocation.proportions)
-buildprops(x::Void) = (1.0)
+buildprops(x::Nothing) = (1.0)
 buildprops(x::Number) = (x, 1 - x)
 buildprops(xs::Tuple) = (xs..., 1 - sum(xs))
 
@@ -196,8 +195,8 @@ function reuse_rejected!(source, dest, prop)
     p = source.params
     # rejected reserves are translocated and used in assimilation.
     if typeof(source.params.assimilation) <: AbstractCAssim 
-        # source.J[C,rej] = -source.J1[C,rej]
-        # dest.J[C,tra] = p.y_EC_ECT * source.J1[C,rej]
+        source.J[C,rej] = -source.J1[C,rej]
+        dest.J[C,tra] = p.y_EC_ECT * source.J1[C,rej]
         # source.J[N,rej] = source.J1[C,rej]
     elseif typeof(source.params.assimilation) <: AbstractNAssim 
         source.J[N,rej] = -source.J1[N,rej]
@@ -250,12 +249,11 @@ end
 """
 κtra is the difference paramsbetween κsoma and κmat
 """
-
 κtra(o) = (1.0 - o.params.κsoma - κmat(o)) 
 
 κmat(o::Organ) = κmat(o.params.maturity)
 κmat(maturity::Maturity) = maturity.κmat
-κmat(maturity::Void) = 0.0
+κmat(maturity::Nothing) = 0.0
 
 """
 Calculate rate formula. TODO: use Roots.jl for this
@@ -279,7 +277,7 @@ Function to apply feedback on growth the process, such as autopagy in resource s
 Without a function like this you will likely be occasionally breaking the 
 laws of thermodynamics by introducing negative rates.
 """
-feedback!(f::Void, o, u) = nothing
+feedback!(f::Nothing, o, u) = nothing
 feedback!(f::Autophagy, o, u) = begin
     hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
     aph = u[V] * (oneunit(hs) - hs)
@@ -294,7 +292,7 @@ scaling(f::KooijmanArea, uV) = begin
     uV > zero(uV) || return 1.0 # || error("Mass is less than zero, I think its dead...") 
     (uV / f.M_Vref)^(-uV / f.M_Vscaling)
 end
-scaling(f::Void, uV) = 1.0
+scaling(f::Nothing, uV) = 1.0
 
 """
 Check if germination has happened. Independent for each organ,
@@ -303,8 +301,6 @@ although this may not make sense. A curve could be better for this too.
 germinated(M_V, M_Vgerm) = M_V > M_Vgerm 
 
 
-"""
-"""
 allometric_height(f::SqrtAllometry, o, u) = begin
     p, v, sh = unpack(o)
     dim = oneunit(u[V] * sh.w_V)

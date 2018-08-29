@@ -12,9 +12,9 @@ Defaults.get_default(t::Type) = begin
     add_units.(d, u)
 end
 
-add_units(::Void, u) = nothing
-add_units(x, ::Void) = x
-add_units(::Void, ::Void) = nothing
+add_units(::Nothing, u) = nothing
+add_units(x, ::Nothing) = x
+add_units(::Nothing, ::Nothing) = nothing
 add_units(x::Number, u::Unitful.Units) = x * u
 add_units(x::AbstractArray, u::Unitful.Units) = x .* u
 

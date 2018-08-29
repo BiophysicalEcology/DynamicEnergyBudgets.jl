@@ -52,7 +52,7 @@ end
     end
     du2
 end
-(o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::Void, t::Number) = begin 
+(o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::Nothing, t::Number) = begin 
     t = t * u"hr"
     du1 = du .* u"mol/hr"
     u1 = u .* u"mol"

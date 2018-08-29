@@ -2,7 +2,7 @@
 const parconv = 4.57e-6
 const gas_molpL = 22.4
 
-@chain columns @label @range @prior @units @default_kw
+@chain columns @description @limits @prior @units @default_kw
 
 ############################################################################################
 # Parameters
@@ -28,7 +28,7 @@ end
 end
 
 @mix @columns struct SLA{MG}
-    # Field | Default | Unit        | Prior            | Range       | Description
+    # Field | Default | Unit        | Prior            | Limits       | Description
     SLA::MG | 9.10    | u"m^2*g^-1" | Gamma(10.0, 1.0) | [5.0, 30.0] | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
@@ -39,7 +39,7 @@ end
 
 " Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "
 @SLA struct KooijmanSLAPhotosynthesis{MoMoS,MoL,MoMoS,μMoMS,MoMS} <: AbstractCAssim
-    # Field            | Default           | Unit               | Prior           | Range        | Description
+    # Field            | Default           | Unit               | Prior           | Limits        | Description
     k_C_binding::MoMoS | 1.0               | u"mol*mol^-1*s^-1" | Gamma(2.0, 2.0) | [0.1, 10.0]  | "Scaling rate for carbon dioxide"
     k_O_binding::MoMoS | 1.0               | u"mol*mol^-1*s^-1" | Gamma(2.0, 2.0) | [0.1, 10.0]  | "Scaling rate for oxygen"
     K_C::MoL           | 400*1e-6/gas_molpL| u"mol*L^-1"        | Gamma(2.0, 2.0) | [0.0, 1.0]   | "Half-saturation concentration of carbon dioxide"
@@ -52,7 +52,7 @@ end
 
 " Parameters for Ammonia/Nitrate assimilation "
 @columns struct KooijmanNH4_NO3Assim{μMoMS,F,MoMo,MoL} <: AbstractNH4_NO3Assim
-    #Field           | Default | Unit                | Prior            | Range         | Description
+    #Field           | Default | Unit                | Prior            | Limits         | Description
     j_NH_Amax::μMoMS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "Max spec uptake of ammonia"
     j_NO_Amax::μMoMS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "Max spec uptake of nitrate"
     ρNO::F           | 0.7     | _                   | Beta(0.7, 1.0)   | [0.0, 1.0]    | "Weights preference for nitrate relative to ammonia." # 1 or less but why?
@@ -64,7 +64,7 @@ end
 
 " Parameters for lumped Nitrogen assimilation "
 @columns struct NAssim{μMoS,MoL} <: AbstractNAssim
-    # Field        | Default | Unit                | Prior            | Range         | Description
+    # Field        | Default | Unit                | Prior            | Limits         | Description
     j_N_Amax::μMoS | 50.0    | u"μmol*mol^-1*s^-1" | Gamma(50.0, 1.0) | [0.1, 1000.0] | "Max spec uptake of ammonia"
     K_N::MoL       | 0.01    | u"mol*L^-1"         | Gamma(0.01, 1.0) | [0.0, 1.0]    | "Half-saturation concentration of nitrate"
     K_H::MoL       | 10.0    | u"mol*L^-1"         | Gamma(10.0, 1.0) | [0.0, 1.0]    | "Half-saturation concentration of water"
@@ -75,7 +75,7 @@ end
 abstract type AbstractTempCorr{K} end
 
 @mix @columns struct Tbase{K}
-    # Field       | Default | Unit | Prior               | Range              | Description
+    # Field       | Default | Unit | Prior               | Limits              | Description
     reftemp::K    | 310.0   | u"K" | Gamma(310.0, 1.0)   | [273.0, 325.0]     | "Reference temperature for all rate parameters"
     arrtemp::K    | 2000.0  | u"K" | Gamma(2000.0, 1.0)  | [200.0, 4000.0]    | "Arrhenius temperature"
 end
@@ -101,7 +101,7 @@ abstract type AbstractStateFeedback end
 
 " Autophagy. Parameters for self reabsorbtion when metabolic rates fall "
 @columns struct Autophagy{Mo} <: AbstractStateFeedback
-    # Field         | Default  | Unit   | Prior           | Range                | Description
+    # Field         | Default  | Unit   | Prior           | Limits                | Description
     K_autophagy::Mo | 0.000001 | u"mol" | Beta(2.0, 2.0)  | [0.0000001, 0.00001] | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
 end
 
@@ -110,8 +110,8 @@ end
 abstract type AbstractAllometry end
 
 @columns struct SqrtAllometry{M} <: AbstractAllometry
-    # Field | Default | Unit | Prior           | Range      | Description
-    allometry::M | 0.1     | u"m" | Gamma(2.0, 0.2) | [0.0, 1.0] | "Allometric height/depth scaling"
+    # Field      | Default | Unit | Prior           | Limits      | Description
+    allometry::M | 0.1     | u"m" | Gamma(2.0, 0.2) | [0.0, 1.0]  | "Allometric height/depth scaling"
 end
 
 
@@ -133,7 +133,7 @@ end
 
 " Maturity parameters. Seperated to make maturity modeling optional, reducing complexity "
 @columns struct Maturity{MoMoD,F,Mo,GMo,MoMo}
-    # Field            | Default         | Unit               | Prior           | Range        | Description
+    # Field            | Default         | Unit               | Prior           | Limits       | Description
     j_E_mat_mai::MoMoD | 0.001           | u"mol*mol^-1*d^-1" | Beta(2.0, 2.0)  | [0.0, 0.1]   | "Shoots spec maturity maint costs "
     κmat::F            | 0.05            | _                  | Beta(2.0, 2.0)  | [0.0, 1.0]   | "Shoots reserve flux allocated to development/reprod."
     M_Vmat::Mo         | 10.0            | u"mol"             | Beta(2.0, 2.0)  | [0.0, 1.0]   | "Shoots structural mass at start reproduction" # TODO: isn't this variable/seasonally triggered?
@@ -143,7 +143,7 @@ end
 
 " Model parameters that vary between organs "
 @columns struct Params{A,S,Al,Ma,Tr,F,Mo,MoMoD,MoMo}
-    # Field            | Default         | Unit               | Prior           | Range        | Description
+    # Field            | Default         | Unit               | Prior           | Limits        | Description
     name::Symbol       | :organ          | _                  | _               | _            | _
     assimilation::A    | ConstantCAssim()| _                  | _               | _            | _ 
     scaling::S         | KooijmanArea()  | _                  | _               | _            | _
@@ -166,7 +166,7 @@ end
 
 " Model parameters shared between organs "
 @columns @flattenable struct SharedParams{Fb,C,MoMo,GMo}
-    # Field         | _  | Default         | Unit               | Prior           | Range        | Description
+    # Field         | _  | Default         | Unit               | Prior           | Limits       | Description
     feedback::Fb    | _  | nothing         | _                  | _               | _            | _
     tempcorr::C     | _  | TempCorrLowerUpper() | _             | _               | _            | _
     # n_N_P::MoMo   | _  | 0.0             | u"mol*mol^-1"      | Gamma(2.0, 2.0) | _            | "N/C in product (wood)"

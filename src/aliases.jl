@@ -42,7 +42,7 @@ ConstantPlant(;kwargs...) = Organism(; params=(ConstantShootParams(), ConstantRo
 LeafParams(;kwargs...) = Params(;name=:leaf, translocation=Translocation(destnames=:stem), 
                                 assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
 StemParams(;kwargs...) = Params(;name=:stem, translocation=Translocation(destnames=(:leaf, :root), proportions=0.5), 
-                                assimilation=KooijmanSLAPhotosynthesis(), kwargs...)
+                                assimilation=nothing, kwargs...)
 RootParams3(;kwargs...) = Params(;name=:root, translocation=Translocation(destnames=:stem), 
                                  assimilation=NAssim(), kwargs...)
 LeafVars(;kwargs...) = Vars(;assimilation=CarbonVars(), kwargs...)

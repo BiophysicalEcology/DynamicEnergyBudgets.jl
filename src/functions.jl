@@ -11,7 +11,7 @@ tempcorr(t, t1, a, l, al) =
 tempcorr(t, t1, a, l, al, h, ah) = 
     exp(a/t1 - a/t) * (1.0 + exp(al/t1 - al/l) + exp(ah/h - ah/t1)) / 
     (1.0 + exp(al/t - al/l) + exp(ah/h - ah/t))
-tempcorr(t, tc::Void) = 1.0
+tempcorr(t, tc::Nothing) = 1.0
 tempcorr(t, tc::TempCorr) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp)
 tempcorr(t, tc::TempCorrLower) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
 tempcorr(t, tc::TempCorrLowerUpper) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)

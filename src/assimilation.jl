@@ -4,7 +4,7 @@ Runs assimilation methods, depending on formulation and state.
 """
 assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
 assimilation!(o::Organ, u) = assimilation!(o.params.assimilation, o, u)
-assimilation!(::Void, o::Organ, u) = nothing
+assimilation!(::Nothing, o::Organ, u) = nothing
 
 """
     assimilation!(f::AbstractAassim, o, u)
@@ -41,7 +41,7 @@ function assimilation!(f::AbstractNH4_NO3Assim, o, u)
     # Merge rejected C from shoot and uptaken N into reserves
     (o.J[C,tra], o.J[N,ass], o.J[E,ass], lossC, lossN) =
         stoich_merge(o.J[C,tra], J_N_ass, y_E_CH, 1/o.shared.n_N_E)
-    # o.J[C,los] += lossC; o.J[N,los] += lossN
+    o.J[C,los] += lossC; o.J[N,los] += lossN
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     o.J[N,ass] = (J_NO_ass - θNO * o.shared.n_N_E * o.J[E,ass]) * 1/o.shared.n_N_EN
@@ -61,7 +61,7 @@ function assimilation!(f::AbstractNAssim, o, u)
     # but incoming N is just N. C was being generated from nowhere, 
     # specifically in the N returned to N reserves by the synthesizing unit.
     # TODO: could this end up with a negative C reserve overall?
-    # o.J[C,ass] += -J_N_assim / o.shared.n_N_N
+    o.J[C,ass] += -J_N_assim / o.shared.n_N_N
 
     # Merge rejected C from shoot and uptaken N into reserves
     # treating N as N reserve now carbon has been incorporated.
@@ -101,11 +101,10 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
     bound_o = j1_o/f.k_O_binding # mol/mol
     bound_c = j1_c/f.k_C_binding # mol/mol
 
-    # c flux
+    # C flux
     j_c_intake = (j1_c - j1_o)
     j1_co = j1_c + j1_o
     co_l = j1_co/j1_l - j1_co/ (j1_l + j1_co)
-    # dimless
 
     j_c_intake / (1 + bound_c + bound_o + co_l) * u[V] * scale(v)
 end
