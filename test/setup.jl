@@ -23,9 +23,9 @@ end
 # end
 
 @testset "sum_flux" begin
-    du = fill(0.0u"mol/hr", 12)
-    o = Organism();
-    or1, or2 = define_organs(o, 1);
+    global du = fill(0.0u"mol/hr", 12)
+    global o = Organism();
+    global or1, or2 = define_organs(o, 1);
     or1.J .= [1.0,2.0,3.0,4.0,5.0,6.0]oneunit(or1.J[1,1])
     or2.J .= [1.0,2.0,3.0,4.0,5.0,6.0]oneunit(or2.J[1,1]) / 2
     sum_flux!(du, (or1, or2))
@@ -33,12 +33,14 @@ end
 end
 
 @testset "split_state" begin
-    o = Organism();
-    os = define_organs(o, 1);
-    u = [1.0:12.0...]u"mol"
-    us = split_state(os, u)
+    global o = Organism();
+    global os = define_organs(o, 1);
+    global u = [1.0:12.0...]u"mol"
+    global us = split_state(os, u)
     @test us[1][1] == 1.0u"mol"
     @test us[2][1] == 7.0u"mol"
     @test sum(us[1]) == sum(1:6) .* u"mol"
     @test sum(us[2]) == sum(7:12) .* u"mol"
 end
+
+nothing

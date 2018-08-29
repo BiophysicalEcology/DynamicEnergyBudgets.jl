@@ -1,14 +1,13 @@
-using Revise, Unitful, DynamicEnergyBudgets
+using Revise, 
+      Unitful, 
+      DynamicEnergyBudgets,
+      Test
+
 using DynamicEnergyBudgets: reuse_rejected!, dissipation!, translocate!, product!, 
                             maintenence!, growth!, sum_flux!, reserve_drain!, reserve_loss!,
                             maturity!, metabolism!, catabolism!, assimilation!, translocation!,
-                            scaling, P, V, M, C, N, E, EE, CN, STATELEN, ass, gro, mai, rep, rej, tra, cat, rej, los, 
+                            scaling, P, V, M, C, N, E, EE, CN, STATELEN, ass, gro, mai, mat, rej, tra, cat, rej, los, 
                             define_organs, default, units, set_var!
-@static if VERSION < v"0.7.0-DEV.2005"
-    using Base.Test
-else
-    using Test
-end
 
 construct_organ(; params=Params(), shared=SharedParams(), vars=Vars()) = begin
     define_organs(Organism(params=(params,), vars=(vars,), shared=shared), 1)[1]
@@ -57,3 +56,5 @@ function cfactory()
 
     o1, p1, u1, du1, o2, p2, u2, du2, f
 end
+
+nothing

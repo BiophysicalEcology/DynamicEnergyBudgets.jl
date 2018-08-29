@@ -17,10 +17,11 @@ end
 
 
 @testset "apply environment to deb vars" begin
-    o = DynamicEnergyBudgets.Plant();
-    o1, o2 = define_organs(o, 1);
-    v1 = o1.vars; v2 = o2.vars
-    va1 = v1.assimilation; va2 = v2.assimilation
+    global o = DynamicEnergyBudgets.Plant();
+    global o1, o2 = define_organs(o, 1);
+    global v1 = o1.vars; v2 = o2.vars
+    global va1 = v1.assimilation; 
+    global va2 = v2.assimilation
 
     apply(apply_environment!, (o1, o2), u, :not_nothing, 1)
     @test temp(v1) == 23.7u"°C"
@@ -31,9 +32,10 @@ end
 end
 
 @testset "apply environment to deb vars" begin
-    o = DynamicEnergyBudgets.FvCBPlant();
-    o1, o2 = define_organs(o, 1);
-    v = o1.vars; va = v.assimilation;
+    global o = DynamicEnergyBudgets.FvCBPlant();
+    global o1, o2 = define_organs(o, 1);
+    global v = o1.vars; 
+    global va = v.assimilation;
     apply_environment!(o1, u, :no_env, 1)
     @test va.tair == 23.7u"°C" 
     @test va.tleaf > va.tair
@@ -47,7 +49,9 @@ end
 end
 
 @testset "temperature correction" begin
-    o = Organism()
+    global o = Organism()
     # @test tempcorr(80.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
     # @test tempcorr(-60.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
 end
+
+nothing
