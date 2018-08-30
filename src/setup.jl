@@ -23,7 +23,7 @@ build_vars(vars, time) = begin
     len == length(vars.rate) && return vars 
 
     fields = []
-    for fname in fieldnames(vars)
+    for fname in fieldnames(typeof(vars))
         ft = fieldtype(typeof(vars), fname)
         if ft <: AbstractArray
             push!(fields, fill(getfield(vars, fname)[1], len)) 
