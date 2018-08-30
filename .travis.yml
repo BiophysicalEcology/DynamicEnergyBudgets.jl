@@ -27,12 +27,12 @@ git:
 
 ## uncomment the following lines to override the default test script
 script:
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/JuliaData/Tables.jl.git", rev="master")); Pkg.build("Tables")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/FugroRoames/TypedTables.jl.git", rev="master")); Pkg.build("TypedTables")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/JuliaData/Tables.jl.git")); Pkg.build("Tables")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Tags.jl.git")); Pkg.build("Tags")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Nested.jl.git")); Pkg.build("Nested")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Mixers.jl.git")); Pkg.build("Mixers")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Flatten.jl.git")); Pkg.build("Flatten")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/FugroRoames/TypedTables.jl.git")); Pkg.build("TypedTables")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Defaults.jl.git")); Pkg.build("Defaults")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Photosynthesis.jl.git")); Pkg.build("Photosynthesis")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/SimpleRoots.jl.git")); Pkg.build("SimpleRoots")'
