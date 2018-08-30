@@ -274,7 +274,7 @@ Organism(; params = (ShootParams(), RootParams()),
         for i = 1:length(params)
             push!(recarray, Records(params[i], vars[i], time, 1.0u"mol/hr", typeof(1.0u"mol/hr")))
         end
-        records = (recarray...)
+        records = (recarray...,)
     end
     Organism(params, shared, records, environment)
 end
