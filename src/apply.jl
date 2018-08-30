@@ -1,5 +1,5 @@
 export apply
-using Base.tail
+using Base: tail
 
 apply(f::F, a::Tuple{A,Vararg}, args...) where {F,A} = begin
     f(a[1], args...)
