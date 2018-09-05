@@ -100,7 +100,6 @@ end
 
     global c = sum(du)
     global n = du ⋅ n_ratios
-    @test rate(o.vars) > zero(rate(o.vars))
     @test c < zero(c)
     @test -c ≈ o.J1[C,los]
     @test -n ≈ o.J1[N,los]
@@ -134,10 +133,12 @@ end
 end
 
 @testset "rejection is balanced" begin
-    global _, _, u1, du1, n_ratios = factory();
-    global _, _, u2, du2 = factory();
-    global o1 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8))
-    global o2 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8))
+    global o1, p1, u1, du1, n_ratios = factory();
+    global o2, p2, u2, du2 = factory();
+
+    # These are set to 1.0 by default which makes this test meaningless
+    global o1 = construct_organ(params=Params(y_EC_ECT = 0.7, y_EN_ENT = 0.9))
+    global o2 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.5))
     global p1 = o1.params; p2 = o2.params
     global sh = o1.shared
     u2 .*= 2.7
@@ -153,7 +154,7 @@ end
     global c1 = sum(du1)
     global c2 = sum(du2)
     global n1 = du1 ⋅ n_ratios
-    global n1 = du1 ⋅ n_ratios
+    global n2 = du2 ⋅ n_ratios
 
     @test c1 != zero(c1)
     @test -c1 - c2 == o1.J1[C,los] + o2.J1[C,los]
