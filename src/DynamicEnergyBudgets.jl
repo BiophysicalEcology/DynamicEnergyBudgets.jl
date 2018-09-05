@@ -21,6 +21,7 @@ using Unitful,
       Photosynthesis,
       Flatten
 
+using Base: tail
 import Flatten: flattenable
 import Defaults: get_default
 import Tags: @prior, @default, @description, @units, @limits, prior, default, description, units, limits
@@ -117,7 +118,7 @@ const mat = 5
 const tra = 6
 const fbk = 7
 
-const cat = 1
+const ctb = 1
 const los = 2
 const rej = 3
 

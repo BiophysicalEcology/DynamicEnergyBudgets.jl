@@ -12,15 +12,12 @@ Runs nitrogen uptake, and combines N with translocated C.
 """
 function assimilation!(f::AbstractCAssim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
+    sh = o.shared
 
-    J1_EC_ass = photosynthesis(f, o, u)
-
-    o.J[C,ass] = J1_EC_ass
     # Merge rejected N from root and photosynthesized C into reserves
-    (o.J[C,ass], o.J[N,tra], o.J[E,ass], lossC, lossN) =
-        stoich_merge(J1_EC_ass, o.J[N,tra], o.shared.y_E_CH_NO, o.shared.y_E_EN)
-    o.J[C,los] += lossC; o.J[N,los] += lossN
-
+    o.J[C,ass], o.J[N,tra], o.J[E,ass] =
+        stoich_merge(photosynthesis(f, o, u), o.J[N,tra], sh.y_E_CH_NO, sh.y_E_EN)
+    stoich_merge_losses(o.J[C,ass], o.J[N,tra], o.J[E,ass], sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
     return nothing
 end
 
@@ -31,20 +28,21 @@ Unused ammonia is discarded.
 """
 function assimilation!(f::AbstractNH4_NO3Assim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
+    sh = o.shared
 
-    (J_N_ass, J_NO_ass, J_NH_ass) = uptake_nitrogen(f, o, u)
+    J_N_ass, J_NO_ass, J_NH_ass = uptake_nitrogen(f, o, u)
 
     θNH = J_NH_ass/J_N_ass                          # Fraction of ammonia in arriving N-flux
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
     y_E_CH = θNH * f.y_E_CH_NH + θNO * o.shared.y_E_CH_NO  # Yield coefficient from C-reserve to reserve
 
     # Merge rejected C from shoot and uptaken N into reserves
-    (o.J[C,tra], o.J[N,ass], o.J[E,ass], lossC, lossN) =
-        stoich_merge(o.J[C,tra], J_N_ass, y_E_CH, 1/o.shared.n_N_E)
-    o.J[C,los] += lossC; o.J[N,los] += lossN
+    o.J[C,tra], o.J[N,ass], o.J[E,ass] =
+        stoich_merge(o.J[C,tra], J_N_ass, y_E_CH, 1/sh.n_N_E)
+    stoich_merge_losses(o.J[C,tra], o.J[N,ass], o.J[E,ass], sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
-    o.J[N,ass] = (J_NO_ass - θNO * o.shared.n_N_E * o.J[E,ass]) * 1/o.shared.n_N_EN
+    o.J[N,ass] = (J_NO_ass - θNO * sh.n_N_E * o.J[E,ass]) * 1/sh.n_N_EN
     return nothing
 end
 
@@ -54,6 +52,7 @@ Runs nitrogen uptake, and combines N with translocated C.
 """
 function assimilation!(f::AbstractNAssim, o, u)
     germinated(u[V], o.params.M_Vgerm) || return nothing
+    sh = o.shared
 
     J_N_assim = uptake_nitrogen(f, o, u)
 
@@ -61,13 +60,13 @@ function assimilation!(f::AbstractNAssim, o, u)
     # but incoming N is just N. C was being generated from nowhere, 
     # specifically in the N returned to N reserves by the synthesizing unit.
     # TODO: could this end up with a negative C reserve overall?
-    o.J[C,ass] += -J_N_assim / o.shared.n_N_N
+    o.J[C,ass] -= -J_N_assim
 
     # Merge rejected C from shoot and uptaken N into reserves
     # treating N as N reserve now carbon has been incorporated.
-    (o.J[C,tra], o.J[N,ass], o.J[E,ass], lossC, lossN) =
-        stoich_merge(o.J[C,tra], J_N_assim, o.shared.y_E_CH_NO, o.shared.y_E_CH_NO)
-    o.J[C,los] += lossC; o.J[N,los] += lossN
+    o.J[C,tra], o.J[N,ass], o.J[E,ass] =
+        stoich_merge(o.J[C,tra], J_N_assim, sh.y_E_CH_NO, sh.y_E_EN)
+    stoich_merge_losses(o.J[C,tra], o.J[N,ass], o.J[E,ass], sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
 
     return nothing
 end
@@ -104,7 +103,7 @@ function photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
     # C flux
     j_c_intake = (j1_c - j1_o)
     j1_co = j1_c + j1_o
-    co_l = j1_co/j1_l - j1_co/ (j1_l + j1_co)
+    co_l = j1_co/j1_l - j1_co/(j1_l + j1_co)
 
     j_c_intake / (1 + bound_c + bound_o + co_l) * u[V] * scale(v)
 end

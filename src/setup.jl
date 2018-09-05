@@ -1,5 +1,3 @@
-using Base: tail
-
 # Parameter helper functions
 watts_to_light_mol(watts) = watts * 4.57e-6
 light_mol_to_watts(light_mol) = light_mol / 4.57e-6
@@ -49,7 +47,7 @@ end
 split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 
 " sum flux matrix " 
-sum_flux!(du, o) = begin
+sum_flux!(du, o::Tuple) = begin
     offset_apply!(sum_flux!, du, o, 0)
     du
 end

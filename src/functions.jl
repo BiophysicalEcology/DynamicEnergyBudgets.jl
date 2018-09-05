@@ -13,35 +13,37 @@ tempcorr(t, t1, a, l, al, h, ah) =
     (1.0 + exp(al/t - al/l) + exp(ah/h - ah/t))
 tempcorr(t, tc::Nothing) = 1.0
 tempcorr(t, tc::TempCorr) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp)
-tempcorr(t, tc::TempCorrLower) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
-tempcorr(t, tc::TempCorrLowerUpper) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)
+tempcorr(t, tc::TempCorrLower) = 
+    tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
+tempcorr(t, tc::TempCorrLowerUpper) = 
+    tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)
 
 """
-    rate_formula(r, ureserve::NTuple, A_turnover::NTuple, j_E_mai, y_V_E, κsoma)
+    rate_formula(r, ureserve::NTuple, turnover::NTuple, j_E_mai, y_V_E, κsoma)
 Rate formulas for E, CN or CNE reserves
 """
-function rate_formula(r, ureserve::NTuple{3}, A_turnover::NTuple{3}, 
+function rate_formula(r, rel_reserve::NTuple{3}, turnover::NTuple{3}, 
                       j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
-    (j_EC, j_EN, j_E) = catabolic_flux(ureserve, A_turnover, r)
+    j_EC, j_EN, j_E = catabolic_flux.(rel_reserve, turnover, r)
     j_ECN = synthesizing_unit(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
     y_V_E * (κsoma * (j_E + j_ECN) - j_E_mai) - r
 end
 
-function rate_bracket(ureserve::NTuple{3}, A_turnover::NTuple{3}, 
+function rate_bracket(rel_reserve::NTuple{3}, turnover::NTuple{3}, 
                      j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)::NTuple{2}
     # Calculate the limits of the rate_formula function when C or N → ∞
-    (uEC, uEN, uE) = ureserve
-    (AEC, AEN, AE) = A_turnover
+    uEC, uEN, uE = rel_reserve
+    AEC, AEN, AE = turnover
     lim(y) = (uE * AE + uEC * AEC - j_E_mai/(κsoma * y))/(1/(y_V_E * κsoma * y) + uE + uEC * y)
-    (lim(y_E_EN), lim(y_E_CH_NO))
+    lim(y_E_EN), lim(y_E_CH_NO)
 end
 
 """
-    catabolic_flux(ureserve, A_turnover, r)
+    catabolic_flux(ureserve, turnover, r)
 Returns the current catabolic flux at rate r,
 or the flux as a proportion of u[V], depending on ureserve values.
 """
-catabolic_flux(ureserve, A_turnover, r) = ureserve .* (A_turnover .- r)
+catabolic_flux(reserve, turnover, r) = reserve * (turnover - r)
 
 """
     half_saturation(max, half, x)

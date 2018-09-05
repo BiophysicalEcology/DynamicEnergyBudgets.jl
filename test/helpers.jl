@@ -1,13 +1,13 @@
-using Revise, 
-      Unitful, 
+using Revise,
+      Unitful,
       DynamicEnergyBudgets,
       Test
 
-using DynamicEnergyBudgets: reuse_rejected!, dissipation!, translocate!, product!, 
-                            maintenence!, growth!, sum_flux!, reserve_drain!, reserve_loss!,
-                            maturity!, metabolism!, catabolism!, assimilation!, translocation!,
-                            scaling, P, V, M, C, N, E, EE, CN, STATELEN, ass, gro, mai, mat, rej, tra, cat, rej, los, 
-                            define_organs, default, units, set_var!
+using DynamicEnergyBudgets: reuse_rejected!, translocate!, maintenence!, growth!, sum_flux!,
+                            reserve_drain!, reserve_loss!, maturity!, metabolism!, catabolism!,
+                            assimilation!, translocation!, set_scaling!, P, V, M, C, N, E, EE, CN,
+                            STATELEN, ass, gro, mai, mat, rej, tra, ctb, rej, los,
+                            define_organs, default, units, set_var!, rate, unpack, tempcorrection, θE
 
 construct_organ(; params=Params(), shared=SharedParams(), vars=Vars()) = begin
     define_organs(Organism(params=(params,), vars=(vars,), shared=shared), 1)[1]
@@ -16,13 +16,15 @@ end
 function factory()
     o = construct_organ()
     p = o.params
-    u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
+    u = [0.0, 1e-2, 0.0, 1e-2, 1e-2, 1e-2, 0.0, 1e-2, 0.0, 1e-2, 1e-2, 10.0]u"mol"
     du = fill(0.0u"mol*hr^-1", 6)
-    o, p, u, du
+    sh = o.shared
+    n_ratios = [sh.n_N_P, sh.n_N_V, sh.n_N_M, sh.n_N_EC, sh.n_N_EN, sh.n_N_E]
+    o, p, u, du, n_ratios
 end
 
 function nfactory()
-    o1 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8), 
+    o1 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8),
                vars=Vars(assimilation=NitrogenVars()));;
     p1 = o1.params
     o2 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8))
@@ -40,7 +42,7 @@ function nfactory()
 end
 
 function cfactory()
-    o1 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8), 
+    o1 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8),
                vars=Vars(assimilation=CarbonVars()));;
     p1 = o1.params;
     o2 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8));
