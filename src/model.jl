@@ -98,12 +98,12 @@ Allocates reserve drain due to maintenance.
 """
 maintenence!(o, u) = begin
     p, v, sh, J, J1 = unpack(o)
+    # TODO this isn't balanced anywhere and is
+    # larger than the total maintenance flux
     # J[P,mai] = maint_prod = p.j_P_mai * tempcorrection(v) * u[V]
     drain = p.j_E_mai * tempcorrection(v) * u[V]
     reserve_drain!(o, mai, drain, θE(v))
     reserve_loss!(o, drain, θE(v)) # all maintenance is loss
-    # J1[C,los] -= maint_prod 
-    # J1[N,los] -= maint_prod * sh.n_N_E
 end
 
 """
@@ -161,13 +161,15 @@ whichever is not the current organs. Will not run with less than 2 organs.
 translocate!(o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[E,ctb]
-    # reserve_drain!(o1, tra, trans, θE(o1.vars))
+    reserve_drain!(o1, tra, trans, θE(o1.vars))
 
     # incoming translocation
-    transx = κtra(o2) * o2.J1[E,ctb] * o2.params.y_E_ET 
+    transx = κtra(o2) * o2.J1[E,ctb]
     o1.J[E,tra] += transx * o2.params.y_E_ET
-    # reserve_loss!(o2, transx * (1 - o2.params.y_E_ET), θE(o2.vars))
-    conversion_loss!(o2, o1.J[E,tra], θE(o2.vars), o2.shared.n_N_V)
+
+    loss = transx * (1 - o2.params.y_E_ET)
+    reserve_loss!(o2, loss, θE(o2.vars))
+    conversion_loss!(o2, transx * o2.params.y_E_ET, θE(o2.vars), o2.shared.n_N_E)
     nothing
 end
 
@@ -179,17 +181,16 @@ Also how does this interact with assimilation?
 """
 reuse_rejected!(source, dest, prop) = begin
     p, v, sh, J, J1 = unpack(source);
-    J[C,rej] = -J1[C,rej]
-    J[N,rej] = -J1[N,rej]
-    # Some rejected reserves are translocated and used in assimilation.
-    # Why isn't the other rejected C and N used?
-    if typeof(p.assimilation) <: AbstractCAssim
-        dest.J[C,tra] = p.y_EC_ECT * J1[C,rej]
-    elseif typeof(p.assimilation) <: AbstractNAssim
-        dest.J[N,tra] = p.y_EN_ENT * J1[N,rej]
-    end
-    J1[C,los] = (1 - p.y_EC_ECT) * J1[C,rej] + (1 - p.y_EN_ENT) * J1[N,rej]
-    J1[N,los] = (1 - p.y_EC_ECT) * J1[C,rej] * sh.n_N_EC + (1 - p.y_EN_ENT) * J1[N,rej] * sh.n_N_EN
+
+    J[C,rej] = J1[C,rej] * (p.κEC - 1)
+    J[N,rej] = J1[N,rej] * (p.κEN - 1)
+    transC = -J[C,rej] 
+    transN = -J[N,rej] 
+    dest.J[C,tra] = p.y_EC_ECT * transC
+    dest.J[N,tra] = p.y_EN_ENT * transN
+    J1[C,los] += transC - dest.J[C,tra] + transN - dest.J[N,tra]
+    J1[N,los] += ((transC - dest.J[C,tra]), (transN - dest.J[N,tra])) ⋅ (sh.n_N_EC, sh.n_N_EN)
+
     nothing
 end
 

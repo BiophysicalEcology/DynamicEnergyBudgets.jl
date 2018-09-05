@@ -1,9 +1,4 @@
 
-
-sum_n_loss(o) = o.J1[E,los] + o.J1[N,los] * o.shared.y_E_EN
-sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los]) * o1.shared.y_E_EN
-
-
 @testset "stoich merge is balanced if yeilds are 2.0" begin
     @test sum(stoich_merge(2.0, 2.0, 2.0, 2.0)) ≈ 4.0
     @test sum(stoich_merge(1.0, 3.0, 2.0, 2.0)) ≈ 4.0
@@ -56,7 +51,7 @@ end
     global c = sum(du)
     global n = du ⋅ n_ratios
 
-    @test o.J1[C,los] > zero(o.J1[C,los])
+    @test c < zero(c)
     @test c ≈ -o.J1[C,los]
     @test n ≈ -o.J1[N,los]
 

@@ -1,4 +1,5 @@
 using Revise,
+      LinearAlgebra,
       Unitful,
       DynamicEnergyBudgets,
       Test

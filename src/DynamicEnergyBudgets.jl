@@ -8,7 +8,8 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
 for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets 
-using Unitful,
+using LinearAlgebra,
+      Unitful,
       OrdinaryDiffEq,
       ForwardDiff,
       DocStringExtensions,

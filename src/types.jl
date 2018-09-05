@@ -154,6 +154,8 @@ end
     translocation::Tr  | nothing         | _                  | _               | _            | _
     M_Vgerm::Mo        | 0.0             | u"mol"             | Gamma(2.0, 2.0) | [0.0,1.0]    | "Structural mass at germination"
     κsoma::F           | 0.6             | _                  | Beta(2.0, 2.0)  | [0.0,1.0]    | "Reserve flux allocated to growth"
+    κEC::F             | 0.3             | _                  | Beta(2.0, 2.0)  | [0.0,1.0]    | "Reserve flux allocated to growth"
+    κEN::F             | 0.3             | _                  | Beta(2.0, 2.0)  | [0.0,1.0]    | "Reserve flux allocated to growth"
     y_P_V::MoMo        | 0.02            | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "Product formation linked to growth"
     y_V_E::MoMo        | 0.7             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "From reserve to structure"
     y_E_ET::MoMo       | 0.8             | u"mol*mol^-1"      | Beta(2.0, 2.0)  | [0.0,1.0]    | "Translocated reserve:"
@@ -171,11 +173,11 @@ end
     # Field         | _     | Default              | Unit          | Prior           | Limits       | Description
     feedback::Fb    | _     | nothing              | _             | _               | _            | _
     tempcorr::C     | _     | TempCorrLowerUpper() | _             | _               | _            | _
-    n_N_P::MoMo     | _     | 0.0                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in product (wood)"
-    n_N_V::MoMo     | _     | 0.2                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in structure" # Shouldnt this be identical to the reserve?
-    n_N_M::MoMo     | _     | 0.2                  | u"mol*mol^-1" | Beta(2.0, 2.0)  | [0.0, 1.0]   | "N/C in M-reserve"
+    n_N_P::MoMo     | _     | 0.1                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in product (wood)"
+    n_N_V::MoMo     | _     | 0.15                 | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in structure" # Shouldnt this be identical to the reserve?
+    n_N_M::MoMo     | _     | 0.3                  | u"mol*mol^-1" | Beta(2.0, 2.0)  | [0.0, 1.0]   | "N/C in M-reserve"
     n_N_E::MoMo     | _     | 0.2                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | [0.0, 1.0]   | "N/C in reserve" # TODO This should be calculated, not constant. 1.8181??? (10/11 * 0.3)/1.5"
-    n_N_EC::MoMo    | _     | 0.0                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in C-reserve"
+    n_N_EC::MoMo    | _     | 0.1                  | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in C-reserve"
     n_N_EN::MoMo    | _     | 10.0                 | u"mol*mol^-1" | Gamma(2.0, 2.0) | _            | "N/C in N-reserve"
     w_P::GMo        | false | 25.0                 | u"g*mol^-1"   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot product (wood)"
     w_V::GMo        | false | 25.0                 | u"g*mol^-1"   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot structure"
