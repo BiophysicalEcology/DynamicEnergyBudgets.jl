@@ -48,7 +48,7 @@ apply_environment!(a::FvCBPhotosynthesis, o, u, env, t) = begin
     va.soilmoist = get_environment(Val{:soilwatercontent}, env, interp, pos)
     va.swp = get_environment(Val{:soilwaterpotential}, env, interp, pos)
 
-    if germinated(u[V], p.M_Vgerm)
+    if germinated(u, p.M_Vgerm)
         phototranspiration!(va, p.assimilation.photoparams)
     else
         va.tleaf = temp(v)

@@ -4,8 +4,9 @@ Run a DEB organism model.
 (o::Organism)(du, u, p::Nothing, t::Number) = o(du, u, t, define_organs(o, t))
 
 (o::Organism)(du, u, t::Number, organs) = begin
+    check_params.(organs)
     ux = split_state(organs, u)
-    apply_environment!(organs, ux, o.environment, t)
+    # apply_environment!(organs, ux, o.environment, t)
     debmodel!(organs, ux)
     sum_flux!(du, organs)
 end
@@ -35,7 +36,7 @@ metabolism!(o, u) = begin
     growth!(o, u)
     maturity!(o, u)
     maintenence!(o, u)
-    feedback!(o.shared.feedback, o, u)
+    feedback!(o, u)
 end
 
 """
@@ -43,37 +44,51 @@ end
 Catabolism for E, C and N, or C, N and E reserves.
 Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
-catabolism!(o, u) = begin
-    p, v, sh, J, J1 = unpack(o); va = assimilation(v);
+catabolism!(o, u) = catabolism!(o.params, o, u)
+catabolism!(p::ParamsCNE, o, u) = begin
+    _, v, sh, J, J1 = unpack(o); va = assimilation(v);
     turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* scale(v)
-    reserve = (u[C], u[N], u[E])
-    rel_reserve = reserve ./ u[V]
+    reserve = (u.C, u.N, u.E)
+    rel_reserve = reserve ./ u.V
     j_E_mai = p.j_E_mai * tempcorrection(v)
 
-    r = find_rate(rel_reserve, turnover, j_E_mai, sh.y_E_CH_NO, sh.y_E_EN, p.y_V_E, p.κsoma)
+    r = find_rate(rel_reserve, turnover, j_E_mai, p.y_E_CH_NO, p.y_E_EN, p.y_V_E, κsoma(o))
     set_var!(v, :rate, r)
-    # r > zero(r) || error("rate is less than zero, thermodyamics disagrees")
 
-    J1[C,ctb], J1[N,ctb], J1[EE,ctb] = catabolic_flux.(reserve, turnover, r)
-    J1[C,rej], J1[N,rej], J1[CN,ctb] = stoich_merge(J1[C,ctb], J1[N,ctb], sh.y_E_CH_NO, sh.y_E_EN)
+    J1[:C,:ctb], J1[:N,:ctb], J1[:EE,:ctb] = catabolic_flux.(reserve, turnover, r)
+    J1[:C,:rej], J1[:N,:rej], J1[:CN,:ctb] = stoich_merge(J1[:C,:ctb], J1[:N,:ctb], p.y_E_CH_NO, p.y_E_EN)
 
-    J1[E,ctb] = J1[EE,ctb] + J1[CN,ctb] # Total catabolic flux
-    set_var!(v, :θE, J1[EE,ctb]/J1[E,ctb]) # Proportion of general reserve flux in total catabolic flux
+    J1[:E,:ctb] = J1[:EE,:ctb] + J1[:CN,:ctb] # Total catabolic flux
+    set_var!(v, :θE, J1[:EE,:ctb]/J1[:E,:ctb]) # Proportion of general reserve flux in total catabolic flux
     nothing
 end
+catabolism!(p::ParamsCN, o, u) = begin
+    _, v, sh, J, J1 = unpack(o); va = assimilation(v);
+    turnover = (p.k_EC, p.k_EN) .* tempcorrection(v) .* scale(v)
+    reserve = (u.C, u.N)
+    rel_reserve = reserve ./ u.V
+    j_E_mai = p.j_E_mai * tempcorrection(v)
+
+    r = find_rate(rel_reserve, turnover, j_E_mai, p.y_E_CH_NO, p.y_E_EN, p.y_V_E, κsoma(o))
+    set_var!(v, :rate, r)
+
+    J1[:C,:ctb], J1[:N,:ctb] = catabolic_flux.(reserve, turnover, r)
+    J1[:C,:rej], J1[:N,:rej], J1[:E,:ctb] = stoich_merge(J1[:C,:ctb], J1[:N,:ctb], p.y_E_CH_NO, p.y_E_EN)
+    nothing
+end
+
 
 """
 Allocates reserves to growth.
 """
 growth!(o, u) = begin
     p, v, sh, J, J1 = unpack(o)
-    θ = θE(v)
-    J[V,gro] = growth = rate(v) * u[V]
+    J[:V,:gro] = growth = rate(v) * u.V
     drain = (1/p.y_V_E) * growth 
     loss = drain - growth
-    reserve_drain!(o, gro, drain, θ)
-    reserve_loss!(o, loss, θ)
-    conversion_loss!(o, growth, θ, sh.n_N_V)
+    reserve_drain!(o, :gro, drain)
+    reserve_loss!(o, loss)
+    conversion_loss!(o, growth, sh.n_N_V)
 end
 
 """
@@ -83,13 +98,13 @@ Stores in M state variable if it exists.
 """
 maturity!(o, u) = maturity!(o.params.maturity, o, u)
 maturity!(f::Maturity, o, u) = begin
-    p, v, sh, J, J1 = unpack(o); θ = θE(v) 
-    J[M,gro] = maturity = f.κmat * J1[E,ctb]
-    mat_mai = f.j_E_mat_mai * tempcorrection(v) * u[V] # min(u[V], f.M_Vmat))
+    p, v, sh, J, J1 = unpack(o)
+    J[:M,:gro] = maturity = f.κmat * J1[:E,:ctb]
+    mat_mai = f.j_E_mat_mai * tempcorrection(v) * u.V # min(u[:V], f.M_Vmat))
     drain = maturity + mat_mai 
-    reserve_drain!(o, mat, drain, θ)
-    reserve_loss!(o, mat_mai, θ)
-    conversion_loss!(o, maturity, θ, sh.n_N_M)
+    reserve_drain!(o, :mat, drain)
+    reserve_loss!(o, mat_mai)
+    conversion_loss!(o, maturity, sh.n_N_M)
 end
 maturity!(f::Nothing, o, u) = nothing
 
@@ -100,10 +115,10 @@ maintenence!(o, u) = begin
     p, v, sh, J, J1 = unpack(o)
     # TODO this isn't balanced anywhere and is
     # larger than the total maintenance flux
-    # J[P,mai] = maint_prod = p.j_P_mai * tempcorrection(v) * u[V]
-    drain = p.j_E_mai * tempcorrection(v) * u[V]
-    reserve_drain!(o, mai, drain, θE(v))
-    reserve_loss!(o, drain, θE(v)) # all maintenance is loss
+    # J[:P,:mai] = maint_prod = p.j_P_mai * tempcorrection(v) * u[:V]
+    drain = p.j_E_mai * tempcorrection(v) * u.V
+    reserve_drain!(o, :mai, drain)
+    reserve_loss!(o, drain) # all maintenance is loss
 end
 
 """
@@ -158,18 +173,19 @@ Translocation is occurs between adjacent organs.
 This function is identical both directiono, and ox represents
 whichever is not the current organs. Will not run with less than 2 organs.
 """
-translocate!(o1, o2, prop) = begin
+translocate!(o1, o2, prop) = translocate!(o1.params, o1, o2, prop)
+translocate!(p, o1, o2, prop) = begin
     # outgoing translocation
-    trans = κtra(o1) * o1.J1[E,ctb]
-    reserve_drain!(o1, tra, trans, θE(o1.vars))
+    trans = κtra(o1) * o1.J1[:E,:ctb]
+    reserve_drain!(o1, :tra, trans)
 
     # incoming translocation
-    transx = κtra(o2) * o2.J1[E,ctb]
-    o1.J[E,tra] += transx * o2.params.y_E_ET
+    transx = κtra(o2) * o2.J1[:E,:ctb]
+    o1.J[:E,:tra] += transx * o2.params.y_E_ET
 
     loss = transx * (1 - o2.params.y_E_ET)
-    reserve_loss!(o2, loss, θE(o2.vars))
-    conversion_loss!(o2, transx * o2.params.y_E_ET, θE(o2.vars), o2.shared.n_N_E)
+    reserve_loss!(o2, loss)
+    conversion_loss!(o2, transx * o2.params.y_E_ET, o2.shared.n_N_E)
     nothing
 end
 
@@ -182,15 +198,14 @@ Also how does this interact with assimilation?
 reuse_rejected!(source, dest, prop) = begin
     p, v, sh, J, J1 = unpack(source);
 
-    J[C,rej] = J1[C,rej] * (p.κEC - 1)
-    J[N,rej] = J1[N,rej] * (p.κEN - 1)
-    transC = -J[C,rej] 
-    transN = -J[N,rej] 
-    dest.J[C,tra] = p.y_EC_ECT * transC
-    dest.J[N,tra] = p.y_EN_ENT * transN
-    J1[C,los] += transC - dest.J[C,tra] + transN - dest.J[N,tra]
-    J1[N,los] += ((transC - dest.J[C,tra]), (transN - dest.J[N,tra])) ⋅ (sh.n_N_EC, sh.n_N_EN)
-
+    transC = J1[:C,:rej] * (1 - p.κEC)
+    transN = J1[:N,:rej] * (1 - p.κEN)
+    J[:C,:rej] = -transC 
+    J[:N,:rej] = -transN
+    dest.J[:C,:tra] = p.y_EC_ECT * transC
+    dest.J[:N,:tra] = p.y_EN_ENT * transN
+    J1[:C,:los] += transC * (1 - p.y_EC_ECT) + transN * (1 - p.y_EN_ENT)
+    J1[:N,:los] += (transC * (1 - p.y_EC_ECT), transN * (1 - p.y_EN_ENT)) ⋅ (sh.n_N_EC, sh.n_N_EN)
     nothing
 end
 
@@ -198,11 +213,18 @@ end
 Generalised reserve drain for any flux column *col* (ie gro)
 and any combination of reserves.
 """
-reserve_drain!(o, col, drain, θ) = begin
-    J_CN = -drain * (1.0 - θ) # fraction on drain from C and N reserves
-    o.J[C,col] = J_CN/o.shared.y_E_CH_NO
-    o.J[N,col] = J_CN/o.shared.y_E_EN
-    o.J[E,col] = -drain * θ
+reserve_drain!(o::Organ, col, drain) = reserve_drain!(o.params, o, col, drain)
+reserve_drain!(p::ParamsCNE, o, col, drain) = begin
+    θ = θE(o)
+    J_CN = -drain * (1 - θ) # fraction on drain from C and N reserves
+    o.J[:C,col] = J_CN/o.params.y_E_CH_NO
+    o.J[:N,col] = J_CN/o.params.y_E_EN
+    o.J[:E,col] = -drain * θ
+    nothing
+end
+reserve_drain!(p::ParamsCN, o, col, drain) = begin
+    o.J[:C,col] = -drain/o.params.y_E_CH_NO
+    o.J[:N,col] = -drain/o.params.y_E_EN
     nothing
 end
 
@@ -211,29 +233,42 @@ Generalised reserve loss to track carbon.
 
 Loss is distributed between general and C and N reserves by the fraction θE
 """
-reserve_loss!(o, loss, θ) = begin
-    p, v, sh = unpack(o)
+reserve_loss!(o, loss) = reserve_loss!(o.params, o, loss)
+reserve_loss!(p::ParamsCNE, o, loss) = begin
+    p, v, sh = unpack(o); θ = θE(o)
     ee = loss * θ # fraction of loss from E reserve
     ecn = loss - ee # fraction on loss from C and N reserves
-    ec = ecn/sh.y_E_CH_NO
-    en = ecn/sh.y_E_EN
-    o.J1[C,los] += ec + en + ee
-    o.J1[N,los] += (ec, en, ee) ⋅ (sh.n_N_EC, sh.n_N_EN, sh.n_N_E)
+    ec = ecn/p.y_E_CH_NO
+    en = ecn/p.y_E_EN
+    o.J1[:C,:los] += ec + en + ee
+    o.J1[:N,:los] += (ec, en, ee) ⋅ (sh.n_N_EC, sh.n_N_EN, sh.n_N_E)
+    nothing
+end
+reserve_loss!(p::ParamsCN, o, loss) = begin
+    p, v, sh = unpack(o)
+    ec = loss/p.y_E_CH_NO
+    en = loss/p.y_E_EN
+    o.J1[:C,:los] += ec + en
+    o.J1[:N,:los] += (ec, en) ⋅ (sh.n_N_EC, sh.n_N_EN)
     nothing
 end
 
-conversion_loss!(o, loss, θ, dest_ratio) = begin
-    p, v, sh = unpack(o)
-    ee = loss * θ # fraction of loss from E reserve
-    ecn = loss - ee # fraction on loss from C and N reserves
-    ec = ecn/sh.y_E_CH_NO
-    en = ecn/sh.y_E_EN
-    o.J1[C,los] += ec + en + ee - loss
-    o.J1[N,los] += (ec, en, ee) ⋅ (sh.n_N_EC, sh.n_N_EN, (sh.n_N_E - 1/θ * dest_ratio))
+conversion_loss!(o, loss, dest_n_N) = conversion_loss!(o.params, o, loss, dest_n_N)
+conversion_loss!(p::ParamsCNE, o, loss, dest_n_N) = begin
+    p, v, sh = unpack(o); θ = θE(o)
+    ecn = loss * (1 - θ) # fraction on loss from C and N reserves
+    ec = ecn/p.y_E_CH_NO
+    en = ecn/p.y_E_EN
+    o.J1[:C,:los] += ec + en + loss * (θ - 1)
+    o.J1[:N,:los] += (ec, en, loss * (θ - dest_n_N/sh.n_N_E)) ⋅ (sh.n_N_EC, sh.n_N_EN, sh.n_N_E)
 end
-
-# reserve_loss!(o, ::Type{Val{:C}}, loss) = o.J1[C,los] += loss
-# reserve_loss!(o, ::Type{Val{:N}}, loss) = o.J1[N,los] += loss/o.shared
+conversion_loss!(p::ParamsCN, o, loss, dest_n_N) = begin
+    p, v, sh = unpack(o)
+    ec = loss/p.y_E_CH_NO
+    en = loss/p.y_E_EN
+    o.J1[:C,:los] += ec + en + loss
+    o.J1[:N,:los] += (ec, en) ⋅ (sh.n_N_EC, sh.n_N_EN)
+end
 
 """
     stoich_merge(Ja, Jb, ya, yb)
@@ -248,18 +283,22 @@ stoich_merge(Ja, Jb, ya, yb) = begin
     (Ja1, Jb1, JEab)
 end
 
-stoich_merge_losses(Ja, Jb, JEab, n_a, n_b, n_Eab) = begin 
-    lossa = Ja + Jb - JEab
-    lossb = Ja * n_a + Ja * n_b - JEab * n_Eab  
+stoich_merge_losses(Jc1, Jn1, Jc2, Jn2, JEcn, n_c, n_n, n_Ecn) = begin 
+    lossa = Jc1 - Jc2 + Jn1 - Jn2 - JEcn
+    lossb = (Jc1 - Jc2, Jn1 - Jn2, -JEcn) ⋅ (n_c, n_n, n_Ecn)  
     lossa, lossb
 end
 
 """
 κtra is the difference paramsbetween κsoma and κmat
 """
-κtra(o) = (1.0 - o.params.κsoma - κmat(o))
+κtra(o) = (1.0 - κsoma(o) - κmat(o))
 
-κmat(o::Organ) = κmat(o.params.maturity)
+κsoma(o::Organ) = κsoma(o.params, o) 
+κsoma(p, o) = p.κsoma
+
+κmat(o::Organ) = κmat(o.params)
+κmat(p) = κmat(p.maturity)
 κmat(maturity::Maturity) = maturity.κmat
 κmat(maturity::Nothing) = 0.0
 
@@ -282,16 +321,28 @@ end
 """
 Function to apply feedback on growth the process, such as autopagy in resource shortage.
 """
-feedback!(f::Nothing, o, u) = nothing
-feedback!(f::Autophagy, o, u) = begin
+feedback!(o, u) = feedback!(o.shared.feedback, o.params, o, u)
+
+feedback!(f::Nothing, x, o, u) = nothing
+feedback!(f::Autophagy, p::ParamsCNE, o, u) = begin
     hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
-    aph = u[V] * (oneunit(hs) - hs)
+    aph = u.V * (oneunit(hs) - hs)
     # TODO this should be a lossy process
-    o.J[E,fbk] += aph
-    o.J[V,fbk] -= aph
+    o.J[:E,:fbk] += aph
+    o.J[:V,:fbk] -= aph
+    nothing
+end
+feedback!(f::Autophagy, p::ParamsCN, o, u) = begin
+    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
+    aph = u.V * (oneunit(hs) - hs)
+    o.J[:C,:fbk] += aph
+    o.J[:N,:fbk] += aph
+    o.J[:V,:fbk] -= aph
+    nothing
 end
 
-set_scaling!(o, u) = set_var!(o.vars, :scale, scaling(o.params.scaling, u[V]))
+
+set_scaling!(o, u) = set_var!(o.vars, :scale, scaling(o.params.scaling, u.V))
 
 scaling(f::KooijmanArea, uV) = begin
     uV > zero(uV) || return 1.0 # || error("Mass is less than zero, I think its dead...")
@@ -303,13 +354,13 @@ scaling(f::Nothing, uV) = 1.0
 Check if germination has happened. Independent for each organ,
 although this may not make sense. A curve could be better for this too.
 """
-germinated(M_V, M_Vgerm) = M_V > M_Vgerm
+germinated(o, u) = u.V > o.params.M_Vgerm
 
 
 allometric_height(f::SqrtAllometry, o, u) = begin
     p, v, sh = unpack(o)
-    dim = oneunit(u[V] * sh.w_V)
-    sqrt((u[P] * sh.w_P + u[V] * sh.w_V) / dim) * f.allometry
+    dim = oneunit(u.V * sh.w_V)
+    sqrt((u.P * sh.w_P + u.V * sh.w_V) / dim) * f.allometry
 end
 
 unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
@@ -331,23 +382,15 @@ unpack(o::Organ) = o.params, o.vars, o.shared, o.J, o.J1
 # ┗━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 # J1: Catabolic flux diagram.
-# ┏━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-# ┃     ┃ catS       │ rejS      │ losS      ┃     ┃ catR       │ rejR      │ losR      ┃
-# ┣━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-# ┃EES  ┃ J_EES,catS │ 0         │ 0         ┃EES  ┃ J_EER,catR │ 0         │ 0         ┃
-# ┃CNS  ┃ J_CNS,catS │ 0         │ 0         ┃NS   ┃ J_CNR,catR │ 0         │ 0         ┃
-# ┃CS   ┃ J_CS,catS  │ J_CS,rejS │ J_CS,losS ┃CS   ┃ J_ECR,catR │ J_CR,rejR │ J_CR,losR ┃
-# ┃NS   ┃ J_NS,catS  │ J_NS,rejS │ J_NS,losS ┃ENS  ┃ J_ENR,catR │ J_NR,rejR │ J_NR,losR ┃
-# ┃ES   ┃ J_ES,catS  │ 0         │ 0         ┃ES   ┃ J_ER,catR  │ 0         │ 0         ┃
-# ┗━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-#
-#
-#
-#
-#
-#
-#
-#
+# ┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+# ┃    ┃ catS       │ rejS      │ losS mols!┃    ┃ catR       │ rejR      │ losR mols!┃
+# ┣━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+# ┃EES ┃ J_EES,catS │ 0         │ 0         ┃EES ┃ J_EER,catR │ 0         │ 0         ┃
+# ┃CNS ┃ J_CNS,catS │ 0         │ 0         ┃NS  ┃ J_CNR,catR │ 0         │ 0         ┃
+# ┃CS  ┃ J_CS,catS  │ J_CS,rejS │ J_CS,losS ┃CS  ┃ J_ECR,catR │ J_CR,rejR │ J_CR,losR ┃
+# ┃NS  ┃ J_NS,catS  │ J_NS,rejS │ J_NS,losS ┃ENS ┃ J_ENR,catR │ J_NR,rejR │ J_NR,losR ┃
+# ┃ES  ┃ J_ES,catS  │ 0         │ 0         ┃ES  ┃ J_ER,catR  │ 0         │ 0         ┃
+# ┗━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┻━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 # M: State vector diagram.
 # ┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓

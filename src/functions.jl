@@ -1,5 +1,16 @@
 # Library of common DEB functions.
 
+assimilation(v) = v.assimilation
+scale(v) = v.scale[v.t]
+rate(v) = v.rate[v.t]
+temp(v) = v.temp[v.t]
+tempcorrection(v) = v.tempcorrection[v.t]
+height(v) = v.height[v.t]
+set_var!(v, fname, val) = getfield(v, fname)[v.t] = val
+θE(v::Vars) = v.θE[v.t]
+θE(o::Organ) = θE(o.vars) 
+
+
 """
     tempcorr(T, T1, A, [L, AL,] [H, AH])
 DEB tempcorr function. Uses lower and uppper bounds if they are supplied.
@@ -22,12 +33,19 @@ tempcorr(t, tc::TempCorrLowerUpper) =
     rate_formula(r, ureserve::NTuple, turnover::NTuple, j_E_mai, y_V_E, κsoma)
 Rate formulas for E, CN or CNE reserves
 """
-function rate_formula(r, rel_reserve::NTuple{3}, turnover::NTuple{3}, 
-                      j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)
+rate_formula(r, rel_reserve::NTuple{2}, turnover::NTuple{2}, 
+             j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma) = begin
+    j_EC, j_EN = catabolic_flux.(rel_reserve, turnover, r)
+    j_ECN = synthesizing_unit(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
+    y_V_E * (κsoma * j_ECN - j_E_mai) - r
+end
+rate_formula(r, rel_reserve::NTuple{3}, turnover::NTuple{3}, 
+             j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma) = begin
     j_EC, j_EN, j_E = catabolic_flux.(rel_reserve, turnover, r)
     j_ECN = synthesizing_unit(j_EC * y_E_CH_NO, j_EN * y_E_EN)  
     y_V_E * (κsoma * (j_E + j_ECN) - j_E_mai) - r
 end
+
 
 function rate_bracket(rel_reserve::NTuple{3}, turnover::NTuple{3}, 
                      j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, κsoma)::NTuple{2}

@@ -16,16 +16,17 @@ using LinearAlgebra,
       Distributions,
       SimpleRoots,
       Mixers,
-      Tags,
+      LabelledArrays,
+      FieldMetadata,
       Defaults,
-      Microclimate,
+      # Microclimate,
       Photosynthesis,
-      Flatten
+      UnitlessFlatten
 
 using Base: tail
-import Flatten: flattenable
+import UnitlessFlatten: flattenable
 import Defaults: get_default
-import Tags: @prior, @default, @description, @units, @limits, prior, default, description, units, limits
+import FieldMetadata: @prior, @default, @description, @units, @limits, prior, default, description, units, limits
 
 export tempcorr,
        rate_bracket,
@@ -86,7 +87,8 @@ export AbstractAssim,
        Maturity,
        CarbonVars,
        NitrogenVars,
-       Params,
+       ParamsCNE,
+       ParamsCN,
        SharedParams,
        Vars,
        Organ,
@@ -99,41 +101,19 @@ export AbstractAssim,
     $(DOCSTRING)
     """
 
-const P = 1
-const V = 2
-const M = 3
-const C = 4
-const N = 5
-const E = 6
-
-const EE = 1
-const CN = 2
-
 const STATELEN = 6
 
-const ass = 1
-const gro = 2 
-const rej = 3 
-const mai = 4 
-const mat = 5 
-const tra = 6
-const fbk = 7
-
-const ctb = 1
-const los = 2
-const rej = 3
-
-const STATE = [:P, :V, :M, :C, :N, :E]
-const STATE1 = [:EE, :CN, :_, :C, :N, :E]
-const TRANS = [:ass, :gro, :mai, :mat, :rej, :tra, :fbk]
-const TRANS1 = [:cat, :rej, :los]
+const STATE = (:P, :V, :M, :C, :N, :E)
+const STATE1 = (:EE, :CN, :C, :N, :E)
+const TRANS = (:ass, :gro, :mai, :mat, :rej, :tra, :fbk)
+const TRANS1 = (:ctb, :rej, :los)
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
-# include("state.jl")
 include("types.jl")
+include("traits.jl")
 include("aliases.jl")
-include("environment.jl")
+# include("environment.jl")
 include("assimilation.jl")
 include("model.jl")
 include("functions.jl")

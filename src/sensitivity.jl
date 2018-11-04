@@ -1,5 +1,10 @@
-import Flatten
+import Flatten: flatten, reconstruct
 using ForwardDiff: Dual
+
+flatten(x::Unitful.Quantity) = (x.val,) 
+reconstruct(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
+retype(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
+update!(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
 
 dualize_records(o, du, u) = begin
     vars1 = dualize_vars(o.records[1].vars[1], zero(u[1]))
@@ -14,6 +19,7 @@ dualize_vars(vars, val) = begin
 end
 
 (o::Organism)(du::AbstractVector{<:Dual}, u::AbstractVector{<:Dual}, p::AbstractVector{<:Real}, t::Number) = begin
+    println("Dual/Real")
     u1 = u .* u"mol"
     o1 = reconstruct(o, p)
     du1 = du .* u"mol/hr"
