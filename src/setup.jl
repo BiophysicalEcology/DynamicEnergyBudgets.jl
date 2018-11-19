@@ -1,5 +1,5 @@
 
-Defaults.get_default(t::Type) = begin 
+FieldDefaults.get_default(t::Type) = begin 
     d = default(t) 
     u = units(t)
     add_units.(d, u)
@@ -74,10 +74,13 @@ define_organs(params::Tuple{}, records::Tuple{}, organism, t) = ()
 check_params(o::Organ) = begin 
     p = o.params; sh = o.shared
     p.y_P_V <= sh.n_N_P/sh.n_N_V || error("y_P_V too high for N conservation ", (p.y_P_V, sh.n_N_P, sh.n_N_V))
+    p.j_P_mai <= p.j_E_mai || error("j_P_mai must be lower than j_E_mai ", (p.j_P_mai, p.j_E_mai))
     p.y_V_E <= sh.n_N_V/sh.n_N_E || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (p.y_V_E, sh.n_N_V, sh.n_N_E ))
     2 <= p.y_E_CH_NO + p.y_E_EN || error("y_ECH_NO or y_E_EN too high for C conservation ", (p.y_E_CH_NO, p.y_E_EN))
-    2sh.n_N_E <= sh.n_N_EC * p.y_E_CH_NO + sh.n_N_EN * p.y_E_EN || error("y_ECH_NO or y_E_EN too high for N conservation ", 
-                                                                         (2sh.n_N_E, sh.n_N_EC, p.y_E_CH_NO, sh.n_N_EN, p.y_E_EN))
+    # 2sh.n_N_E <= sh.n_N_EC * p.y_E_CH_NO + sh.n_N_EN * p.y_E_EN || error("y_ECH_NO or y_E_EN too high for N conservation ", 
+                                                                         # (2sh.n_N_E, sh.n_N_EC, p.y_E_CH_NO, sh.n_N_EN, p.y_E_EN))
+    2sh.n_N_E <= p.y_E_CH_NO + p.y_E_EN || error("y_ECH_NO or y_E_EN too high for N conservation ", 
+                                                                         (sh.n_N_E, p.y_E_CH_NO, p.y_E_EN))
 
     # These will be required if structures can have different reserve N ratios
     # p.y_E_ET < n_N_E/n_N_E

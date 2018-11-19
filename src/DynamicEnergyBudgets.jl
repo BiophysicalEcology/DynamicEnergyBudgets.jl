@@ -18,14 +18,16 @@ using LinearAlgebra,
       Mixers,
       LabelledArrays,
       FieldMetadata,
-      Defaults,
+      FieldDefaults,
       # Microclimate,
       Photosynthesis,
       UnitlessFlatten
 
+using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, m, s, hr, d, mol, mmol, μmol, σ
 using Base: tail
+
 import UnitlessFlatten: flattenable
-import Defaults: get_default
+import FieldDefaults: get_default
 import FieldMetadata: @prior, @default, @description, @units, @limits, prior, default, description, units, limits
 
 export tempcorr,
@@ -84,9 +86,14 @@ export AbstractAssim,
        TempCorrLowerUpper,
        AbstractScaling,
        KooijmanArea,
+       AbstractMaturity,
        Maturity,
+       AbstractRejection,
+       AbstractTranslocation,
+       AbstractAllometry,
        CarbonVars,
        NitrogenVars,
+       AbstractParams,
        ParamsCNE,
        ParamsCN,
        SharedParams,
@@ -111,7 +118,6 @@ const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
 include("types.jl")
-include("traits.jl")
 include("aliases.jl")
 # include("environment.jl")
 include("assimilation.jl")

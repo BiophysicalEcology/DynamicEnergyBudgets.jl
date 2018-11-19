@@ -6,9 +6,17 @@ Run a DEB organism model.
 (o::Organism)(du, u, t::Number, organs) = begin
     check_params.(organs)
     ux = split_state(organs, u)
+    set_height!.(organs, ux)
     # apply_environment!(organs, ux, o.environment, t)
     debmodel!(organs, ux)
     sum_flux!(du, organs)
+end
+
+set_height!(o, u) = set_height!(o.params.allometry, o, u)
+set_height!(a::Nothing, o, u) = nothing
+set_height!(a, o, u) = begin
+    h = allometric_height(a, o, u)
+    set_var!(o.vars, :height, h)
 end
 
 """
@@ -46,7 +54,7 @@ Does not finalise flux in J - operates only on J1 (intermediate storage)
 """
 catabolism!(o, u) = catabolism!(o.params, o, u)
 catabolism!(p::ParamsCNE, o, u) = begin
-    _, v, sh, J, J1 = unpack(o); va = assimilation(v);
+    _, v, sh, J, J1 = unpack(o)
     turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* scale(v)
     reserve = (u.C, u.N, u.E)
     rel_reserve = reserve ./ u.V
@@ -63,7 +71,7 @@ catabolism!(p::ParamsCNE, o, u) = begin
     nothing
 end
 catabolism!(p::ParamsCN, o, u) = begin
-    _, v, sh, J, J1 = unpack(o); va = assimilation(v);
+    _, v, sh, J, J1 = unpack(o)
     turnover = (p.k_EC, p.k_EN) .* tempcorrection(v) .* scale(v)
     reserve = (u.C, u.N)
     rel_reserve = reserve ./ u.V
@@ -84,9 +92,10 @@ Allocates reserves to growth.
 growth!(o, u) = begin
     p, v, sh, J, J1 = unpack(o)
     J[:V,:gro] = growth = rate(v) * u.V
+    J[:P,:gro] = production = growth * p.y_P_V
     drain = (1/p.y_V_E) * growth 
-    loss = drain - growth
-    reserve_drain!(o, :gro, drain)
+    loss = drain - growth - production
+    reserve_drain!(o, Val(:gro), drain)
     reserve_loss!(o, loss)
     conversion_loss!(o, growth, sh.n_N_V)
 end
@@ -102,9 +111,9 @@ maturity!(f::Maturity, o, u) = begin
     J[:M,:gro] = maturity = f.κmat * J1[:E,:ctb]
     mat_mai = f.j_E_mat_mai * tempcorrection(v) * u.V # min(u[:V], f.M_Vmat))
     drain = maturity + mat_mai 
-    reserve_drain!(o, :mat, drain)
+    reserve_drain!(o, Val(:mat), drain)
     reserve_loss!(o, mat_mai)
-    conversion_loss!(o, maturity, sh.n_N_M)
+    conversion_loss!(o, maturity, f.n_N_M)
 end
 maturity!(f::Nothing, o, u) = nothing
 
@@ -115,10 +124,10 @@ maintenence!(o, u) = begin
     p, v, sh, J, J1 = unpack(o)
     # TODO this isn't balanced anywhere and is
     # larger than the total maintenance flux
-    # J[:P,:mai] = maint_prod = p.j_P_mai * tempcorrection(v) * u[:V]
     drain = p.j_E_mai * tempcorrection(v) * u.V
-    reserve_drain!(o, :mai, drain)
-    reserve_loss!(o, drain) # all maintenance is loss
+    J[:P,:mai] = maint_prod = p.j_P_mai * tempcorrection(v) * u.V
+    reserve_drain!(o, Val(:mai), drain)
+    reserve_loss!(o, drain - maint_prod) # all maintenance is loss
 end
 
 """
@@ -173,11 +182,12 @@ Translocation is occurs between adjacent organs.
 This function is identical both directiono, and ox represents
 whichever is not the current organs. Will not run with less than 2 organs.
 """
-translocate!(o1, o2, prop) = translocate!(o1.params, o1, o2, prop)
-translocate!(p, o1, o2, prop) = begin
+translocate!(o1, o2, prop) = translocate!(o1.params.translocation, o1, o2, prop)
+translocate!(p::Nothing, o1, o2, prop) = nothing
+translocate!(p::AbstractDissipativeTranslocation, o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[:E,:ctb]
-    reserve_drain!(o1, :tra, trans)
+    reserve_drain!(o1, Val(:tra), trans)
 
     # incoming translocation
     transx = κtra(o2) * o2.J1[:E,:ctb]
@@ -189,17 +199,29 @@ translocate!(p, o1, o2, prop) = begin
     nothing
 end
 
+translocate!(p::AbstractLosslessTranslocation, o1, o2, prop) = begin
+    # outgoing translocation
+    trans = κtra(o1) * o1.J1[:E,:ctb]
+    reserve_drain!(o1, Val(:tra), trans)
+
+    # incoming translocation
+    transx = κtra(o2) * o2.J1[:E,:ctb]
+    o1.J[:E,:tra] += transx
+
+    conversion_loss!(o2, transx, o2.shared.n_N_E)
+    nothing
+end
+
 """
 Reallocate state rejected from synthesizing units.
-
-TODO add a 1-organs method
-Also how does this interact with assimilation?
-"""
-reuse_rejected!(source, dest, prop) = begin
+TODO add a 1-organs method Also how does this interact with assimilation?  """
+reuse_rejected!(source, dest, prop) = reuse_rejected!(source.params.rejection, source, dest, prop)
+reuse_rejected!(rejected::Nothing, source, dest, prop) = nothing
+reuse_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
     p, v, sh, J, J1 = unpack(source);
 
-    transC = J1[:C,:rej] * (1 - p.κEC)
-    transN = J1[:N,:rej] * (1 - p.κEN)
+    transC = J1[:C,:rej] # * (1 - p.κEC)
+    transN = J1[:N,:rej] # * (1 - p.κEN)
     J[:C,:rej] = -transC 
     J[:N,:rej] = -transN
     dest.J[:C,:tra] = p.y_EC_ECT * transC
@@ -208,23 +230,34 @@ reuse_rejected!(source, dest, prop) = begin
     J1[:N,:los] += (transC * (1 - p.y_EC_ECT), transN * (1 - p.y_EN_ENT)) ⋅ (sh.n_N_EC, sh.n_N_EN)
     nothing
 end
+reuse_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
+    p, v, sh, J, J1 = unpack(source);
 
-"""
-Generalised reserve drain for any flux column *col* (ie gro)
-and any combination of reserves.
-"""
-reserve_drain!(o::Organ, col, drain) = reserve_drain!(o.params, o, col, drain)
-reserve_drain!(p::ParamsCNE, o, col, drain) = begin
-    θ = θE(o)
-    J_CN = -drain * (1 - θ) # fraction on drain from C and N reserves
-    o.J[:C,col] = J_CN/o.params.y_E_CH_NO
-    o.J[:N,col] = J_CN/o.params.y_E_EN
-    o.J[:E,col] = -drain * θ
+    transC = J1[:C,:rej] # * (1 - p.κEC)
+    transN = J1[:N,:rej] # * (1 - p.κEN)
+    J[:C,:rej] = -transC 
+    J[:N,:rej] = -transN
+    dest.J[:C,:tra] = transC
+    dest.J[:N,:tra] = transN
     nothing
 end
-reserve_drain!(p::ParamsCN, o, col, drain) = begin
-    o.J[:C,col] = -drain/o.params.y_E_CH_NO
-    o.J[:N,col] = -drain/o.params.y_E_EN
+
+"""
+Generalised reserve drain for any flux column *col* (ie :gro)
+and any combination of reserves.
+"""
+@inline reserve_drain!(o::Organ, col, drain) = reserve_drain!(o.params, o, col, drain)
+@inline reserve_drain!(p::ParamsCNE, o, col, drain) = begin
+    θ = θE(o)
+    J_CN = -drain * (1 - θ) # fraction on drain from C and N reserves
+    @inbounds o.J[:C,col] = J_CN/o.params.y_E_CH_NO
+    @inbounds o.J[:N,col] = J_CN/o.params.y_E_EN
+    @inbounds o.J[:E,col] = -drain * θ
+    nothing
+end
+@inline reserve_drain!(p::ParamsCN, o, col, drain) = begin
+    @inbounds o.J[:C,col] = -drain/o.params.y_E_CH_NO
+    @inbounds o.J[:N,col] = -drain/o.params.y_E_EN
     nothing
 end
 
@@ -233,7 +266,7 @@ Generalised reserve loss to track carbon.
 
 Loss is distributed between general and C and N reserves by the fraction θE
 """
-reserve_loss!(o, loss) = reserve_loss!(o.params, o, loss)
+reserve_loss!(o, loss) = nothing #reserve_loss!(o.params, o, loss)
 reserve_loss!(p::ParamsCNE, o, loss) = begin
     p, v, sh = unpack(o); θ = θE(o)
     ee = loss * θ # fraction of loss from E reserve
@@ -253,20 +286,20 @@ reserve_loss!(p::ParamsCN, o, loss) = begin
     nothing
 end
 
-conversion_loss!(o, loss, dest_n_N) = conversion_loss!(o.params, o, loss, dest_n_N)
+conversion_loss!(o, loss, dest_n_N) = nothing #conversion_loss!(o.params, o, loss, dest_n_N)
 conversion_loss!(p::ParamsCNE, o, loss, dest_n_N) = begin
     p, v, sh = unpack(o); θ = θE(o)
     ecn = loss * (1 - θ) # fraction on loss from C and N reserves
     ec = ecn/p.y_E_CH_NO
     en = ecn/p.y_E_EN
-    o.J1[:C,:los] += ec + en + loss * (θ - 1)
+    o.J1[:C,:los] += ec + loss * (θ - 1) # + en
     o.J1[:N,:los] += (ec, en, loss * (θ - dest_n_N/sh.n_N_E)) ⋅ (sh.n_N_EC, sh.n_N_EN, sh.n_N_E)
 end
 conversion_loss!(p::ParamsCN, o, loss, dest_n_N) = begin
     p, v, sh = unpack(o)
     ec = loss/p.y_E_CH_NO
     en = loss/p.y_E_EN
-    o.J1[:C,:los] += ec + en + loss
+    o.J1[:C,:los] += ec + loss # + en
     o.J1[:N,:los] += (ec, en) ⋅ (sh.n_N_EC, sh.n_N_EN)
 end
 
@@ -292,15 +325,17 @@ end
 """
 κtra is the difference paramsbetween κsoma and κmat
 """
-κtra(o) = (1.0 - κsoma(o) - κmat(o))
-
-κsoma(o::Organ) = κsoma(o.params, o) 
-κsoma(p, o) = p.κsoma
+κtra(o::Organ) = κtra(o.params)
+κtra(p) = κtra(p.translocation)
+κtra(translocation::AbstractTranslocation) = translocation.κtra
+κtra(o::Nothing) = 0.0
 
 κmat(o::Organ) = κmat(o.params)
 κmat(p) = κmat(p.maturity)
 κmat(maturity::Maturity) = maturity.κmat
 κmat(maturity::Nothing) = 0.0
+
+κsoma(o::Organ) = (1.0 - κtra(o) - κmat(o))
 
 """
 Calculate rate formula. TODO: use Roots.jl for this
@@ -333,9 +368,9 @@ feedback!(f::Autophagy, p::ParamsCNE, o, u) = begin
     nothing
 end
 feedback!(f::Autophagy, p::ParamsCN, o, u) = begin
-    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, o.vars.rate)
+    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
     aph = u.V * (oneunit(hs) - hs)
-    o.J[:C,:fbk] += aph
+    o.J[:C,:fbk] += aph # TODO divide this by y_CH_NO etc
     o.J[:N,:fbk] += aph
     o.J[:V,:fbk] -= aph
     nothing

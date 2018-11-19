@@ -1,10 +1,10 @@
-import Flatten: flatten, reconstruct
 using ForwardDiff: Dual
 
-flatten(x::Unitful.Quantity) = (x.val,) 
-reconstruct(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
-retype(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
-update!(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
+# import Flatten: flatten, reconstruct
+# flatten(x::Unitful.Quantity) = (x.val,) 
+# reconstruct(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
+# retype(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
+# update!(::T, data, n) where T <: Unitful.Quantity = (unit(T) * data[n],), n + 1
 
 dualize_records(o, du, u) = begin
     vars1 = dualize_vars(o.records[1].vars[1], zero(u[1]))
@@ -20,38 +20,38 @@ end
 
 (o::Organism)(du::AbstractVector{<:Dual}, u::AbstractVector{<:Dual}, p::AbstractVector{<:Real}, t::Number) = begin
     println("Dual/Real")
-    u1 = u .* u"mol"
+    u1 = u .* mol
     o1 = reconstruct(o, p)
-    du1 = du .* u"mol/hr"
+    du1 = du .* (mol/hr)
     rec = dualize_records(o, du1, u)
-    o1(du1, u1, t * u"hr", define_organs(o1.params, rec, o1, t))
+    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
     du .= ustrip.(du1)
 end
 (o::Organism)(du::AbstractVector{<:Dual}, u::AbstractVector{<:Dual}, p::AbstractVector{<:Dual}, t::Number) = begin
     println("Dual/Dual")
-    u1 = u .* u"mol"
+    u1 = u .* mol
     o1 = reconstruct(o, p)
-    du1 = [zero(p[1]) .* u"mol/hr" for d in du]
+    du1 = [zero(p[1]) .* (mol/hr) for d in du]
     rec = dualize_records(o, du1, u)
-    o1(du1, u1, t * u"hr", define_organs(o1.params, rec, o1, t))
+    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
     du .= ustrip.(du1)
 end
 (o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Dual}, t::Number) = begin
     println("Real/Dual")
-    u1 = u .* u"mol"
+    u1 = u .* mol
     o1 = reconstruct(o, p)
-    du1 = [zero(p[1]) .* u"mol/hr" for d in du]
+    du1 = [zero(p[1]) .* (mol/hr) for d in du]
     rec = dualize_records(o, du1, p)
-    o1(du1, u1, t * u"hr", define_organs(o1.params, rec, o1, t))
+    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
     ustrip.(du1)
 end
 (o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number) = begin
     println("Real/Real")
-    u1 = u .* u"mol"
+    u1 = u .* mol
     o1 = reconstruct(o, p)
-    du1 = du .* u"mol/hr"
+    du1 = du .* (mol/hr)
     rec = Records(o.params)
-    o1(du1, u1, t * u"hr", define_organs(o1.params, rec, o1, t))
+    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
     du2 = ustrip.(du1)
     if eltype(du2) == eltype(du)
         du .= du2
@@ -59,9 +59,9 @@ end
     du2
 end
 (o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::Nothing, t::Number) = begin 
-    t = t * u"hr"
-    du1 = du .* u"mol/hr"
-    u1 = u .* u"mol"
+    t = t * (hr)
+    du1 = du .* (mol/hr)
+    u1 = u .* (mol)
     o(du1, u1, t, define_organs(o, t))
     du .= ustrip.(du1)
 end

@@ -4,11 +4,11 @@ assimilation(v) = v.assimilation
 scale(v) = v.scale[v.t]
 rate(v) = v.rate[v.t]
 temp(v) = v.temp[v.t]
+θE(v::Vars) = v.θE[v.t]
+θE(o::Organ) = θE(o.vars) 
 tempcorrection(v) = v.tempcorrection[v.t]
 height(v) = v.height[v.t]
 set_var!(v, fname, val) = getfield(v, fname)[v.t] = val
-θE(v::Vars) = v.θE[v.t]
-θE(o::Organ) = θE(o.vars) 
 
 
 """
@@ -23,11 +23,11 @@ tempcorr(t, t1, a, l, al, h, ah) =
     exp(a/t1 - a/t) * (1.0 + exp(al/t1 - al/l) + exp(ah/h - ah/t1)) / 
     (1.0 + exp(al/t - al/l) + exp(ah/h - ah/t))
 tempcorr(t, tc::Nothing) = 1.0
-tempcorr(t, tc::TempCorr) = tempcorr(t |> u"K", tc.reftemp, tc.arrtemp)
+tempcorr(t, tc::TempCorr) = tempcorr(t |> K, tc.reftemp, tc.arrtemp)
 tempcorr(t, tc::TempCorrLower) = 
-    tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
+    tempcorr(t |> K, tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower)
 tempcorr(t, tc::TempCorrLowerUpper) = 
-    tempcorr(t |> u"K", tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)
+    tempcorr(t |> K, tc.reftemp, tc.arrtemp, tc.lowerbound, tc.arrlower, tc.upperbound, tc.arrupper)
 
 """
     rate_formula(r, ureserve::NTuple, turnover::NTuple, j_E_mai, y_V_E, κsoma)

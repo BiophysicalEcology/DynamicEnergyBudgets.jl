@@ -1,22 +1,22 @@
-const water_fraction_to_M = 1.0u"m^3*m^-3" * 1u"kg*L^-1" / 18.0u"g*mol^-1"
+const water_fraction_to_M = 1.0m^3*m^-3 * 1kg*L^-1 / 18.0g*mol^-1
 
 get_environment(t::Type{Val{:soiltemperature}}, env::M, interp, i) where M <: MicroclimateTable = 
-    layer_interp(interp, env.soil, i) * u"°C"
+    layer_interp(interp, env.soil, i) * °C
 get_environment(t::Type{Val{:soilwatercontent}}, env::M, interp, i) where M <: MicroclimateTable =
     layer_interp(interp, env.soilmoist, i)
 get_environment(t::Type{Val{:soilwaterpotential}}, env::M, interp, i) where M <: MicroclimateTable = 
-    layer_interp(interp, env.soilmoist, i) * u"Pa"
+    layer_interp(interp, env.soilmoist, i) * Pa
 get_environment(t::Type{Val{:relhumidity}}, env::M, interp, i) where M <: MicroclimateTable =
     layer_interp(interp, env.humid, i)
 
 get_environment(t::Type{Val{:airtemperature}}, env::M, interp, i) where M <: MicroclimateTable =
-    lin_interp(env.metout, Val{:TALOC}, i) * u"°C"
+    lin_interp(env.metout, Val{:TALOC}, i) * °C
 get_environment(t::Type{Val{:windspeed}}, env::M, interp, i) where M <: MicroclimateTable =
-    lin_interp(env.metout, Val{:VLOC}, i) * u"m*s^-1"
+    lin_interp(env.metout, Val{:VLOC}, i) * m*s^-1
 get_environment(t::Type{Val{:radiation}}, env::M, interp, i) where M <: MicroclimateTable =
-    lin_interp(env.metout, Val{:SOLR}, i) * u"W*m^-2"
+    lin_interp(env.metout, Val{:SOLR}, i) * W*m^-2
 get_environment(t::Type{Val{:par}}, env::M, interp, i) where M <: MicroclimateTable =
-    lin_interp(env.metout, Val{:SOLR}, i) * 4.57u"mol*m^-2*s^-1"
+    lin_interp(env.metout, Val{:SOLR}, i) * 4.57mol*m^-2*s^-1
 
 
 apply_environment!(organs::Tuple{O,Vararg}, ux::Tuple{U,Vararg}, env, t) where {U,O} = begin

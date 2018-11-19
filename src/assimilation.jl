@@ -21,7 +21,7 @@ assimilation!(f::AbstractCAssim, p::ParamsCNE, o, u) = begin
     o.J[:C,:ass], o.J[:N,:tra], o.J[:E,:ass] = stoich_merge(c_uptake, n_tra, p.y_E_CH_NO, p.y_E_EN)
 
     lc, ln = stoich_merge_losses(c_uptake, n_tra, o.J[:C,:ass], o.J[:N,:tra], o.J[:E,:ass], 
-                                 sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
+                                 1, 1, sh.n_N_E) 
     o.J1[:C,:los] += lc
     o.J1[:N,:los] += ln
 end
@@ -45,7 +45,7 @@ assimilation!(f::AbstractNH4_NO3Assim, p::ParamsCNE, o, u) = begin
     # Merge rejected C from shoot and uptaken N into reserves
     o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass] =
         stoich_merge(c_tra, J_N_ass, y_E_CH, 1/sh.n_N_E)
-    stoich_merge_losses(c_tra, J_N_ass, o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass], sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
+    stoich_merge_losses(c_tra, J_N_ass, o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass], 1, 1, sh.n_N_E) 
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     o.J[:N,:ass] = (J_NO_ass - θNO * sh.n_N_E * o.J[:E,:ass]) * 1/sh.n_N_EN
@@ -61,16 +61,10 @@ assimilation!(f::AbstractNAssim, p::ParamsCNE, o, u) = begin
     J_N_assim = uptake_nitrogen(f, o, u)
     c_tra = o.J[:C,:tra]
 
-    # This was not in the orignal model, but is needed to balance C. N reserve is part C
-    # but incoming N is just N. C was being generated from nowhere, 
-    # specifically in the N returned to N reserves by the synthesizing unit.
-    # TODO: could this end up with a negative C reserve overall?
-    o.J[:C,:ass] -= J_N_assim
-
     # Merge rejected C from shoot and uptaken N into reserves
     # treating N as N reserve now carbon has been incorporated.
     o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass] = stoich_merge(c_tra, J_N_assim, p.y_E_CH_NO, p.y_E_EN)
-    lc, ln = stoich_merge_losses(c_tra, J_N_assim, o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass], sh.n_N_EC, sh.n_N_EN, sh.n_N_E) 
+    lc, ln = stoich_merge_losses(c_tra, J_N_assim, o.J[:C,:tra], o.J[:N,:ass], o.J[:E,:ass], 1, 1, sh.n_N_E) 
     o.J1[:C,:los] += lc
     o.J1[:N,:los] += ln
 end
