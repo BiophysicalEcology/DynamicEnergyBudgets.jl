@@ -1,5 +1,5 @@
 """
-This is a generalised DEB model. It was developed for plant modelling, but can potentially 
+This is a generalised DEB model. It was developed for plant modelling, but can potentially
 model any organisms and symbioses.
 
 This model can also be run in microclimates provided by the NicheMapr R package, and
@@ -7,7 +7,7 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 [Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets 
+for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets
 using LinearAlgebra,
       Unitful,
       OrdinaryDiffEq,
@@ -19,7 +19,7 @@ using LinearAlgebra,
       LabelledArrays,
       FieldMetadata,
       FieldDefaults,
-      # Microclimate,
+      Microclimate,
       Photosynthesis,
       UnitlessFlatten
 
@@ -48,9 +48,9 @@ export integrate,
        debmodel!,
        apply_environment!
 
-export AbstractState, 
-       AbstractStateE, 
-       AbstractStateCN, 
+export AbstractState,
+       AbstractStateE,
+       AbstractStateCN,
        AbstractStateCNE,
        StateV,
        StateE,
@@ -76,8 +76,16 @@ export AbstractAssim,
        KooijmanPhotosynthesis,
        KooijmanSLAPhotosynthesis,
        KooijmanNH4_NO3Assim,
+       FvCBPhotosynthesis,
        ConstantCAssim,
        ConstantNAssim,
+       AbstractSU,
+       ParallelComplementarySU,
+       MinimumRuleSU,
+       KfamilySU,
+       AbstractRate,
+       SimpleRate,
+       FZeroRate,
        AbstractStateFeedback,
        Autophagy,
        AbstractTempCorr,
@@ -88,14 +96,22 @@ export AbstractAssim,
        KooijmanArea,
        AbstractMaturity,
        Maturity,
+       AbstractProduction,
+       Production,
        AbstractRejection,
+       LosslessRejection,
+       DissipativeRejection,
        AbstractTranslocation,
+       LosslessMultipleTranslocation,
+       DissipativeMultipleTranslocation,
+       LosslessTranslocation,
+       DissipativeTranslocation,
        AbstractAllometry,
+       SqrtAllometry,
        CarbonVars,
        NitrogenVars,
        AbstractParams,
-       ParamsCNE,
-       ParamsCN,
+       Params,
        SharedParams,
        Vars,
        Organ,
@@ -119,9 +135,10 @@ const BI_MAXITER = 100
 
 include("types.jl")
 include("aliases.jl")
-# include("environment.jl")
+include("environment.jl")
 include("assimilation.jl")
 include("model.jl")
+include("getters.jl")
 include("functions.jl")
 include("apply.jl")
 include("setup.jl")

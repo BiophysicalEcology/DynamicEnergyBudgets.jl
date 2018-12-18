@@ -1,18 +1,19 @@
 julia 0.7
 Unitful
 SimpleTraits
-Mixers
-Defaults
-Tags
 Unitful
 AxisArrays
 ForwardDiff
 StaticArrays
 DataFrames
-SimpleRoots
 OrdinaryDiffEq
-Microclimate
-Photosynthesis
 DocStringExtensions
 Distributions
-Flatten
+UnitlessFlatten 0.0.1
+Mixers 0.1.0
+FieldMetadata 0.0.1
+FieldDefaults
+SimpleRoots
+Microclimate
+Photosynthesis
+LabelledArrays

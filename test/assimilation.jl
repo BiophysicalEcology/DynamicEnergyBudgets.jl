@@ -1,8 +1,46 @@
-using DynamicEnergyBudgets: reuse_rejected!, translocate!, assimilation!, translocation!, sum_flux!,
-                            scaling, uptake_nitrogen, photosynthesis,
-                            P, V, M, C, N, E, ass, rej, los
+function nfactory()
+    o1 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8),
+               vars=Vars(assimilation=NitrogenVars()));;
+    p1 = o1.params
+    o2 = construct_organ(params=Params(y_EC_ECT=0.8, y_EN_ENT=0.8))
+    p2 = o2.params;
+    u1 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u2 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u1 = LVector{eltype(u1),typeof(u1),DynamicEnergyBudgets.STATE}(u1)
+    u2 = LVector{eltype(u2),typeof(u2),DynamicEnergyBudgets.STATE}(u2)
+    u2 .*= 2.7
+    du1 = fill(0.0u"mol*hr^-1", 6)
+    du2 = fill(0.0u"mol*hr^-1", 6)
+    du1 = LVector{eltype(du1),typeof(du1),DynamicEnergyBudgets.STATE}(du1)
+    du2 = LVector{eltype(du2),typeof(du2),DynamicEnergyBudgets.STATE}(du2)
+    set_var!(o1.vars, :scale, scaling(o1.params.scaling, u1[:V]))
+    set_var!(o2.vars, :scale, scaling(o2.params.scaling, u2[:V]))
+    f = NAssim();
 
-sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los]) * o1.shared.y_E_EN
+    o1, p1, u1, du1, o2, p2, u2, du2, f
+end
+
+function cfactory()
+    o1 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8),
+               vars=Vars(assimilation=CarbonVars()));;
+    p1 = o1.params;
+    o2 = construct_organ(params=Params(y_EC_ECT = 0.8, y_EN_ENT = 0.8));
+    p2 = o2.params;
+    u1 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u2 = [9.0,8.0,7.0,6.0,5.0,4.0]u"mol"
+    u1 = LVector{eltype(u1),typeof(u1),DynamicEnergyBudgets.STATE}(u1)
+    u2 = LVector{eltype(u2),typeof(u2),DynamicEnergyBudgets.STATE}(u2)
+    u2 .*= 1.9
+    du1 = fill(0.0u"mol*hr^-1", 6)
+    du2 = fill(0.0u"mol*hr^-1", 6)
+    du1 = LVector{eltype(du1),typeof(du1),DynamicEnergyBudgets.STATE}(du1)
+    du2 = LVector{eltype(du2),typeof(du2),DynamicEnergyBudgets.STATE}(du2)
+    set_var!(o1.vars, :scale, scaling(o1.params.scaling, u1[:V]))
+    set_var!(o2.vars, :scale, scaling(o2.params.scaling, u2[:V]))
+    f = KooijmanSLAPhotosynthesis();
+
+    o1, p1, u1, du1, o2, p2, u2, du2, f
+end
 
 @testset "N assimilation" begin
     global o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory();
@@ -40,7 +78,7 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
 
     @testset "N assimilation depends on structure linearly (ignoring scaling)" begin
         global a = uptake_nitrogen(f, o1, u1)
-        u1[V] *= 2
+        u1[:V] *= 2
         global b = uptake_nitrogen(f, o1, u1)
         # Lower scaling, less uptake
         @test 2a == b
@@ -53,62 +91,54 @@ sum_n_loss(o1, o2) = o1.J1[E,los] + o2.J1[E,los] + (o1.J1[N,los] + o2.J1[N,los])
         sum_flux!(du2, o2, 0)
         global c1 = sum(du1)
         global c2 = sum(du2)
-        # @test n1 == o1.J[N,ass]
+        # @test n1 == o1.J[:N,:ass]
         # @test n1 == uptake_nitrogen(f, o1, u1)
     end
 
     @testset "N assimilation flux is merged correctly" begin
 
-        # run without assimilation
-        global o1, p1, u1, du1a, o2, p2, u2, du2a, f = nfactory();
-        o1.J1[C,rej] = 2.3oneunit(o1.J1[1,1])
-        o2.J1[C,rej] = 2.1oneunit(o2.J1[1,1])
-        o1.J1[N,rej] = 1.9oneunit(o1.J1[1,1])
-        o2.J1[N,rej] = 22.3oneunit(o2.J1[1,1])
-
-        reuse_rejected!(o1, o2, 1.0)
-        reuse_rejected!(o2, o1, 1.0)
-        sum_flux!(du1a, o1, 0)
-        sum_flux!(du2a, o2, 0)
-        global c1a = sum(du1a)
-        global c2a = sum(du2a)
-
-        # run with assimilation
-        global o1, p1, u1, du1, o2, p2, u2, du2, f = nfactory()
-        o1.J1[C,rej] = 2.3oneunit(o1.J1[1,1])
-        o2.J1[C,rej] = 2.1oneunit(o2.J1[1,1])
-        o1.J1[N,rej] = 1.9oneunit(o1.J1[1,1])
-        o2.J1[N,rej] = 22.3oneunit(o2.J1[1,1])
-
-        reuse_rejected!(o1, o2, 1.0)
-        reuse_rejected!(o2, o1, 1.0)
-        uptake_n = uptake_nitrogen(f, o1, u1)
-        assimilation!(f, o1, u1)
-        sum_flux!(du1, o1, 0)
-        sum_flux!(du2, o2, 0)
-        global c1 = sum(du1)
-        global c2 = sum(du2)
-        
-        # compare
-        @testset "N assimilation should have lost C and moved some to general" begin
-            @test du1a[C] > du1[C] 
-            @test du2a[C] == du2[C]
+        set_rej!(o1, o2) = begin
+            c_trans = 1.9oneunit(o1.J1[:1,:1])
+            o1.J[:C,:tra] = o2.J[:C,:tra] = c_trans
+            o1.J[:C,:rej] = o2.J[:C,:rej] = -c_trans
         end
-        @testset "N assimilation should have added N" begin
-            @test du1a[N] < du1[N] 
-            @test du2a[N] == du2[N] 
-        end
-        @testset "N assimilation should have reduced total cmols" begin
-            @test_broken c1a > c1 
-            @test c2a == c2
-        end
+
+        global o1a, p1a, u1a, du1a, o2a, p2a, u2a, du2a, fa = nfactory();
+        set_rej!(o1a, o2a)
+        sum_flux!(du1a, o1a, 0); sum_flux!(du2a, o2a, 0)
+
+        global o1b, p1b, u1b, du1b, o2b, p2b, u2b, du2b, fa = nfactory();
+        set_rej!(o1b, o2b)
+        sum_flux!(du1b, o1b, 0); sum_flux!(du2b, o2b, 0)
+
+        @test o1a.J[:C,:tra] == o1b.J[:C,:tra]
+        @test du1a[:C] == du1b[:C]
+        @test du1a[:N] == du1b[:N]
+        @test du1a[:E] == du1b[:E]
+        @test sum(du2a) == sum(du2b)
+
+        global uptake_n = uptake_nitrogen(f, o1b, u1b)
+        assimilation!(f, o1b, u1b)
+        sum_flux!(du1b, o1b, 0); sum_flux!(du2b, o2b, 0)
+
+        @test du1a[:C] > du1b[:C] 
+        @test du1a[:N] < du1b[:N] 
+        @test du1a[:E] < du1b[:E] 
+
+        # Actual C and N calcs
+        global c1a, c2a, c1b, c2b = sum.((du1a, du2a, du1b, du2b))
+        global n1a, n2a, n1b, n2b = dot.((du1a, du2a, du1b, du2b), (n_ratios,))
+
+        global c_loss = o1b.J1[:C,:los] + o2b.J1[:C,:los]
+        global n_loss = o1b.J1[:N,:los] + o2b.J1[:N,:los]
+
+        @test c1a > c1b
+        @test n1a < n1b
 
         @testset "N assimilation should balance" begin
-            global c_loss = sum(o1.J1[:,los]) + sum(o2.J1[:,los])
-            global n_loss = sum_n_loss(o1, o2)
             @test -c_loss != zero(c_loss)
-            @test_broken c1 + c2 + (uptake_n / o1.shared.n_N_N) ≈ -c_loss
-            @test_broken upreferred(n1 + n2 * o1.shared.y_E_EN) + n_loss ≈ upreferred(uptake_n * o1.shared.y_E_EN)
+            @test c1b + c2b ≈ -c_loss
+            @test_broken upreferred(n1b + n2b) ≈ upreferred(uptake_n) - upreferred(n_loss) 
         end
     end
 end
@@ -172,7 +202,7 @@ end
 
     @testset "photosynthesis depends on structure linearly (ignoring scaling)" begin
         global a = photosynthesis(f, o1, u1)
-        u1[V] *= 2
+        u1[:V] *= 2
         global b = photosynthesis(f, o1, u1)
         # Lower scaling, less uptake
         @test 2a == b
@@ -185,57 +215,51 @@ end
         sum_flux!(du2, o1, 0)
         global c1 = sum(du1)
         global c2 = sum(du2)
-        @test c1 == o1.J[C,ass]
+        @test c1 == o1.J[:C,:ass]
         @test c1 == photosynthesis(f, o1, u1)
     end
 
     @testset "C assimilation flux is merged correctly" begin
 
         global o1a, p1a, u1a, du1a, o2a, p2a, u2a, du2a, fa = cfactory();
-        n_trans = 1.9oneunit(o1a.J1[1,1])
-        o1a.J[N,tra] = o2a.J[N,tra] = n_trans
-        o1a.J[N,rej] = o2a.J[N,rej] = -n_trans
+        global n_trans = 1.9oneunit(o1a.J1[:1,:1])
+        o1a.J[:N,:tra] = o2a.J[:N,:tra] = o1b.J[:N,:tra] = o2b.J[:N,:tra] = n_trans
+        o1a.J[:N,:rej] = o2a.J[:N,:rej] = o1b.J[:N,:rej] = o2b.J[:N,:rej] = -n_trans
         sum_flux!(du1a, o1a, 0); sum_flux!(du2a, o2a, 0)
 
         global o1b, p1b, u1b, du1b, o2b, p2b, u2b, du2b, fa = cfactory();
-        n_trans = 1.9oneunit(o1a.J1[1,1])
-        o1b.J[N,tra] = o2b.J[N,tra] = n_trans
-        o1b.J[N,rej] = o2b.J[N,rej] = -n_trans
         sum_flux!(du1b, o1b, 0); sum_flux!(du2b, o2b, 0)
 
-        @test du2a[C] == du2b[C]
-        @test du2a[N] == du2b[N]
-        @test du2a[E] == du2b[E]
+        @test du2a[:C] == du2b[:C]
+        @test du2a[:N] == du2b[:N]
+        @test du2a[:E] == du2b[:E]
 
         # assimilation only on o1b
         global uptake_c = photosynthesis(f, o1b, u1b)
         assimilation!(KooijmanSLAPhotosynthesis(), o1b, u1b)
-        # (o1b.J[C,ass], o1b.J[N,tra], o1b.J[E,ass], lossC, lossN) =
-            # stoich_merge(uptake_c, o1b.J[N,tra], o1b.shared.y_E_CH_NO, o1b.shared.y_E_EN)
-        # o1b.J1[C,los] += lossC 
-        # o1b.J[N,los] += lossN
+        upreferred(o1b.J1[:N,:los])
+        o1b.J
         sum_flux!(du1b, o1b, 0); sum_flux!(du2b, o2b, 0)
+        du1a
+        du1b
 
-        # compare
-        @testset "C assimilation should have added some C" begin
-            @test du1a[C] < du1b[C]
-        end
-        @testset "C assimilation should have moved some N to general" begin
-            @test du1a[N] > du1b[N]
-            @test du1a[E] < du1b[E]
-        end
+        @test du1a[:C] < du1b[:C]
+        @test du1a[:N] > du1b[:N]
+        @test du1a[:E] < du1b[:E]
 
-        global cmol1a, cmol2a, cmol1, cmol2 = sum(du1a), sum(du2a), sum(du1b), sum(du2b)
+        global c1a, c2a, c1b, c2b = sum.((du1a, du2a, du1b, du2b))
+        global n1a, n2a, n1b, n2b = dot.((du1a, du2a, du1b, du2b), (n_ratios,))
+        global c_loss = o1b.J1[:C,:los] + o2b.J1[:C,:los]
+        global n_loss = o1b.J1[:N,:los] + o2b.J1[:N,:los]
 
         @testset "C assimilation should have gained total cmols" begin
-            @test cmol1a < cmol1
-            @test cmol2a == cmol2
+            @test c1a < c1b
+            @test c2a == c2b
         end
 
         @testset "C assimilation should balance" begin
-            upreferred(uptake_c)
-            upreferred(cmol1 + cmol2)
-            @test_broken upreferred(cmol1 + cmol2) ≈ upreferred(uptake_c)
+            @test upreferred(c1b + c2b) ≈ upreferred(-c_loss + uptake_c)
+            @test upreferred(n1b + n2b) ≈ upreferred(-n_loss)
         end
 
     end

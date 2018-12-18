@@ -55,36 +55,49 @@ sum_flux!(du, organ::Organ, offset::Int) = begin
     end
     offset + size(J, 1)
 end
-
 " update vars and flux to record for time t "
-define_organs(o::Organism, t) = define_organs(o.params, o.records, o, t)
-define_organs(params::Tuple{P,Vararg}, records::Tuple{R,Vararg}, organism, t) where {P,R} = begin
+define_organs(o::Organism, t) = define_organs(o.params, o.shared, o.records, t)
+define_organs(params::Tuple{P,Vararg}, shared, records::Tuple{R,Vararg}, t) where {P,R} = begin
     rec = records[1]
-    t = length(rec.vars.rate) != 1 ? floor(Int, ustrip(t)) + 1 : 1
+    t = calc_t(rec.vars, t)
     rec.vars.t = t
     vJ = view(rec.J, :, :, t)
     vJ1 = view(rec.J1, :, :, t)
     J = LMatrix{eltype(vJ),typeof(vJ),STATE,TRANS}(vJ)
     J1 = LMatrix{eltype(vJ1),typeof(vJ1),STATE1,TRANS1}(vJ1)
-    organ = Organ(params[1], organism.shared, rec.vars, J, J1)
-    (organ, define_organs(tail(params), tail(records), organism, t)...)
-end
-define_organs(params::Tuple{}, records::Tuple{}, organism, t) = ()
 
+    organ = Organ(params[1], shared, rec.vars, J, J1)
+    (organ, define_organs(tail(params), shared, tail(records), t)...)
+end
+define_organs(params::Tuple{}, shared, records::Tuple{}, t) = ()
+
+calc_t(vars, t) = length(vars.rate) != 1 ? floor(Int, ustrip(t)) + 1 : 1
+
+update_t!(organs::Tuple, t) = begin
+    organs[1].vars.t = calc_t(organs[1].vars, t)
+    update_t!(tail(organs), t)
+end
+update_t!(organs::Tuple{}, t) = nothing
+
+
+check_params(o::Tuple) = apply(check_params, o)
 check_params(o::Organ) = begin 
-    p = o.params; sh = o.shared
-    p.y_P_V <= sh.n_N_P/sh.n_N_V || error("y_P_V too high for N conservation ", (p.y_P_V, sh.n_N_P, sh.n_N_V))
-    p.j_P_mai <= p.j_E_mai || error("j_P_mai must be lower than j_E_mai ", (p.j_P_mai, p.j_E_mai))
-    p.y_V_E <= sh.n_N_V/sh.n_N_E || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (p.y_V_E, sh.n_N_V, sh.n_N_E ))
-    2 <= p.y_E_CH_NO + p.y_E_EN || error("y_ECH_NO or y_E_EN too high for C conservation ", (p.y_E_CH_NO, p.y_E_EN))
-    # 2sh.n_N_E <= sh.n_N_EC * p.y_E_CH_NO + sh.n_N_EN * p.y_E_EN || error("y_ECH_NO or y_E_EN too high for N conservation ", 
-                                                                         # (2sh.n_N_E, sh.n_N_EC, p.y_E_CH_NO, sh.n_N_EN, p.y_E_EN))
-    2sh.n_N_E <= p.y_E_CH_NO + p.y_E_EN || error("y_ECH_NO or y_E_EN too high for N conservation ", 
-                                                                         (sh.n_N_E, p.y_E_CH_NO, p.y_E_EN))
+    y_V_E(o) <= n_N_V(o)/n_N_E(o) || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (y_V_E(o), n_N_V(o), n_N_E(o) ))
+    2 <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for C conservation ", (y_E_EC(o), y_E_EN(o)))
+    # 2n_N_E(o) <= n_N_EC(o) * y_E_EC(o) + n_N_EN(o) * y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for N conservation ", 
+    # (2n_N_E(o), n_N_EC(o), y_E_EC(o), n_N_EN(o), y_E_EN(o)))
+    2n_N_E(o) <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for N conservation ", 
+                                                   (n_N_E(o), y_E_EC(o), y_E_EN(o)))
+    check_params(production_pars(o), o::Organ)
 
     # These will be required if structures can have different reserve N ratios
-    # p.y_E_ET < n_N_E/n_N_E
-    # p.y_EC_ECT <n_N_C/n_N_C
-    # p.y_EN_ENT < n_N_N/n_N_N
+    # y_E_ET(o) < n_N_E/n_N_E
+    # y_EC_ECT(o) <n_N_C/n_N_C
+    # y_EN_ENT(o) < n_N_N/n_N_N
 end
 
+check_params(p::Nothing, o::Organ) = nothing 
+check_params(p::Production, o::Organ) = begin 
+    p.y_P_V <= n_N_P(o)/n_N_V(o) || error("y_P_V too high for N conservation ", (p.y_P_V, p.n_N_P, n_N_V(o)))
+    p.j_P_mai <= j_E_mai(o) || error("j_P_mai must be lower than j_E_mai ", (p.j_P_mai, j_E_mai(o)))
+end

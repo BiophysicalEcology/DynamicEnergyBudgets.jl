@@ -33,7 +33,9 @@ end
     o1 = reconstruct(o, p)
     du1 = [zero(p[1]) .* (mol/hr) for d in du]
     rec = dualize_records(o, du1, u)
-    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
+    define_organs(o1.params, rec, o1, t)
+    check_params.(o1.organs)
+    o1(du1, u1, t * (hr), )
     du .= ustrip.(du1)
 end
 (o::Organism)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Dual}, t::Number) = begin
