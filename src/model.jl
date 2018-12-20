@@ -1,5 +1,5 @@
 """
-Run a DEB organism model.
+Run a DEB organism model from DiffEq.
 """
 (o::Organism)(du, u, p::Nothing, t::Number) = begin
     update_t!(o.organs, t)
@@ -11,6 +11,7 @@ end
     o.dead[] && return
     ux = split_state(organs, u)
     apply(set_height!, organs, ux)
+    apply(set_shape!, organs, ux)
     apply_environment!(organs, ux, o.environment, t)
     if !debmodel!(organs, ux) 
         du .= zero(eltype(du)) 
@@ -18,13 +19,13 @@ end
         return
     end
     sum_flux!(du, organs)
-    return
+    nothing
 end
 
 """
 A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
 
-Applies metabolism, translocation and assimilation mehtods to N organs.
+Applies metabolism, translocation and assimilation methods to N organs.
 
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
@@ -42,7 +43,6 @@ different parameters or area and rate functions.
 """
 metabolism!(organs::Tuple, u) = apply(metabolism!, organs, u)
 metabolism!(o::Organ, u) = begin
-    set_scale!(o, u)
     catabolism!(o, u) || return false
     growth!(o, u)
     maturity!(o, u)
@@ -59,7 +59,7 @@ Does not finalise flux in J - operates only on J1 (intermediate storage)
 catabolism!(o, u) = catabolism!(turnover_pars(o), o, u)
 catabolism!(t::TurnoverCNE, o, u) = begin
     v, J, J1 = unpack(o)
-    turnover = (t.k_EC, t.k_EN, t.k_E) .* tempcorrection(v) .* scale(v)
+    turnover = (t.k_EC, t.k_EN, t.k_E) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N, u.E)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
@@ -77,7 +77,7 @@ catabolism!(t::TurnoverCNE, o, u) = begin
 end
 catabolism!(t::TurnoverCN, o, u) = begin
     v, J, J1 = unpack(o)
-    turnover = (t.k_EC, t.k_EN) .* tempcorrection(v) .* scale(v)
+    turnover = (t.k_EC, t.k_EN) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
@@ -353,26 +353,31 @@ set_height!(a, o, u) = begin
     set_var!(o, :height, h)
 end
 
-set_scale!(o, u) = set_var!(o, :scale, calc_scaling(scaling_pars(o), u.V))
+set_shape!(o, u) = set_var!(o, :shape, shape_correction(o, u))
 
-calc_scaling(f::KooijmanArea, uV) = begin
-    # uV <= zero(uV) && error("Mass is less than zero, I think its dead...")
-    (uV / f.M_Vref)^(-uV / f.M_Vscaling)
-end
-calc_scaling(f::Nothing, uV) = 1
+shape_correction(o::Organ, u) = shape_correction(shape_pars(o), u.V)
+
+shape_correction(f::Nothing, V) = 1
+shape_correction(f::Isomorph, V) = 1
+shape_correction(f::V0morph, V) = (V / f.Vd)^(-2//3)
+shape_correction(f::V1morph, V) = (V / f.Vd)^(1//3)
+shape_correction(f::V1V0morph, V) = (V / f.Vd)^(1//3 - (V/f.Vmax)^f.β)
+shape_correction(f::Plantmorph, V) = (V / f.M_Vref)^(-V / f.M_Vscaling)
 
 """
 Check if germination has happened. Independent for each organ,
 although this may not make sense. A curve could be better for this too.
 """
-is_germinated(o, u) = u.V > M_Vgerm(o)
+is_germinated(o, u) = is_germinated(germination_pars(o), o, u)
+is_germinated(g::Nothing, o, u) = true
+is_germinated(g::Germination, o, u) = u.V > g.M_Vgerm
 
 
 allometric_height(o, u) = allometric_height(allometry_pars(o), o, u)
 allometric_height(f::Nothing, o, u) = zero(height(o.vars))
 allometric_height(f::SqrtAllometry, o, u) = begin
-    dim = oneunit(u.V * w_V(o))
-    sqrt((u.P * w_P(o) + u.V * w_V(o)) / dim) * f.allometry
+    units = oneunit(u.V * w_V(o))
+    sqrt((u.V * w_V(o)) / units) * f.allometry
 end
 
 unpack(o::Organ) = o.vars, o.J, o.J1

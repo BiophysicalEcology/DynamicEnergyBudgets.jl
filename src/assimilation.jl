@@ -69,14 +69,14 @@ assimilation!(::HasCN, f::AbstractNAssim, o, u) = o.J[:N,:ass] = uptake_nitrogen
     photosynthesis(f::ConstantCAssim, o, u)
 Returns a constant rate of carbon assimilation.
 """
-photosynthesis(f::ConstantCAssim, o, u) = f.uptake * u[:V] * scale(o.vars)
+photosynthesis(f::ConstantCAssim, o, u) = f.uptake * u[:V] * shape(o.vars)
 
 """
     photosynthesis(f::FvCBPhotosynthesis, o, u)
 Returns carbon assimilated in mols per time.
 """
 photosynthesis(f::FvCBPhotosynthesis, o, u) =
-    assimilation_vars(o.vars).aleaf * f.SLA * w_V(o) * u[:V] * scale(o.vars)
+    assimilation_vars(o.vars).aleaf * f.SLA * w_V(o) * u[:V] * shape(o.vars)
 
 """
     photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
@@ -98,14 +98,14 @@ photosynthesis(f::KooijmanSLAPhotosynthesis, o, u) = begin
     j1_co = j1_c + j1_o
     co_l = j1_co/j1_l - j1_co/(j1_l + j1_co)
 
-    j_c_intake / (1 + bound_c + bound_o + co_l) * u[:V] * scale(v)
+    j_c_intake / (1 + bound_c + bound_o + co_l) * u[:V] * shape(v)
 end
 
 """
     uptake_nitrogen(f::ConstantNAssim, o, u)
 Returns constant nitrogen assimilation.
 """
-uptake_nitrogen(f::ConstantNAssim, o, u) = f.uptake * u[:V] * scale(o.vars)
+uptake_nitrogen(f::ConstantNAssim, o, u) = f.uptake * u[:V] * shape(o.vars)
 
 """
     uptake_nitrogen(f::KooijmanNH4_NO3Assim, o, u)
@@ -114,10 +114,10 @@ Returns total nitrogen, nitrate and ammonia assimilated in mols per time.
 function uptake_nitrogen(f::KooijmanNH4_NO3Assim, o, u)
     v = o.vars; va = assimilation(v)
 
-    K1_NH = half_saturation(f.K_NH, f.K_H * scale(v), va.X_H) # Ammonia saturation. va.X_H was multiplied by ox.scaling. But that makes no sense.
-    K1_NO = half_saturation(f.K_NO, f.K_H * scale(v), va.X_H) # Nitrate saturation
-    J1_NH_ass = u.V * scale(v) * half_saturation(f.j_NH_Amax, K1_NH, va.X_NH) # Arriving ammonia mols.mol⁻¹.s⁻¹
-    J_NO_ass = u.V * scale(v) * half_saturation(f.j_NO_Amax, K1_NO, va.X_NO) # Arriving nitrate mols.mol⁻¹.s⁻¹
+    K1_NH = half_saturation(f.K_NH, f.K_H * shape(v), va.X_H) # Ammonia saturation. va.X_H was multiplied by ox.scaling. But that makes no sense.
+    K1_NO = half_saturation(f.K_NO, f.K_H * shape(v), va.X_H) # Nitrate saturation
+    J1_NH_ass = u.V * shape(v) * half_saturation(f.j_NH_Amax, K1_NH, va.X_NH) # Arriving ammonia mols.mol⁻¹.s⁻¹
+    J_NO_ass = u.V * shape(v) * half_saturation(f.j_NO_Amax, K1_NO, va.X_NO) # Arriving nitrate mols.mol⁻¹.s⁻¹
 
     J_N_ass = J1_NH_ass + f.ρNO * J_NO_ass # Total arriving N flux
     return (J_N_ass, J_NO_ass, J1_NH_ass)
@@ -130,8 +130,8 @@ Returns nitrogen assimilated in mols per time.
 function uptake_nitrogen(f::NAssim, o, u)
     v = o.vars; va = assimilation_vars(v)
     # Ammonia proportion in soil water
-    K1_N = half_saturation(f.K_N, f.K_H * scale(v), va.X_H)
+    K1_N = half_saturation(f.K_N, f.K_H * shape(v), va.X_H)
     # Arriving ammonia in mol mol^-1 s^-1
-    u[:V] * scale(v) * half_saturation(f.j_N_Amax, K1_N, va.X_NO)
+    u[:V] * shape(v) * half_saturation(f.j_N_Amax, K1_N, va.X_NO)
 end
 

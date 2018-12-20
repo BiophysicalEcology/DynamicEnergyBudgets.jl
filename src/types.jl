@@ -21,6 +21,28 @@ struct MinimumRuleSU <: AbstractSU end
     k::K | 1.0 | _ | Gamma(2.0, 2.0) | [0.0, 10.0]  | "Synthesizing unit efficiency"
 end
 
+
+
+" Surface area scaling rules "
+abstract type AbstractShape end
+
+struct Isomorph <: AbstractShape end 
+@columns struct V0morph{Mo} <: AbstractShape
+    Vd::Mo  | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | "reference"
+end
+@columns struct V1morph{Mo} <: AbstractShape
+    Vd::Mo  | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | "reference"
+end
+@columns struct V1V0morph{Mo,B} <: AbstractShape
+    Vd::Mo    | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | "reference"
+    Vmax::Mo  | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | "reference"
+    β::B      | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 10.0] | "reference"
+end
+@columns struct Plantmorph{Mo} <: AbstractShape
+    M_Vref::Mo     | 4.0     | mol | Gamma(2.0, 0.2) | [0.4, 20.0]    | "Scaling reference"
+    M_Vscaling::Mo | 400.0   | mol | Gamma(2.0, 0.2) | [40.0, 2000.0] | "Scaling mass"
+end
+
 ############################################################################################
 # Assimilation Parameters
 
@@ -135,16 +157,6 @@ abstract type AbstractAllometry end
     allometry::M    | 0.1      | m    | Gamma(2.0, 0.2) | [0.0, 1.0]   | "Allometric height/depth scaling"
 end
 
-
-" Surface area scaling rules "
-abstract type AbstractScaling end
-
-" Surface areai scaling curve. Simulates growth and shade crowding later in life. "
-@columns struct KooijmanArea{Mo} <: AbstractScaling
-    M_Vref::Mo     | 4.0     | mol | Gamma(2.0, 0.2) | [0.4, 20.0]    | "Shoots scaling reference"
-    M_Vscaling::Mo | 400.0   | mol | Gamma(2.0, 0.2) | [40.0, 2000.0] | "Shoots scaling mass"
-end
-
 abstract type AbstractTranslocation end
 abstract type AbstractDissipativeTranslocation <: AbstractTranslocation end
 abstract type AbstractLosslessTranslocation <: AbstractTranslocation end
@@ -186,10 +198,11 @@ end
 
 abstract type AbstractProduction end
 
-@columns struct Production{MoMo,MoMoD} <: AbstractProduction
+@columns struct Production{MoMo,MoMoD,GMo} <: AbstractProduction
     y_P_V::MoMo        | 0.02            | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0]    | "Product formation linked to growth"
     j_P_mai::MoMoD     | 0.001           | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,0.1]    | "Product formation linked to maintenance"
     n_N_P::MoMo        | 0.1             | mol*mol^-1      | Gamma(2.0, 2.0) | [0.0, 1.0]   | "N/C in product (wood)"
+    w_P::GMo           | 25.0            | g*mol^-1        | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot product (wood)"
 end
 
 abstract type AbstractRejection end
@@ -241,7 +254,7 @@ abstract type AbstractParams end
     name::Symbol         | :organ
     rate_formula         | FZeroRate()
     assimilation_pars::A | ConstantCAssim()
-    scaling_pars::S      | KooijmanArea()
+    shape_pars::S        | Plantmorph()
     allometry_pars::Al   | nothing
     maturity_pars::Ma    | nothing
     trans_pars::Tr       | nothing
@@ -252,13 +265,14 @@ abstract type AbstractParams end
     turnover_pars::Tu    | TurnoverCN()
 end
 
-@columns struct Composition{MoMo,GMo}
+abstract type AbstractCore end
+
+@columns struct Core{MoMo,GMo} <: AbstractCore
     y_V_E::MoMo  | 0.7   | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0]    | "From reserve to structure"
     y_E_EC::MoMo | 1.0   | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 4.0]   | "From C-reserve to reserve, using nitrate"
     y_E_EN::MoMo | 1.0   | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 4.0]   | "From N-reserve to reserve"
     n_N_V::MoMo  | 0.15  | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 1.0]   | "N/C in structure"
     n_N_E::MoMo  | 0.2   | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 1.0]   | "N/C in reserve"
-    w_P::GMo     | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot product (wood)"
     w_V::GMo     | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot structure"
     # w_C::GMo   | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot C-reserve"
     # w_N::GMo   | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [10.0, 40.0] | "Mol-weight of shoot N-reserve"
@@ -268,11 +282,12 @@ end
 
 " Model parameters shared between organs "
 @default_kw struct SharedParams{SU,Co,FB,TC}
-    su_pars::SU          | ParallelComplementarySU()
-    composition_pars::Co | Composition()
-    feedback_pars::FB    | nothing
-    tempcorr_pars::TC    | nothing
+    su_pars::SU       | ParallelComplementarySU()
+    core_pars::Co     | Core()
+    feedback_pars::FB | nothing
+    tempcorr_pars::TC | nothing
 end
+
 
 
 ###########################################################################################
@@ -299,7 +314,7 @@ end
 " Model variables "
 @units @default_kw mutable struct Vars{V,F,MoMoD,C,M}
     assimilation_vars::V | nothing | _
-    scale::F             | [0.0]   | _
+    shape::F             | [0.0]   | _
     rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1
     θE::F                | [0.0]   | _
     temp::C              | [25.0]  | °C
