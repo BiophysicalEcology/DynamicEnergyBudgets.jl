@@ -1,46 +1,51 @@
-using DynamicEnergyBudgets
-using Unitful
-using DynamicEnergyBudgets: catabolic_flux
+using DynamicEnergyBudgets, Unitful, Test
+using DynamicEnergyBudgets: non_growth_flux
 
-@testset "Math" begin
-    @test half_saturation(10.0, 5.0, 5.0) ≈ 5.0
+@testset "Half saturation curve" begin
+    mx = 10.0
+    half = 5.0
+    x = 5.0
+    @test half_saturation(mx, half, x) == 5.0
 
-    @test synthesizing_unit(2.0, 2.0) ≈ 1.333333333333333333
-    @test synthesizing_unit(Inf, 2.0) == 2.0
-    @test synthesizing_unit(0.0, 2.0) == 0.0
+    # Maximum
+    x = 100000000000000000000000000.0
+    @test half_saturation(mx, half, x) == 10.0
 
-    global (a, b, c) = stoich_merge(1.0, 1.0, 2.0, 2.0)
-    @test a ≈ 0.3333333333333333333
-    @test b ≈ 0.3333333333333333333
-    @test c ≈ 1.3333333333333333333
-    @test sum((a, b, c)) ≈ 1.0 + 1.0
+    # Minimum
+    x = 0.0
+    @test half_saturation(mx, half, x) == 0.0
+end
 
-    global (a, b, c) = catabolic_flux.((0.1,0.2,0.3), (0.2,0.3,0.4), 0.1)
+@testset "Flux" begin
+    (a, b, c) = non_growth_flux.((0.1,0.2,0.3), (0.2,0.3,0.4), 0.1)
     @test a ≈ 0.01
     @test b ≈ 0.04
     @test c ≈ 0.09
 end
 
 @testset "Rate" begin
-    global j_E_mai    = 0.003
-    global y_E_CH_NO  = 1.0/1.5
-    global y_E_EN     = 1.0/0.7
-    global y_V_E      = 0.7
-    global kap_soma   = 0.6
-    global r          = 0.001
-    global mass       = (1.0, 1.0, 1.0)
-    global A_turnover = ((0.2, 0.2, 0.2) .* 0.05)
-    global rf         = rate_formula(r, mass, A_turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
+    j_E_mai    = 0.003
+    y_E_CH_NO  = 1.0/1.5
+    y_E_EN     = 1.0/0.7
+    y_V_E      = 0.7
+    kap_soma   = 0.6
+    r          = 0.001
+    reserve    = (1.0, 1.0, 1.0)
+    turnover   = ((0.2, 0.2, 0.2) .* 0.05)
+    su = ParallelComplementarySU()
+
+    # rate_formula(r, su, rel_reserve::NTuple{3}, turnover::NTuple{3}, j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
+    rf = rate_formula(r, su, reserve, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
 
     @test rf == 0.002874195250659631
 
     @testset "test rate with units" begin
-        global j_E_mai   = 0.003u"mol/mol*d^-1"
-        global A_turnover = ((0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1") .* 0.05)
-        global mass = (1.0u"mol/mol", 1.0u"mol/mol", 1.0u"mol/mol")
-        global r = 0.001u"mol/mol*d^-1"
-        @test_nowarn catabolic_flux.(mass, A_turnover, r)
-        global rf = rate_formula(r, mass, A_turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
+        j_E_mai   = 0.003u"mol/mol*d^-1"
+        turnover = ((0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1") .* 0.05)
+        mass = (1.0u"mol/mol", 1.0u"mol/mol", 1.0u"mol/mol")
+        r = 0.001u"mol/mol*d^-1"
+        @test_nowarn non_growth_flux.(mass, turnover, r)
+        rf = rate_formula(r, su, reserve, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
         @test rf == 0.002874195250659631u"mol/mol*d^-1"
     end
 

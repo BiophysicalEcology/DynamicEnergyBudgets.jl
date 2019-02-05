@@ -7,7 +7,7 @@ using Revise,
 
 using DynamicEnergyBudgets: reuse_rejected!, translocate!, maintenence!, growth!, sum_flux!,
                             reserve_drain!, reserve_loss!, maturity!, metabolism!, catabolism!,
-                            assimilation!, translocation!, scaling, set_scaling!,
+                            assimilation!, translocation!, shape, set_var!,
                             uptake_nitrogen, photosynthesis, STATELEN,
                             define_organs, default, units, set_var!, rate, unpack, tempcorrection, θE
 

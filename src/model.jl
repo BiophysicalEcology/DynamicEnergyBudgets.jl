@@ -1,23 +1,30 @@
 """
 Run a DEB organism model from DiffEq.
 """
-(o::Organism)(du, u, p::Nothing, t::Number) = begin
-    update_t!(o.organs, t)
-    o(du, u, t, o.organs)
-end
+(organism::Plant)(du, u, t::Number, organs) = begin
+    dead(organism) && return
 
-(o::Organism)(du, u, t::Number, organs) = begin
+    # Make sure the parameters don't any physical laws
     check_params(organs)
-    o.dead[] && return
+
+    # Split state into separate organs
     ux = split_state(organs, u)
-    apply(set_height!, organs, ux)
-    apply(set_shape!, organs, ux)
-    apply_environment!(organs, ux, o.environment, t)
-    if !debmodel!(organs, ux) 
+
+    # Set up variables for this timestep and the current state
+    apply(update_tstep!, organs, t)
+    apply(zero_flux!, organs)
+    apply(update_height!, organs, ux)
+    apply(update_shape!, organs, ux)
+    apply_environment!(organism, organs, ux, t)
+
+    # Run the model, tag the organism as dead if it breaks.
+    if !debmodel!(organs, ux, environment(organism)) 
         du .= zero(eltype(du)) 
-        o.dead[] = true
+        set_dead!(organism, true)
         return
     end
+
+    # Sum the flux matrix to the state change vector
     sum_flux!(du, organs)
     nothing
 end
@@ -30,7 +37,8 @@ Applies metabolism, translocation and assimilation methods to N organs.
 settings is a struct with required model data, DEBSettings or similar.
 t is the timestep
 """
-debmodel!(organs::Tuple, u::Tuple) = begin
+debmodel!(organs::Tuple, u::Tuple, env) = begin
+    # Quit if it dies 
     false in metabolism!(organs, u) && return false
     translocation!(organs)
     assimilation!(organs, u)
@@ -42,7 +50,8 @@ Metabolism is an identical process for all organs, with potentially
 different parameters or area and rate functions.
 """
 metabolism!(organs::Tuple, u) = apply(metabolism!, organs, u)
-metabolism!(o::Organ, u) = begin
+metabolism!(o::AbstractOrgan, u) = begin
+    # Quit if it dies 
     catabolism!(o, u) || return false
     growth!(o, u)
     maturity!(o, u)
@@ -54,12 +63,12 @@ end
 """
     catabolism!(o, u, t::Number)
 Catabolism for E, C and N, or C, N and E reserves.
-Does not finalise flux in J - operates only on J1 (intermediate storage)
+Does not alter flux in J - operates only on J1 (intermediate storage)
 """
-catabolism!(o, u) = catabolism!(turnover_pars(o), o, u)
-catabolism!(t::TurnoverCNE, o, u) = begin
-    v, J, J1 = unpack(o)
-    turnover = (t.k_EC, t.k_EN, t.k_E) .* tempcorrection(v) .* shape(v)
+catabolism!(o, u) = catabolism!(catabolism_pars(o), o, u)
+catabolism!(p::CatabolismCNE, o, u) = begin
+    v, J, J1 = vars(o), flux(o), flux1(o)
+    turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N, u.E)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
@@ -69,15 +78,15 @@ catabolism!(t::TurnoverCNE, o, u) = begin
     r < zero(r) && return false
 
     J1[:C,:ctb], J1[:N,:ctb], J1[:EE,:ctb] = non_growth_flux.(reserve, turnover, r)
-    J1[:C,:rej], J1[:N,:rej], J1[:CN,:ctb] = stoich_merge(o, J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
+    J1[:C,:rej], J1[:N,:rej], J1[:CN,:ctb] = stoich_merge(su_pars(o), J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
 
     J1[:E,:ctb] = J1[:EE,:ctb] + J1[:CN,:ctb] # Total catabolic flux
     set_var!(o, :θE, J1[:EE,:ctb]/J1[:E,:ctb]) # Proportion of general reserve flux in total catabolic flux
     true
 end
-catabolism!(t::TurnoverCN, o, u) = begin
-    v, J, J1 = unpack(o)
-    turnover = (t.k_EC, t.k_EN) .* tempcorrection(v) .* shape(v)
+catabolism!(p::CatabolismCN, o, u) = begin
+    v, J, J1 = vars(o), flux(o), flux1(o)
+    turnover = (p.k_EC, p.k_EN) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
@@ -87,7 +96,7 @@ catabolism!(t::TurnoverCN, o, u) = begin
     r < zero(r) && return false
 
     J1[:C,:ctb], J1[:N,:ctb] = non_growth_flux.(reserve, turnover, r)
-    J1[:C,:rej], J1[:N,:rej], J1[:E,:ctb] = stoich_merge(o, J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
+    J1[:C,:rej], J1[:N,:rej], J1[:E,:ctb] = stoich_merge(su_pars(o), J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
     true
 end
 
@@ -95,8 +104,8 @@ end
 Allocates reserves to growth.
 """
 growth!(o, u) = begin
-    drain = rate(o.vars) * u.V
-    o.J[:V,:gro] = growth = y_V_E(o) * drain
+    flux(o)[:V,:gro] = growth = rate(o) * u.V
+    drain = (1/y_V_E(o)) * growth 
     product = growth_production!(o, growth)
     reserve_drain!(o, Val(:gro), drain)
     # loss = drain - growth - product
@@ -105,22 +114,22 @@ growth!(o, u) = begin
 end
 
 growth_production!(o, growth) = growth_production!(production_pars(o), o, growth)
-growth_production!(p::Production, o, growth) = o.J[:P,:gro] = growth * p.y_P_V
+growth_production!(p::Production, o, growth) = flux(o)[:P,:gro] = growth * p.y_P_V
 growth_production!(p, o, growth) = zero(growth)
 
 """
 Allocates reserve drain due to maintenance.
 """
 maintenence!(o, u) = begin
-    drain = j_E_mai(o) * tempcorrection(o.vars) * u.V
+    drain = j_E_mai(o) * tempcorrection(o) * u.V
     maint_prod = maintenance_production!(o, u)
     reserve_drain!(o, Val(:mai), drain)
     # reserve_loss!(o, drain - maint_prod) # all maintenance is loss
 end
 
 maintenance_production!(o, u) = maintenance_production!(production_pars(o), o, u)
-maintenance_production!(p::Production, o, u) = o.J[:P,:mai] = p.j_P_mai * tempcorrection(o.vars) * u.V
-maintenance_production!(p, o, u) = zero(eltype(o.J))
+maintenance_production!(p::Production, o, u) = flux(o)[:P,:mai] = p.j_P_mai * tempcorrection(o) * u.V
+maintenance_production!(p, o, u) = zero(eltype(flux(o)))
 
 """
     maturity!(f, o, u)
@@ -129,7 +138,7 @@ Stores in M state variable if it exists.
 """
 maturity!(o, u) = maturity!(maturity_pars(o), o, u)
 maturity!(f::Maturity, o, u) = begin
-    o.J[:M,:gro] = mat = f.κmat * o.J1[:E,:ctb]
+    flux(o)[:M,:gro] = mat = f.κmat * flux1(o)[:E,:ctb]
     mat_mai = f.j_E_mat_mai * tempcorrection(v) * u.V # min(u[:V], f.M_Vmat))
     drain = mat + mat_mai
     reserve_drain!(o, Val(:mat), drain)
@@ -139,6 +148,17 @@ end
 maturity!(f::Nothing, o, u) = nothing
 
 """
+    assimilation!(o, u)
+Runs assimilation methods, depending on formulation and state.
+"""
+assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
+assimilation!(o::AbstractOrgan, u) = begin
+    is_germinated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
+    nothing
+end
+assimilation!(::Nothing, x, o::AbstractOrgan, u, env) = nothing
+
+"""
 Translocation occurs between adjacent organs.
 This function is identical both directiono, so on represents
 whichever is not the current organs.
@@ -146,8 +166,8 @@ whichever is not the current organs.
 Will not run with less than 2 organs.
 """
 translocation!(organs::Tuple{Organ, Organ}) = begin
-    reuse_rejected!(organs[1], organs[2], 1.0)
-    reuse_rejected!(organs[2], organs[1], 1.0)
+    translocate_rejected!(organs[1], organs[2], 1.0)
+    translocate_rejected!(organs[2], organs[1], 1.0)
     translocate!(organs[1], organs[2], 1.0)
     translocate!(organs[2], organs[1], 1.0)
 end
@@ -155,95 +175,33 @@ translocation!(organs::Tuple) = translocation!(organs...)
 translocation!(organs::Tuple{}) = nothing
 translocation!(organs::Tuple{Organ}) = nothing
 
-# Recurse through all organs. A loop would not be type-stable.
-# translocation!(organs::Tuple, destorgans::Tuple) = begin
-#     props = buildprops(organs[1])
-#     translocation!(organs[1], destorgans, organs[1].params.translocation.destnames, props)
-#     translocation!(tail(organs), destorgans)
-# end
-# translocation!(organs::Tuple{}, destorgans::Tuple) = nothing
-# translocation!(organ::Organ, destorgans::Tuple, destnames::Symbol, props) =
-#     translocation!(organ, destorgans, (destnames,), props)
-# # Translocate to organs with names in the destnames list
-# translocation!(organ::Organ, destorgans::Tuple, destnames, props) = begin
-#     for i = 1:length(destnames)
-#         if destorgans[1].params.name == destnames[i]
-#             reuse_rejected!(organ, destorgans[1], props[i])
-#             translocate!(organ, destorgans[1], props[i])
-#             break
-#         end
-#     end
-#     translocation!(organ, tail(destorgans), destnames, props)
-# end
-# translocation!(organ::Organ, destorgans::Tuple{}, destnames, props) = nothing
-
-# Add the last remainder proportion (so that its not a model parameter)
-# buildprops(o::Organ) = buildprops(o.params.translocation.proportions)
-# buildprops(x::Nothing) = (1.0)
-# buildprops(x::Number) = (x, 1 - x)
-# buildprops(xs::Tuple) = (xs..., 1 - sum(xs))
-
-"""
-Versions for E, CN and CNE reserves.
-
-Translocation is occurs between adjacent organs.
-This function is identical both directiono, and ox represents
-whichever is not the current organs. Will not run with less than 2 organs.
-"""
-translocate!(o1, o2, prop) = translocate!(trans_pars(o1), o1, o2, prop)
-translocate!(p::Nothing, o1, o2, prop) = nothing
-translocate!(p::AbstractDissipativeTranslocation, o1, o2, prop) = begin
-    # outgoing translocation
-    trans = κtra(o1) * o1.J1[:E,:ctb]
-    reserve_drain!(o1, Val(:tra), trans)
-
-    # incoming translocation
-    transx = κtra(o2) * o2.J1[:E,:ctb]
-    o1.J[:E,:tra] += transx * y_E_ET(o2)
-
-    # loss = transx * (1 - y_E_ET(o2))
-    # reserve_loss!(o2, loss)
-    # conversion_loss!(o2, transx * y_E_ET(o2), n_N_E(o2))
-    nothing
-end
-
-translocate!(p::AbstractLosslessTranslocation, o1, o2, prop) = begin
-    # outgoing translocation
-    trans = κtra(o1) * o1.J1[:E,:ctb]
-    reserve_drain!(o1, Val(:tra), trans)
-
-    # incoming translocation
-    transx = κtra(o2) * o2.J1[:E,:ctb]
-    o1.J[:E,:tra] += transx
-
-    # conversion_loss!(o2, transx, n_N_E(o2))
-    nothing
-end
 
 """
 Reallocate state rejected from synthesizing units.
-TODO add a 1-organs method Also how does this interact with assimilation?  """
-reuse_rejected!(source, dest, prop) = reuse_rejected!(rejection_pars(source), source, dest, prop)
-reuse_rejected!(rejected::Nothing, source, dest, prop) = nothing
-reuse_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
-    v, J, J1 = unpack(o)
-    transC = J1[:C,:rej] # * (1 - κEC(o))
-    transN = J1[:N,:rej] # * (1 - κEN(o))
-    J[:C,:rej] = -transC
-    J[:N,:rej] = -transN
-    dest.J[:C,:tra] = y_EC_ECT(o) * transC
-    dest.J[:N,:tra] = y_EN_ENT(o) * transN
-    J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
-    J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
+TODO: add a 1-organs method. How does this interact with assimilation?  
+"""
+translocate_rejected!(source, dest, prop) = translocate_rejected!(rejection_pars(source), source, dest, prop)
+translocate_rejected!(rejected::Nothing, source, dest, prop) = nothing
+translocate_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
+    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
+    transC = J1s[:C,:rej] # * (1 - κEC(o))
+    transN = J1s[:N,:rej] # * (1 - κEN(o))
+    Js[:C,:rej] = -transC
+    Js[:N,:rej] = -transN
+    Jd[:C,:tra] = y_EC_ECT(o) * transC
+    Jd[:N,:tra] = y_EN_ENT(o) * transN
+    # J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
+    # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
     nothing
 end
-reuse_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
-    transC = source.J1[:C,:rej] # * (1 - κEC(o))
-    transN = source.J1[:N,:rej] # * (1 - κEN(o))
-    source.J[:C,:rej] = -transC
-    source.J[:N,:rej] = -transN
-    dest.J[:C,:tra] = transC
-    dest.J[:N,:tra] = transN
+translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
+    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
+    transC = J1s[:C,:rej] # * (1 - κEC(o))
+    transN = J1s[:N,:rej] # * (1 - κEN(o))
+    Js[:C,:rej] = -transC
+    Js[:N,:rej] = -transN
+    Jd[:C,:tra] = transC
+    Jd[:N,:tra] = transN
     nothing
 end
 
@@ -251,118 +209,23 @@ end
 Generalised reserve drain for any flux column *col* (ie :gro)
 and any combination of reserves.
 """
-@inline reserve_drain!(o::Organ, col, drain) = reserve_drain!(has_reserves(o), o, col, drain)
+@inline reserve_drain!(o::AbstractOrgan, col, drain) = reserve_drain!(has_reserves(o), o, col, drain)
 @inline reserve_drain!(::HasCNE, o, col, drain) = begin
-    θ = θE(o)
+    ΘE, J = θE(o), flux(o)
     J_CN = -drain * (1 - θ) # fraction on drain from C and N reserves
-    @inbounds o.J[:C,col] = J_CN/y_E_EC(o)
-    @inbounds o.J[:N,col] = J_CN/y_E_EN(o)
-    @inbounds o.J[:E,col] = -drain * θ
+    @inbounds J[:C,col] = J_CN/y_E_EC(o)
+    @inbounds J[:N,col] = J_CN/y_E_EN(o)
+    @inbounds J[:E,col] = -drain * ΘE 
     nothing
 end
 @inline reserve_drain!(::HasCN, o, col, drain) = begin
-    @inbounds o.J[:C,col] = -drain/y_E_EC(o)
-    @inbounds o.J[:N,col] = -drain/y_E_EN(o)
+    J = flux(o)
+    @inbounds J[:C,col] = -drain/y_E_EC(o)
+    @inbounds J[:N,col] = -drain/y_E_EN(o)
     nothing
 end
 
-"""
-Generalised reserve loss to track carbon.
-
-Loss is distributed between general and C and N reserves by the fraction θE
-"""
-@inline reserve_loss!(o, loss) = nothing #reserve_loss!(o.params, o, loss)
-@inline reserve_loss!(::HasCNE, o, loss) = begin
-    ee = loss * θ # fraction of loss from E reserve
-    ecn = loss - ee # fraction on loss from C and N reserves
-    ec = ecn/y_E_EC(o)
-    en = ecn/y_E_EN(o)
-    o.J1[:C,:los] += ec + en + ee
-    o.J1[:N,:los] += (ec, en, ee) ⋅ (n_N_EC(o), n_N_EN(o), n_N_E(o))
-    nothing
-end
-@inline reserve_loss!(::HasCN, o, loss) = begin
-    ec = loss/y_E_EC(o)
-    en = loss/y_E_EN(o)
-    o.J1[:C,:los] += ec + en
-    o.J1[:N,:los] += (ec, en) ⋅ (n_N_EC(o), n_N_EN(o))
-    nothing
-end
-
-@inline conversion_loss!(o, loss, dest_n_N) = nothing #conversion_loss!(o.params, o, loss, dest_n_N)
-@inline conversion_loss!(::HasCNE, o, loss, dest_n_N) = begin
-    ecn = loss * (1 - θE(o)) # fraction on loss from C and N reserves
-    ec = ecn/y_E_EC(o)
-    en = ecn/y_E_EN(o)
-    o.J1[:C,:los] += ec + loss * (θE(o) - 1) # + en
-    o.J1[:N,:los] += (ec, en, loss * (θ - dest_n_N/n_N_E(o))) ⋅ (n_N_EC(o), n_N_EN(o), n_N_E(o))
-end
-@inline conversion_loss!(::HasCN, o, loss, dest_n_N) = begin
-    ec = loss/y_E_EC(o)
-    en = loss/y_E_EN(o)
-    o.J1[:C,:los] += ec + loss # + en
-    o.J1[:N,:los] += (ec, en) ⋅ (n_N_EC(o), n_N_EN(o))
-end
-
-"""
-    stoich_merge(Ja, Jb, ya, yb)
-Merge fluxes stoichiometrically into general reserve Eab based on yeild
-fractions ya and yb. An unmixed proportion is returned as unmixed reserves Ea and Eb.
-Losses are also calculated.
-"""
-stoich_merge(o, Ja, Jb, ya, yb) = begin
-    JEab = synthesizing_unit(su_pars(o), Ja * ya, Jb * yb)
-    Ja1 = Ja - JEab/ya
-    Jb1 = Jb - JEab/yb
-    (Ja1, Jb1, JEab)
-end
-
-stoich_merge_losses(Jc1, Jn1, Jc2, Jn2, JEcn, n_c, n_n, n_Ecn) = begin
-    lossa = Jc1 - Jc2 + Jn1 - Jn2 - JEcn
-    lossb = (Jc1 - Jc2, Jn1 - Jn2, -JEcn) ⋅ (n_c, n_n, n_Ecn)
-    lossa, lossb
-end
-
-"""
-Function to apply feedback on growth the process, such as autopagy in resource shortage.
-"""
-feedback!(o, u) = feedback!(feedback_pars(o), has_reserves(o), o, u)
-feedback!(f::Nothing, x, o, u) = nothing
-feedback!(f::Autophagy, ::HasCNE, o, u) = begin
-    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
-    aph = u.V * (oneunit(hs) - hs)
-    # TODO this should be a lossy process
-    o.J[:E,:fbk] += aph
-    o.J[:V,:fbk] -= aph
-    nothing
-end
-feedback!(f::Autophagy, ::HasCN, o, u) = begin
-    hs = half_saturation(oneunit(f.K_autophagy), f.K_autophagy, rate(o.vars))
-    aph = u.V * (oneunit(hs) - hs)
-    o.J[:C,:fbk] += aph
-    o.J[:N,:fbk] += aph * n_N_V(o)
-    o.J[:V,:fbk] -= aph
-    nothing
-end
-
-
-set_height!(o, u) = set_height!(allometry_pars(o), o, u)
-set_height!(a::Nothing, o, u) = nothing
-set_height!(a, o, u) = begin
-    h = allometric_height(a, o, u)
-    set_var!(o, :height, h)
-end
-
-set_shape!(o, u) = set_var!(o, :shape, shape_correction(o, u))
-
-shape_correction(o::Organ, u) = shape_correction(shape_pars(o), u.V)
-
-shape_correction(f::Nothing, V) = 1
-shape_correction(f::Isomorph, V) = 1
-shape_correction(f::V0morph, V) = (V / f.Vd)^(-2//3)
-shape_correction(f::V1morph, V) = (V / f.Vd)^(1//3)
-shape_correction(f::V1V0morph, V) = (V / f.Vd)^(1//3 - (V/f.Vmax)^f.β)
-shape_correction(f::Plantmorph, V) = (V / f.M_Vref)^(-V / f.M_Vscaling)
+update_shape!(o, u) = set_shape!(o, shape_correction(shape_pars(o), u.V))
 
 """
 Check if germination has happened. Independent for each organ,
@@ -373,14 +236,14 @@ is_germinated(g::Nothing, o, u) = true
 is_germinated(g::Germination, o, u) = u.V > g.M_Vgerm
 
 
-allometric_height(o, u) = allometric_height(allometry_pars(o), o, u)
-allometric_height(f::Nothing, o, u) = zero(height(o.vars))
+update_height!(o, u) = update_height!(allometry_pars(o), o, u)
+update_height!(a::Nothing, o, u) = nothing
+update_height!(a, o, u) = set_height!(o, allometric_height(a, o, u))
+
 allometric_height(f::SqrtAllometry, o, u) = begin
     units = oneunit(u.V * w_V(o))
     sqrt((u.V * w_V(o)) / units) * f.allometry
 end
-
-unpack(o::Organ) = o.vars, o.J, o.J1
 
 # J: Flux matrix diagram.
 # Rows: state.

@@ -7,28 +7,31 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 [Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ module DynamicEnergyBudgets
-using LinearAlgebra,
-      Unitful,
+for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ 
+module DynamicEnergyBudgets
+
+using Unitful,
       OrdinaryDiffEq,
-      ForwardDiff,
       DocStringExtensions,
+      MacroTools,
       Distributions,
+      LabelledArrays,
       SimpleRoots,
       Mixers,
-      LabelledArrays,
       FieldMetadata,
       FieldDefaults,
-      Microclimate,
       Photosynthesis,
-      UnitlessFlatten
+      Microclimate,
+      Flatten
 
-using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, m, s, hr, d, mol, mmol, μmol, σ
+using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ
 using Base: tail
 
-import UnitlessFlatten: flattenable
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @description, @units, @limits, prior, default, description, units, limits
+import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, 
+                      prior, default, description, units, limits, logscaled, flattenable
+import Photosynthesis: potential_dependence                      
+
 
 export tempcorr,
        rate_bracket,
@@ -39,7 +42,6 @@ export tempcorr,
        synthesizing_unit
 
 export integrate,
-       Tspan,
        get_state1_names,
        init_state,
        describe,
@@ -48,87 +50,39 @@ export integrate,
        debmodel!,
        apply_environment!
 
-export AbstractState,
-       AbstractStateE,
-       AbstractStateCN,
-       AbstractStateCNE,
-       StateV,
-       StateE,
-       StatePV,
-       StateVE,
-       StateCN,
-       StatePVE,
-       StateVCN,
-       StateVME,
-       StateCNE,
-       StatePVME,
-       StatePVCN,
-       StatePVMCN,
-       StatePVCNE,
-       StatePVMCNE
-
 export AbstractAssim,
-       AbstractCAssim,
-       AbstractNAssim,
-       NH4_NO3Assim,
-       NAssim,
-       C3Photosynthesis,
-       KooijmanPhotosynthesis,
-       KooijmanSLAPhotosynthesis,
-       KooijmanNH4_NO3Assim,
-       FvCBPhotosynthesis,
-       ConstantCAssim,
-       ConstantNAssim,
-       AbstractSU,
-       ParallelComplementarySU,
-       MinimumRuleSU,
-       KfamilySU,
-       AbstractRate,
-       SimpleRate,
-       FZeroRate,
-       AbstractStateFeedback,
-       Autophagy,
-       AbstractTempCorr,
-       TempCorr,
-       TempCorrLower,
-       TempCorrLowerUpper,
-       AbstractScaling,
-       KooijmanArea,
-       AbstractMaturity,
-       Maturity,
-       AbstractProduction,
-       Production,
-       AbstractShape,
-       Isomorph,
-       V0morph,
-       V1morph,
-       V1V0morph,
-       Plantmorph,
-       AbstractRejection,
-       LosslessRejection,
-       DissipativeRejection,
-       AbstractTranslocation,
-       LosslessMultipleTranslocation,
-       DissipativeMultipleTranslocation,
-       LosslessTranslocation,
-       DissipativeTranslocation,
-       AbstractAllometry,
-       SqrtAllometry,
-       CarbonVars,
-       NitrogenVars,
-       AbstractParams,
-       Params,
-       SharedParams,
-       Vars,
-       Organ,
-       Organism,
-       Records
+       AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
+       AbstractCAssim, C3Photosynthesis,
+       KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
+       KooijmanNH4_NO3Assim, FvCBPhotosynthesis, ConstantCAssim,
+       AbstractSU, ParallelComplementarySU, MinimumRuleSU, KfamilySU,
+       AbstractRate, SimpleRate, FZeroRate,
+       AbstractStateFeedback, LosslessAutophagy, DissipativeAutophagy,
+       AbstractTempCorr, TempCorr, TempCorrLower, TempCorrLowerUpper,
+       AbstractScaling, KooijmanArea,
+       AbstractMaturity, Maturity,
+       AbstractProduction, Production,
+       AbstractShape, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph,
+       AbstractRejection, LosslessRejection, DissipativeRejection,
+       AbstractCatabolism, CatabolismE, CatabolismCN, CatabolismCNE,
+       AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultipleTranslocation,
+       LosslessTranslocation, DissipativeTranslocation,
+       AbstractAllometry, SqrtAllometry,
+       AbstractParams, Params, SharedParams,
+       Vars, CarbonVars, NitrogenVars,
+       Records,
+       AbstractOrgan, Organ,
+       AbstractOrganism, Plant
 
+# Auto docstrings
 @template TYPES =
     """
     $(TYPEDEF)
     $(DOCSTRING)
     """
+
+# Field metadata columns
+@chain columns @description @logscaled @limits @prior @units @default_kw
 
 const STATELEN = 6
 
@@ -139,15 +93,22 @@ const TRANS1 = (:ctb, :rej, :los)
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
-include("types.jl")
-include("aliases.jl")
-include("environment.jl")
+include("traits.jl")
+include("synthesizing_units.jl")
+include("temperature_correction.jl")
+include("rate.jl")
+include("shape.jl")
+include("allometry.jl")
+include("autophagy.jl")
 include("assimilation.jl")
+include("types.jl")
+include("environment.jl")
+include("translocation.jl")
 include("model.jl")
 include("getters.jl")
 include("functions.jl")
-include("apply.jl")
 include("setup.jl")
-include("sensitivity.jl")
+include("apply.jl")
+include("aliases.jl")
 
 end # module

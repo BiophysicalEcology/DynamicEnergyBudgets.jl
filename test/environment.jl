@@ -1,26 +1,25 @@
 import DynamicEnergyBudgets: get_environment, temp
 
-DynamicEnergyBudgets.get_environment(::Type{Val{:soiltemperature}}, env, h, i) = 15.4u"°C"
-DynamicEnergyBudgets.get_environment(::Type{Val{:soilwatercontent}}, env, h, i) = 0.7
-DynamicEnergyBudgets.get_environment(::Type{Val{:soilwaterpotential}}, env, h, i) = 100.0u"Pa"
-DynamicEnergyBudgets.get_environment(::Type{Val{:airtemperature}}, env, h, i) = 23.7u"°C"
-DynamicEnergyBudgets.get_environment(::Type{Val{:windspeed}}, env, h, i) = 3.7u"m*s^-1"
-DynamicEnergyBudgets.get_environment(::Type{Val{:relhumidity}}, env, h, i) = 0.74
-DynamicEnergyBudgets.get_environment(::Type{Val{:radiation}}, env, h, i) = 985.0u"W*m^-2"
-DynamicEnergyBudgets.get_environment(::Type{Val{:par}}, env, h, i) = 3130.0u"mol*m^-2*s^-1"
+soiltemperature = [15.4u"°C"]
+soilwatercontent = [0.7]
+soilwaterpotential = [100.0u"Pa"]
+airtemperature = [23.7u"°C"]
+windspeed = [3.7u"m*s^-1"]
+relhumidity = [0.74]
+radiation = [985.0u"W*m^-2"]
+par = [3130.0u"mol*m^-2*s^-1"]
+
+environment = Env(soiltemperature, soilwatercontent, soilwaterpotential, 
+                  airtemperature, windspeed, relhumidity, radiation, par)
 
 u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
 
-@testset "get environment" begin
-    @test get_environment(Val{:par}, :not_nothing, 1, 1) == 3130.0u"mol*m^-2*s^-1"
-end
-
 
 @testset "apply environment to deb vars" begin
-    global o = DynamicEnergyBudgets.Plant();
-    global o1, o2 = define_organs(o, 1);
+    global o = DynamicEnergyBudgets.Plant(environment=environment)
+    global o1, o2 = define_organs(o, 1)
     global v1 = o1.vars; v2 = o2.vars
-    global va1 = v1.assimilation; 
+    global va1 = v1.assimilation 
     global va2 = v2.assimilation
 
     apply(apply_environment!, (o1, o2), u, :not_nothing, 1)
@@ -32,8 +31,8 @@ end
 end
 
 @testset "apply environment to deb vars" begin
-    global o = DynamicEnergyBudgets.FvCBPlant();
-    global o1, o2 = define_organs(o, 1);
+    global o = DynamicEnergyBudgets.FvCBPlant(environment=environment)
+    global o1, o2 = define_organs(o, 1)
     global v = o1.vars; 
     global va = v.assimilation;
     apply_environment!(o1, u, :no_env, 1)
@@ -46,12 +45,6 @@ end
     @test va.par == 3130.0u"mol*m^-2*s^-1"
     @test va.soilmoist == 0.7
     @test va.swp == 100.0u"Pa"
-end
-
-@testset "temperature correction" begin
-    global o = Organism()
-    # @test tempcorr(80.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
-    # @test tempcorr(-60.0u"°C", o.shared.tempcorr) ≈ 0.0 atol=1e-10
 end
 
 nothing
