@@ -15,7 +15,7 @@ add_units(x::AbstractArray, u::Unitful.Units) = x .* u
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
     v = view(u, offset+1:offset+STATELEN)
-    lv = LVector{eltype(v),typeof(v),STATE}(v)
+    lv = LArray{STATE}(v)
     (lv, split_state(tail(o), u, offset + STATELEN)...)
 end
 split_state(o::Tuple{}, u::AbstractArray, offset) = ()

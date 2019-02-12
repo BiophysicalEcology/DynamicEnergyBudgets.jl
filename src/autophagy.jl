@@ -2,14 +2,14 @@
 abstract type AbstractStateFeedback end
 
 @mix @columns struct KAutophagy{Mo}
-    K_autophagy::Mo | 0.000001 | mol  | Beta(2.0, 2.0)  | [0.0000001, 0.0001] | _ | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
+    K_autophagy::Mo | 0.000001 | mol  | Beta(2.0, 2.0)  | [0.0000001, 0.0001] | true | "Half saturation metabolic rate for reincorporation of tissues. Necessary to not break the laws of thermodynamics!"
 end
 " Autophagy. Parameters for self reabsorbtion when metabolic rates fall "
 @KAutophagy struct LosslessAutophagy{Mo} <: AbstractStateFeedback end
 
 @KAutophagy struct DissipativeAutophagy{Mo,MoMo} <: AbstractStateFeedback
-    r_EC_V::MoMo    | 0.2      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Recovery of C from structure"
-    r_EN_V::MoMo    | 0.6      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Recovery of N from structure"
+    r_EC_V::MoMo    | 0.0      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Recovery of C from structure"
+    r_EN_V::MoMo    | 0.5      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Recovery of N from structure"
 end
 
 """

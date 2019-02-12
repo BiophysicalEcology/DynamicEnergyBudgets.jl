@@ -19,7 +19,7 @@ abstract type AbstractNAssim <: AbstractAssim end
 abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
-    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0) | [0.0, 1.0] | _ | "constant rate of C uptake"
+    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0) | [0.0, 10.0] | _ | "constant rate of C uptake"
 end
 
 @columns struct ConstantNAssim{μMoMS} <: AbstractNAssim
@@ -28,7 +28,7 @@ end
 
 @mix @columns struct SLA{MG}
     # Field | Default | Unit     | Prior         | Limits       | Description
-    SLA::MG | 9.10    | m^2*g^-1 | Gamma(10.0, 1.0) | [5.0, 30.0] | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
+    SLA::MG | 24.0    | m^2*kg^-1 | Gamma(10.0, 1.0) | [5.0, 30.0] | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
@@ -119,9 +119,8 @@ assimilation!(p::HasCNE, f::AbstractCAssim, o, u) = begin
     # J1[:C,:los] += lc
     # J1[:N,:los] += ln
 end
-assimilation!(::HasCN, f::AbstractCAssim, o, u) = flux(o)[:C,:ass] = begin
-    println(shape(o))
-    photosynthesis(f, o, u) * u.V * shape(o)
+assimilation!(::HasCN, f::AbstractCAssim, o, u) = begin
+    flux(o)[:C,:ass] = photosynthesis(f, o, u) * u.V * shape(o)
 end
 
 """
@@ -137,11 +136,11 @@ assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
     y_E_EC = θNH * f.y_E_CH_NH + θNO * shared(o).y_E_EC  # Yield coefficient from C-reserve to reserve
 
-    c_tra = J[:C,:tra]
+    C_tra = J[:C,:tra]
 
     # Merge rejected C from shoot and uptaken N into reserves
-    J[:C,:tra], J[:N,:ass], J[:E,:ass] = stoich_merge(c_tra, J_N_ass, y_E_EC, 1/n_N_E(o))
-    stoich_merge_losses(c_tra, J_N_ass, J[:C,:tra], J[:N,:ass], J[:E,:ass], 1, 1, n_N_E(o)) 
+    J[:C,:tra], J[:N,:ass], J[:E,:ass] = stoich_merge(C_tra, J_N_ass, y_E_EC, 1/n_N_E(o))
+    # stoich_merge_losses(c_tra, J_N_ass, J[:C,:tra], J[:N,:ass], J[:E,:ass], 1, 1, n_N_E(o)) 
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     J[:N,:ass] = (J_NO_ass - θNO * n_N_E(o) * J[:E,:ass]) * 1/n_N_EN(o)
@@ -163,7 +162,12 @@ assimilation!(::HasCNE, f::AbstractNAssim, o, u) = begin
     # J1[:C,:los] += lc
     # J1[:N,:los] += ln
 end
-assimilation!(::HasCN, f::AbstractNAssim, o, u) = flux(o)[:N,:ass] = nitrogen_uptake(f, o, u) * u.V * shape(vars(o))
+assimilation!(::HasCN, f::AbstractNAssim, o, u) = begin
+    J = flux(o)
+    max_N = nitrogen_uptake(f, o, u) * u.V * shape(vars(o))
+    unused_C, unused_N, J[:N,:ass] = stoich_merge(su_pars(o), J[:C,:tra], max_N, 1.0, 1.0)
+    J[:C,:ass] = unused_C - J[:C,:tra]
+end
 
 """
     photosynthesis(f::ConstantCAssim, o, u)
@@ -197,14 +201,14 @@ photosynthesis(f::KooijmanSLAPhotosynthesis, o, u) = begin
     j1_co = j1_c + j1_o
     co_l = j1_co/j1_l - j1_co/(j1_l + j1_co)
 
-    j_c_intake / (1 + bound_c + bound_o + co_l)
+    j_c_intake / (1 + bound_c + bound_o + co_l) * tempcorrection(o)
 end
 
 photosynthesis(f::KooijmanWaterPotentialPhotosynthesis, o, u) = begin
     v = vars(o); va = assimilation_vars(v)
     mass_area_coef = w_V(o) * f.SLA
 
-    j1_l = half_saturation(f.j_L_Amax, f.J_L_K, va.J_L_F) * mass_area_coef
+    j1_l = half_saturation(f.j_L_Amax, f.J_L_K, va.J_L_F) * mass_area_coef / 2
 
     # Modify CO2 and O2 intake by water availability
     potential_mod = potential_dependence(f.potential_modifier, assimilation_vars(o).soilwaterpotential)
@@ -222,7 +226,7 @@ photosynthesis(f::KooijmanWaterPotentialPhotosynthesis, o, u) = begin
     j1_co = j1_c + j1_o
     co_l = j1_co/j1_l - j1_co/(j1_l + j1_co)
 
-    j_c_intake / (1 + bound_c + bound_o + co_l)
+    j_c_intake / (1 + bound_c + bound_o + co_l) * tempcorrection(o)
 end
 
 
@@ -237,7 +241,7 @@ end
     nitrogen_uptake(f::ConstantNAssim, o, u)
 Returns constant nitrogen assimilation.
 """
-nitrogen_uptake(f::ConstantNAssim, o, u) = f.uptake
+nitrogen_uptake(f::ConstantNAssim, o, u) = f.uptake * tempcorrection(o)
 
 """
     nitrogen_uptake(f::KooijmanNH4_NO3Assim, o, u)
@@ -264,6 +268,6 @@ function nitrogen_uptake(f::NAssim, o, u)
     # Ammonia proportion in soil water
     K1_N = half_saturation(f.K_N, f.K_H, va.X_H)
     # Arriving ammonia in mol mol^-1 s^-1
-    half_saturation(f.j_N_Amax, K1_N, va.X_NO)
+    half_saturation(f.j_N_Amax, K1_N, va.X_NO) * tempcorrection(o)
 end
 

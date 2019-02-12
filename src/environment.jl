@@ -7,11 +7,13 @@ apply_environment!(plant, env, organs, u, t) = begin
     envpos = ustrip(calc_envtime(plant, t))
     shoot, root = organs
     # Get the climate at a particular height and time
-    shoot_env = MicroclimInstant(env, height(shoot), envpos)
-    root_env = MicroclimInstant(env, height(root), envpos)
+    # Use half the height for the median temperature/windspeed/humidity etc.
+    # relating temperature to the distribution of biomass may be more accurate.
+    shootenv = MicroclimInstant(env, height(root)/2, envpos)
+    rootenv = MicroclimInstant(env, depth(root)/2, envpos)
     # Update any environment dependent variables
-    apply_environment!(assimilation_pars(shoot), shoot, u, shoot_env, root_env)
-    apply_environment!(assimilation_pars(root), root, u, root_env, shoot_env)
+    apply_environment!(assimilation_pars(shoot), shoot, u, shootenv, rootenv)
+    apply_environment!(assimilation_pars(root), root, u, rootenv, shootenv)
     nothing
 end
 
@@ -36,15 +38,14 @@ apply_environment!(a::FvCBPhotosynthesis, o, u, shootenv, rootenv) = begin
 end
 
 apply_environment!(a::AbstractCAssim, o, u, shootenv, rootenv) = begin
-    temp = airtemperature(shootenv)
-    update_temp!(o, temp)
+    update_temp!(o, airtemperature(shootenv))
     assimilation_vars(o).J_L_F = radiation(shootenv) * 4.57mol*W^-1*s^-1
-    assimilation_vars(o).soilwaterpotential = mean_soilwaterpotential(rootenv)
+    # Use the mean soil water potential between zero and the full root depth 
+    assimilation_vars(o).soilwaterpotential = mean_soilwaterpotential(rootenv.microclimate, depth(o), rootenv.t)
 end
 
 apply_environment!(a::AbstractNAssim, o, u, rootenv, shootenv) = begin
-    temp = soiltemperature(rootenv)
-    update_temp!(o, temp)
+    update_temp!(o, soiltemperature(rootenv))
     # va.X_H = interp_layer(inc_interp, env.soilwatercontent, i)
 end
 

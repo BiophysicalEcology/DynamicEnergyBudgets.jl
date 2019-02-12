@@ -68,7 +68,7 @@ Does not alter flux in J - operates only on J1 (intermediate storage)
 catabolism!(o, u) = catabolism!(catabolism_pars(o), o, u)
 catabolism!(p::CatabolismCNE, o, u) = begin
     v, J, J1 = vars(o), flux(o), flux1(o)
-    turnover = (p.k_EC, p.k_EN, p.k_E) .* tempcorrection(v) .* shape(v)
+    turnover = (k_EC(p), k_EN(p), k_E(p)) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N, u.E)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
@@ -86,7 +86,7 @@ catabolism!(p::CatabolismCNE, o, u) = begin
 end
 catabolism!(p::CatabolismCN, o, u) = begin
     v, J, J1 = vars(o), flux(o), flux1(o)
-    turnover = (p.k_EC, p.k_EN) .* tempcorrection(v) .* shape(v)
+    turnover = (k_EC(p), k_EN(p)) .* tempcorrection(v) .* shape(v)
     reserve = (u.C, u.N)
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
