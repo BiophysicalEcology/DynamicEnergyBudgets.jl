@@ -18,8 +18,8 @@ end
 end
 
 @columns struct Plantmorph{Mo} <: AbstractShape
-    M_Vref::Mo     | 4.0     | mol | Gamma(2.0, 0.2) | [0.4, 20.0]    | _ | "Scaling reference"
-    M_Vscaling::Mo | 400.0   | mol | Gamma(2.0, 0.2) | [40.0, 2000.0] | _ | "Scaling mass"
+    M_Vref::Mo     | 0.1  | mol | Gamma(2.0, 0.2) | [0.001, 20.0]  | true | "Scaling reference"
+    M_Vscaling::Mo | 1.0 | mol | Gamma(2.0, 0.2)  | [0.01, 2000.0] | true | "Scaling mass"
 end
 
 shape_correction(f::Nothing, V) = 1
