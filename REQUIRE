@@ -9,9 +9,9 @@ DataFrames
 OrdinaryDiffEq
 DocStringExtensions
 Distributions
-UnitlessFlatten 0.0.1
-Mixers 0.1.0
-FieldMetadata 0.0.1
+Flatten
+Mixers
+FieldMetadata
 FieldDefaults
 SimpleRoots
 Microclimate
