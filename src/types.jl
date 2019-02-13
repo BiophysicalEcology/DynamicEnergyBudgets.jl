@@ -169,8 +169,8 @@ define_organs(params::Tuple{P,Vararg}, shared, records::Tuple{R,Vararg}, t) wher
     rec.vars.t[1] = t
     vJ = view(rec.J, :, :, t)
     vJ1 = view(rec.J1, :, :, t)
-    J = LSlicedMatrix{STATE,TRANS}(vJ)
-    J1 = LSlicedMatrix{STATE1,TRANS1}(vJ1)
+    J = LArray{Tuple{STATE,TRANS}}(vJ)
+    J1 = LArray{Tuple{STATE1,TRANS1}}(vJ1)
 
     organ = Organ(params[1], shared, rec.vars, J, J1)
     (organ, define_organs(tail(params), shared, tail(records), t)...)
