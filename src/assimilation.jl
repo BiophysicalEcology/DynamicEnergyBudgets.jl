@@ -102,6 +102,17 @@ end
     X_H::MoL                   | 10.0  | mol*L^-1 | _
 end
 
+"""
+    assimilation!(o, u)
+Runs assimilation methods, depending on formulation and state.
+"""
+assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
+assimilation!(o, u) = begin
+    is_germinated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
+    nothing
+end
+assimilation!(::Nothing, x, o, u, env) = nothing
+
 
 """
     assimilation!(f::AbstractAassim, o, u)

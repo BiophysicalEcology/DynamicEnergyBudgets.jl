@@ -21,6 +21,17 @@ end
 @Trans @MultiTrans struct LosslessMultipleTranslocation{} <: AbstractLosslessTranslocation end
 @Trans struct LosslessTranslocation{} <: AbstractLosslessTranslocation end
 
+
+abstract type AbstractRejection end
+
+@columns struct DissipativeRejection{MoMo} <: AbstractRejection
+    y_EC_ECT::MoMo       | 1.0             | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Translocated C-reserve"
+    y_EN_ENT::MoMo       | 1.0             | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Translocated N-reserve"
+end
+struct LosslessRejection <: AbstractRejection end
+
+
+
 # Recurse through all organs. A loop would not be type-stable.
 # translocation!(organs::Tuple, destorgans::Tuple) = begin
 #     props = buildprops(organs[1])
@@ -83,5 +94,53 @@ translocate!(p::AbstractLosslessTranslocation, o1, o2, prop) = begin
     o1.J[:E,:tra] += transx
 
     # conversion_loss!(o2, transx, n_N_E(o2))
+    nothing
+end
+
+
+"""
+Translocation occurs between adjacent organs.
+This function is identical both directiono, so on represents
+whichever is not the current organs.
+
+Will not run with less than 2 organs.
+"""
+translocation!(organs::Tuple{Organ, Organ}) = begin
+    translocate_rejected!(organs[1], organs[2], 1.0)
+    translocate_rejected!(organs[2], organs[1], 1.0)
+    translocate!(organs[1], organs[2], 1.0)
+    translocate!(organs[2], organs[1], 1.0)
+end
+translocation!(organs::Tuple) = translocation!(organs...)
+translocation!(organs::Tuple{}) = nothing
+translocation!(organs::Tuple{Organ}) = nothing
+
+
+"""
+Reallocate state rejected from synthesizing units.
+TODO: add a 1-organs method. How does this interact with assimilation?  
+"""
+translocate_rejected!(source, dest, prop) = translocate_rejected!(rejection_pars(source), source, dest, prop)
+translocate_rejected!(rejected::Nothing, source, dest, prop) = nothing
+translocate_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
+    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
+    transC = J1s[:C,:rej] # * (1 - κEC(o))
+    transN = J1s[:N,:rej] # * (1 - κEN(o))
+    Js[:C,:rej] = -transC
+    Js[:N,:rej] = -transN
+    Jd[:C,:tra] = y_EC_ECT(o) * transC
+    Jd[:N,:tra] = y_EN_ENT(o) * transN
+    # J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
+    # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
+    nothing
+end
+translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
+    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
+    transC = J1s[:C,:rej] # * (1 - κEC(o))
+    transN = J1s[:N,:rej] # * (1 - κEN(o))
+    Js[:C,:rej] = -transC
+    Js[:N,:rej] = -transN
+    Jd[:C,:tra] = transC
+    Jd[:N,:tra] = transN
     nothing
 end

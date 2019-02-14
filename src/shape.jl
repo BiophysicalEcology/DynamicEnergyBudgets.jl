@@ -22,9 +22,12 @@ end
     M_Vscaling::Mo | 1.0 | mol | Gamma(2.0, 0.2)  | [0.01, 2000.0] | true | "Scaling mass"
 end
 
+update_shape!(o, u) = set_shape!(o, shape_correction(shape_pars(o), u.V))
+
 shape_correction(f::Nothing, V) = 1
 shape_correction(f::Isomorph, V) = 1
 shape_correction(f::V0morph, V) = (V / f.Vd)^(-2//3)
 shape_correction(f::V1morph, V) = (V / f.Vd)^(1//3)
 shape_correction(f::V1V0morph, V) = (V / f.Vd)^(1//3 - (V/f.Vmax)^f.β)
 shape_correction(f::Plantmorph, V) = (V / f.M_Vref)^(-V / f.M_Vscaling)
+

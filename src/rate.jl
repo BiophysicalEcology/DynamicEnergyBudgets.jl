@@ -39,7 +39,7 @@ rate_formula(r, su, rel_reserve::NTuple{3}, turnover::NTuple{3},
              j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
     j_Ea, j_Eb, j_E = non_growth_flux.(rel_reserve, turnover, r)
     j_E += synthesizing_unit(su, j_Ea * y_E_Ea, j_Eb * y_E_Eb)
-    y_V_E * (κsoma * j_E - j_E_mai) - r
+    r = y_V_E * (κsoma * j_E - j_E_mai)
 end
 
 
@@ -56,4 +56,10 @@ calc_rate(::SimpleRate, su, rel_reserve::NTuple{3}, turnover::NTuple{3},
     j_E - j_E_mai
 end
 
+"""
+    non_growth_flux(ureserve, turnover, r)
+Returns the current non_growth_flux flux at rate r,
+or the flux as a proportion of u[V], depending on ureserve values.
+"""
+non_growth_flux(reserve, turnover, r) = reserve * (turnover - r)
 

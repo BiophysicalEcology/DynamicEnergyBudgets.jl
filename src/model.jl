@@ -113,10 +113,6 @@ growth!(o, u) = begin
     # conversion_loss!(o, growth, n_N_V(o))
 end
 
-growth_production!(o, growth) = growth_production!(production_pars(o), o, growth)
-growth_production!(p::Production, o, growth) = flux(o)[:P,:gro] = growth * p.y_P_V
-growth_production!(p, o, growth) = zero(growth)
-
 """
 Allocates reserve drain due to maintenance.
 """
@@ -125,84 +121,6 @@ maintenence!(o, u) = begin
     maint_prod = maintenance_production!(o, u)
     reserve_drain!(o, Val(:mai), drain)
     # reserve_loss!(o, drain - maint_prod) # all maintenance is loss
-end
-
-maintenance_production!(o, u) = maintenance_production!(production_pars(o), o, u)
-maintenance_production!(p::Production, o, u) = flux(o)[:P,:mai] = p.j_P_mai * tempcorrection(o) * u.V
-maintenance_production!(p, o, u) = zero(eltype(flux(o)))
-
-"""
-    maturity!(f, o, u)
-Allocates reserve drain due to maturity maintenance.
-Stores in M state variable if it exists.
-"""
-maturity!(o, u) = maturity!(maturity_pars(o), o, u)
-maturity!(f::Maturity, o, u) = begin
-    flux(o)[:M,:gro] = mat = f.κmat * flux1(o)[:E,:ctb]
-    mat_mai = f.j_E_mat_mai * tempcorrection(v) * u.V # min(u[:V], f.M_Vmat))
-    drain = mat + mat_mai
-    reserve_drain!(o, Val(:mat), drain)
-    # reserve_loss!(o, mat_mai)
-    # conversion_loss!(o, mat, f.n_N_M)
-end
-maturity!(f::Nothing, o, u) = nothing
-
-"""
-    assimilation!(o, u)
-Runs assimilation methods, depending on formulation and state.
-"""
-assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
-assimilation!(o::AbstractOrgan, u) = begin
-    is_germinated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
-    nothing
-end
-assimilation!(::Nothing, x, o::AbstractOrgan, u, env) = nothing
-
-"""
-Translocation occurs between adjacent organs.
-This function is identical both directiono, so on represents
-whichever is not the current organs.
-
-Will not run with less than 2 organs.
-"""
-translocation!(organs::Tuple{Organ, Organ}) = begin
-    translocate_rejected!(organs[1], organs[2], 1.0)
-    translocate_rejected!(organs[2], organs[1], 1.0)
-    translocate!(organs[1], organs[2], 1.0)
-    translocate!(organs[2], organs[1], 1.0)
-end
-translocation!(organs::Tuple) = translocation!(organs...)
-translocation!(organs::Tuple{}) = nothing
-translocation!(organs::Tuple{Organ}) = nothing
-
-
-"""
-Reallocate state rejected from synthesizing units.
-TODO: add a 1-organs method. How does this interact with assimilation?  
-"""
-translocate_rejected!(source, dest, prop) = translocate_rejected!(rejection_pars(source), source, dest, prop)
-translocate_rejected!(rejected::Nothing, source, dest, prop) = nothing
-translocate_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
-    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
-    transC = J1s[:C,:rej] # * (1 - κEC(o))
-    transN = J1s[:N,:rej] # * (1 - κEN(o))
-    Js[:C,:rej] = -transC
-    Js[:N,:rej] = -transN
-    Jd[:C,:tra] = y_EC_ECT(o) * transC
-    Jd[:N,:tra] = y_EN_ENT(o) * transN
-    # J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
-    # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
-    nothing
-end
-translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
-    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
-    transC = J1s[:C,:rej] # * (1 - κEC(o))
-    transN = J1s[:N,:rej] # * (1 - κEN(o))
-    Js[:C,:rej] = -transC
-    Js[:N,:rej] = -transN
-    Jd[:C,:tra] = transC
-    Jd[:N,:tra] = transN
-    nothing
 end
 
 """
@@ -223,26 +141,6 @@ end
     @inbounds J[:C,col] = -drain/y_E_EC(o)
     @inbounds J[:N,col] = -drain/y_E_EN(o)
     nothing
-end
-
-update_shape!(o, u) = set_shape!(o, shape_correction(shape_pars(o), u.V))
-
-"""
-Check if germination has happened. Independent for each organ,
-although this may not make sense. A curve could be better for this too.
-"""
-is_germinated(o, u) = is_germinated(germination_pars(o), o, u)
-is_germinated(g::Nothing, o, u) = true
-is_germinated(g::Germination, o, u) = u.V > g.M_Vgerm
-
-
-update_height!(o, u) = update_height!(allometry_pars(o), o, u)
-update_height!(a::Nothing, o, u) = nothing
-update_height!(a, o, u) = set_height!(o, allometric_height(a, o, u))
-
-allometric_height(f::SqrtAllometry, o, u) = begin
-    units = oneunit(u.V * w_V(o))
-    sqrt((u.V * w_V(o)) / units) * f.allometry
 end
 
 # J: Flux matrix diagram.
