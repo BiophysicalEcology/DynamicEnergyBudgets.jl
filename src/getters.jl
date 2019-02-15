@@ -104,3 +104,4 @@ k_EN(p::AbstractCatabolism) = p.k_E
 k_E(p::AbstractCatabolism) = p.k_E
 
 κsoma(o::AbstractOrgan) = (oneunit(κtra(o) - κtra(o) - κmat(o)))
+mass(o, u) = u.V * w_V(o)

@@ -22,14 +22,15 @@ using Unitful,
       FieldDefaults,
       Photosynthesis,
       Microclimate,
+      Apply,
       Flatten
 
 using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, 
-                      prior, default, description, units, limits, logscaled, flattenable
+import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @selectable
+                      prior, default, description, units, limits, logscaled, flattenable, selectable
 import Photosynthesis: potential_dependence                      
 
 
@@ -54,25 +55,40 @@ export AbstractAssim,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
-       KooijmanNH4_NO3Assim, FvCBPhotosynthesis, ConstantCAssim,
-       AbstractSU, ParallelComplementarySU, MinimumRuleSU, KfamilySU,
-       AbstractRate, SimpleRate, FZeroRate,
-       AbstractStateFeedback, LosslessAutophagy, DissipativeAutophagy,
-       AbstractTempCorr, TempCorr, TempCorrLower, TempCorrLowerUpper,
-       AbstractScaling, KooijmanArea,
-       AbstractMaturity, Maturity,
-       AbstractProduction, Production,
-       AbstractShape, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph,
-       AbstractRejection, LosslessRejection, DissipativeRejection,
-       AbstractCatabolism, CatabolismE, CatabolismCN, CatabolismCNE,
-       AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultipleTranslocation,
-       LosslessTranslocation, DissipativeTranslocation,
-       AbstractAllometry, SqrtAllometry,
-       AbstractParams, Params, SharedParams,
-       Vars, CarbonVars, NitrogenVars,
-       Records,
+       KooijmanNH4_NO3Assim, FvCBPhotosynthesis, ConstantCAssim
+
+export AbstractSU, ParallelComplementarySU, MinimumRuleSU, KfamilySU
+
+export AbstractRate, SimpleRate, FZeroRate
+
+export AbstractStateFeedback, LosslessAutophagy, DissipativeAutophagy
+
+export AbstractTempCorr, TempCorr, TempCorrLower, TempCorrLowerUpper
+
+export AbstractScaling, KooijmanArea
+
+export AbstractMaturity, Maturity
+
+export AbstractGermination, ThresholdGermination
+
+export AbstractProduction, Production
+
+export AbstractShape, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph
+
+export AbstractRejection, LosslessRejection, DissipativeRejection
+
+export AbstractCatabolism, CatabolismE, CatabolismCN, CatabolismCNE
+
+export AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultipleTranslocation,
+       LosslessTranslocation, DissipativeTranslocation
+
+export AbstractAllometry, Allometry, SqrtAllometry, FixedAllometry
+
+export AbstractParams, Params, SharedParams,
+       Vars, CarbonVars, NitrogenVars, Records,
        AbstractOrgan, Organ,
        AbstractOrganism, Plant
+
 
 # Auto docstrings
 @template TYPES =

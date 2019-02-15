@@ -19,16 +19,16 @@ abstract type AbstractNAssim <: AbstractAssim end
 abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
-    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0) | [0.0, 10.0] | _ | "constant rate of C uptake"
-end
-
-@columns struct ConstantNAssim{μMoMS} <: AbstractNAssim
-    uptake::μMoMS | 0.03 | μmol*mol^-1*s^-1  | Gamma(2.0, 2.0) | [0.0, 0.5] | _ | "constant rate of N uptake" 
+    # Field       | Def | Unit              | Prior            | Limits      | Log | Description
+    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | Gamma(2.0, 2.0)  | [0.0, 10.0] | _   | "constant rate of C uptake"
+end                                                            
+                                                               
+@columns struct ConstantNAssim{μMoMS} <: AbstractNAssim        
+    uptake::μMoMS | 0.03 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0)  | [0.0, 0.5]  | _   | "constant rate of N uptake" 
 end
 
 @mix @columns struct SLA{MG}
-    # Field | Default | Unit     | Prior         | Limits       | Description
-    SLA::MG | 24.0    | m^2*kg^-1 | Gamma(10.0, 1.0) | [5.0, 30.0] | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
+    SLA::MG       | 24.0 | m^2*kg^-1        | Gamma(10.0, 1.0) | [5.0, 30.0] | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
@@ -37,11 +37,11 @@ end
 end
 
 @SLA @mix @columns struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS}
-    # Field             | Default           | Unit             | Prior           | Limits        | Log  | Description
+    #Field              | Default           | Unit             | Prior           | Limits           | Log  | Description
     k_C_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0) | [1e-5, 2000.0]   | true | "Scaling rate for carbon dioxide"
     k_O_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0) | [1e-5, 2000.0]   | true | "Scaling rate for oxygen"
-    K_C::MoL            | 50*1e-6/gas_molpL | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]   | true | "Half-saturation concentration of carbon dioxide"
-    K_O::MoL            | 0.0021/gas_molpL  | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]   | true | "Half-saturation concentration of oxygen"
+    K_C::MoL            | 50*1e-6/gas_molpL | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]    | true | "Half-saturation concentration of carbon dioxide"
+    K_O::MoL            | 0.0021/gas_molpL  | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]    | true | "Half-saturation concentration of oxygen"
     J_L_K::MoMS         | 2000.0            | mol*m^-2*s^-1    | Gamma(2.0, 2.0) | [1e-3, 100000.0] | true | "Half-saturation flux of useful photons"
     j_L_Amax::μMoMS     | 100.01            | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [1e-4, 10000.0]  | true | "Max spec uptake of useful photons"
     j_C_Amax::μMoMS     | 20.0              | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [5.0,  100.0]    | true | "Max spec uptake of carbon dioxide"
@@ -65,7 +65,6 @@ end
 
 " Parameters for Ammonia/Nitrate assimilation "
 @columns struct KooijmanNH4_NO3Assim{μMoMS,F,MoMo,MoL} <: AbstractNH4_NO3Assim
-    #Field           | Default | Unit                | Prior            | Limits         | Description
     j_NH_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | Gamma(50.0, 1.0) | [0.1, 1000.0] | _ | "Max spec uptake of ammonia"
     j_NO_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | Gamma(50.0, 1.0) | [0.1, 1000.0] | _ | "Max spec uptake of nitrate"
     ρNO::F           | 0.7     | _                | Beta(0.7, 1.0)   | [1e-4, 1.0]   | _ | "Weights preference for nitrate relative to ammonia." # 1 or less but why?
@@ -77,8 +76,7 @@ end
 
 " Parameters for lumped Nitrogen assimilation "
 @columns struct NAssim{μMoS,MoL} <: AbstractNAssim
-    # Field        | Default | Unit                | Prior            | Limits         | Description
-    j_N_Amax::μMoS | 50.0    | μmol*mol^-1*s^-1 | Gamma(50.0, 1.0) | [0.1, 1000.0] | _ | "Max spec uptake of ammonia"
+    j_N_Amax::μMoS | 50.0    | μmol*mol^-1*s^-1 | Gamma(50.0, 1.0) | [0.1, 1000.0]  | _ | "Max spec uptake of ammonia"
     K_N::MoL       | 0.01    | mol*L^-1         | Gamma(0.01, 1.0) | [1e-4, 1.0]    | _ | "Half-saturation concentration of nitrate"
     K_H::MoL       | 10.0    | mol*L^-1         | Gamma(10.0, 1.0) | [1e-2, 100.0]  | _ | "Half-saturation concentration of water"
 end

@@ -28,18 +28,18 @@ end
 abstract type AbstractParams end
 
 " Model parameters that vary between organs "
-@default_kw struct Params{A,S,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
-    # Field              | Default
-    name::Symbol         | :organ
-    rate_formula         | FZeroRate()
-    assimilation_pars::A | ConstantCAssim()
-    shape_pars::S        | Plantmorph()
-    allometry_pars::Al   | nothing
-    maturity_pars::Ma    | nothing
-    trans_pars::Tr       | nothing
-    rejection_pars::Re   | LosslessRejection()
-    germination_pars::Ge | Germination()
-    production_pars::Pr  | Production()
+@default_kw @selectable struct Params{A,S,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
+    # Field              | Selectable Types                     | Default
+    name::Symbol         | _                                    | :organ
+    rate_formula         | _                                    | FZeroRate()
+    assimilation_pars::A | Union{Nothing,AbstractAssimilation}  | ConstantCAssim()
+    shape_pars::S        | Union{Nothing,AbstractShape}         | Plantmorph()
+    allometry_pars::Al   | Union{Nothing,AbstractAllometry}     | nothing
+    maturity_pars::Ma    | Union{Nothing,AbstractMaturity}      | nothing
+    trans_pars::Tr       | Union{Nothing,AbstractTranslocation} | nothing
+    rejection_pars::Re   | Union{Nothing,AbstractRejection}     | LosslessRejection()
+    germination_pars::Ge | Union{Nothing,AbstractGermination}   | Germination()
+    production_pars::Pr  | Union{Nothing,AbstractProduction}    | Production()
 end
 
 
@@ -67,13 +67,14 @@ end
 
 
 " Model parameters shared between organs "
-@default_kw struct SharedParams{SU,Co,FB,TC,Tu,Mt}
-    su_pars::SU          | ParallelComplementarySU()
-    core_pars::Co        | Core()
-    feedback_pars::FB    | nothing
-    tempcorr_pars::TC    | nothing
-    catabolism_pars::Tu  | CatabolismCN()
-    maintenance_pars::Mt | Maintenance()
+@default_kw @selectable struct SharedParams{SU,Co,FB,TC,Tu,Mt}
+    # Field              | Selectable Types                             | Default
+    su_pars::SU          | Union{Nothing,AbstractSynthesizingUnit}      | ParallelComplementarySU()
+    core_pars::Co        | nothing                                      | Core()
+    feedback_pars::FB    | Union{Nothing,AbstractFeedback}              | nothing
+    tempcorr_pars::TC    | Union{Nothing,AbstractTemperatureCorrection} | nothing
+    catabolism_pars::Tu  | AbstractCatabolism                           | CatabolismCN()
+    maintenance_pars::Mt | AbstractMaintenance                          | Maintenance()
 end
 
 ###########################################################################################

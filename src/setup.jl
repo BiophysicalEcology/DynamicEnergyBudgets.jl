@@ -23,7 +23,7 @@ split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 
 " Sum flux matrix " 
 sum_flux!(du, organs::Tuple) = begin
-    offset_apply!(sum_flux!, du, organs, 0)
+    offset_apply(sum_flux!, du, organs, 0)
     du
 end
 sum_flux!(du, organ::Organ, offset::Int) = begin

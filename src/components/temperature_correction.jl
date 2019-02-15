@@ -1,5 +1,5 @@
 " Temperature correction parameters"
-abstract type AbstractTempCorr{T} end
+abstract type AbstractTemperatureCorrection{T} end
 
 # Temperature mixins
 @mix @columns struct Tbase{T}
@@ -20,11 +20,11 @@ end
 
 # Temperature types
 " Simple temperature correction parameters "
-@Tbase struct TempCorr{T} <: AbstractTempCorr{T} end
+@Tbase struct TempCorr{T} <: AbstractTemperatureCorrection{T} end
 " Temperature correction with lower boudn parameters"
-@Tbase @Tlow struct TempCorrLower{T} <: AbstractTempCorr{T} end
+@Tbase @Tlow struct TempCorrLower{T} <: AbstractTemperatureCorrection{T} end
 " Temperature correction with lower and upper bound parameters"
-@Tbase @Tlow @Tup struct TempCorrLowerUpper{T} <: AbstractTempCorr{T} end
+@Tbase @Tlow @Tup struct TempCorrLowerUpper{T} <: AbstractTemperatureCorrection{T} end
 
 
 tempcorr(t, tc::Nothing) = 1.0

@@ -12,13 +12,13 @@ end
 end
 
 @columns struct V1V0morph{Mo,B} <: AbstractShape
-    Vd::Mo    | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | _ | "reference"
-    Vmax::Mo  | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | _ | "reference"
-    β::B      | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 10.0] | _ | "reference"
+    Vd::Mo   | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | _ | "reference"
+    Vmax::Mo | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 1000.0] | _ | "reference"
+    β::B     | 4.0 | mol | Gamma(2.0, 0.2) | [0.0, 10.0] | _ | "reference"
 end
 
 @columns struct Plantmorph{Mo} <: AbstractShape
-    M_Vref::Mo     | 0.1  | mol | Gamma(2.0, 0.2) | [0.001, 20.0]  | true | "Scaling reference"
+    M_Vref::Mo     | 0.1 | mol | Gamma(2.0, 0.2) | [0.001, 20.0]  | true | "Scaling reference"
     M_Vscaling::Mo | 1.0 | mol | Gamma(2.0, 0.2)  | [0.01, 2000.0] | true | "Scaling mass"
 end
 
