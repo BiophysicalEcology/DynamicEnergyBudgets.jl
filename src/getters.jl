@@ -96,8 +96,8 @@ j_E_mai(o::AbstractOrgan) = maintenance_pars(o).j_E_mai
 κtra(o::Nothing) = 0.0
 
 κmat(o::AbstractOrgan) = κmat(maturity_pars(o))
-κmat(maturity::Maturity) = maturity_pars.κmat
-κmat(maturity::Nothing) = 0.0
+κmat(maturity_pars::Maturity) = maturity_pars.κmat
+κmat(::Nothing) = 0.0
 
 k_EC(p::AbstractCatabolism) = p.k_E
 k_EN(p::AbstractCatabolism) = p.k_E

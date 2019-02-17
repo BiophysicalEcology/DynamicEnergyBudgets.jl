@@ -1,17 +1,4 @@
 
-FieldDefaults.get_default(t::Type) = begin 
-    d = default(t) 
-    u = units(t)
-    add_units.(d, u)
-end
-
-add_units(::Nothing, u) = nothing
-add_units(x, ::Nothing) = x
-add_units(::Nothing, ::Nothing) = nothing
-add_units(x::Number, u::Unitful.Units) = x * u
-add_units(x::AbstractArray, u::Unitful.Units) = x .* u
-
-
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
     v = view(u, offset+1:offset+STATELEN)

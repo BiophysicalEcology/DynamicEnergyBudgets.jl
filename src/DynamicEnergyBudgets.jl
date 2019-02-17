@@ -29,7 +29,7 @@ using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, m
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @selectable
+import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @selectable,
                       prior, default, description, units, limits, logscaled, flattenable, selectable
 import Photosynthesis: potential_dependence                      
 
@@ -51,23 +51,27 @@ export integrate,
        debmodel!,
        apply_environment!
 
-export AbstractAssim,
+export AbstractAssimilation,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
        KooijmanNH4_NO3Assim, FvCBPhotosynthesis, ConstantCAssim
 
-export AbstractSU, ParallelComplementarySU, MinimumRuleSU, KfamilySU
+export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, KfamilySU
 
 export AbstractRate, SimpleRate, FZeroRate
 
 export AbstractStateFeedback, LosslessAutophagy, DissipativeAutophagy
 
-export AbstractTempCorr, TempCorr, TempCorrLower, TempCorrLowerUpper
+export AbstractTemperatureCorrection, TempCorr, TempCorrLower, TempCorrLowerUpper
 
 export AbstractScaling, KooijmanArea
 
 export AbstractMaturity, Maturity
+
+export AbstractMaintenance, Maintenance
+
+export AbstractDEBCore, DEBCore
 
 export AbstractGermination, ThresholdGermination
 
@@ -98,7 +102,7 @@ export AbstractParams, Params, SharedParams,
     """
 
 # Field metadata columns
-@chain columns @description @logscaled @limits @prior @units @default_kw
+@chain columns @description @logscaled @limits @prior @units @udefault_kw
 
 const STATELEN = 6
 
@@ -110,24 +114,23 @@ const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
 include("traits.jl")
-include("synthesizing_units.jl")
-include("temperature_correction.jl")
-include("rate.jl")
-include("shape.jl")
-include("allometry.jl")
-include("autophagy.jl")
-include("assimilation.jl")
-include("germination.jl")
-include("maturity.jl")
-include("production.jl")
+include("components/synthesizing_units.jl")
+include("components/temperature_correction.jl")
+include("components/rate.jl")
+include("components/shape.jl")
+include("components/allometry.jl")
+include("components/autophagy.jl")
+include("components/assimilation.jl")
+include("components/germination.jl")
+include("components/maturity.jl")
+include("components/production.jl")
+include("components/translocation.jl")
 include("types.jl")
 include("environment.jl")
-include("translocation.jl")
 include("model.jl")
 include("getters.jl")
 include("functions.jl")
 include("setup.jl")
-include("apply.jl")
 include("aliases.jl")
 
 end # module

@@ -1,12 +1,12 @@
 abstract type AbstractCatabolism end
 
 @mix @columns struct CatabolismCN{MoMoD}
-    k_EC::MoMoD | 0.4 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
-    k_EN::MoMoD | 0.4 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "N-reserve turnover rate"
+    k_EC::MoMoD | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
+    k_EN::MoMoD | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "N-reserve turnover rate"
 end
 
 @mix @columns struct CatabolismE{MoMoD}
-    k_E::MoMoD  | 0.4 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
+    k_E::MoMoD  | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
 end
 
 @CatabolismE struct CatabolismE{} <: AbstractCatabolism end
@@ -21,40 +21,40 @@ end
 abstract type AbstractMaintenance end
 
 @columns struct Maintenance{MoMoD} <: AbstractMaintenance
-    j_E_mai::MoMoD       | 0.023 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [1e-4, 1.0] | true | "Spec somatic maint costs."
+    j_E_mai::MoMoD       | 0.01 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [1e-4, 1.0] | true | "Spec somatic maint costs."
 end
 
 
 abstract type AbstractParams end
 
 " Model parameters that vary between organs "
-@default_kw @selectable struct Params{A,S,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
-    # Field              | Selectable Types                     | Default
-    name::Symbol         | _                                    | :organ
-    rate_formula         | _                                    | FZeroRate()
-    assimilation_pars::A | Union{Nothing,AbstractAssimilation}  | ConstantCAssim()
-    shape_pars::S        | Union{Nothing,AbstractShape}         | Plantmorph()
-    allometry_pars::Al   | Union{Nothing,AbstractAllometry}     | nothing
-    maturity_pars::Ma    | Union{Nothing,AbstractMaturity}      | nothing
-    trans_pars::Tr       | Union{Nothing,AbstractTranslocation} | nothing
-    rejection_pars::Re   | Union{Nothing,AbstractRejection}     | LosslessRejection()
-    germination_pars::Ge | Union{Nothing,AbstractGermination}   | Germination()
-    production_pars::Pr  | Union{Nothing,AbstractProduction}    | Production()
+@selectable @flattenable @default_kw struct Params{A,S,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
+    # Field              | Default                | _     | Selectable Types
+    name::Symbol         | :organ                 | false | _
+    rate_formula         | FZeroRate()            | _     | _
+    assimilation_pars::A | ConstantCAssim()       | _     | Union{Nothing,AbstractAssim}
+    shape_pars::S        | Plantmorph()           | _     | Union{Nothing,AbstractShape}
+    allometry_pars::Al   | nothing                | _     | Union{Nothing,AbstractAllometry}
+    maturity_pars::Ma    | nothing                | _     | Union{Nothing,AbstractMaturity}
+    trans_pars::Tr       | nothing                | _     | Union{Nothing,AbstractTranslocation}
+    rejection_pars::Re   | LosslessRejection()    | _     | AbstractRejection
+    germination_pars::Ge | ThresholdGermination() | _     | Union{Nothing,AbstractGermination}
+    production_pars::Pr  | Production()           | _     | Union{Nothing,AbstractProduction}
 end
 
 
-abstract type AbstractCore end
+abstract type AbstractDEBCore end
 
-@columns struct Core{MoMo,GMo} <: AbstractCore
-    y_V_E::MoMo  | 0.7   | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0, 1.0]   | _ | "From reserve to structure"
-    y_E_EC::MoMo | 0.7   | mol*mol^-1 | Gamma(2.0, 2.0) | [1e-6, 1.0]  | true | "From C-reserve to reserve, using nitrate"
-    y_E_EN::MoMo | 30.0  | mol*mol^-1 | Gamma(2.0, 2.0) | [1.0, 50.0]  | false | "From N-reserve to reserve"
-    n_N_V::MoMo  | 0.03  | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 0.1]   | _ | "N/C in structure"
-    n_N_E::MoMo  | 0.025 | mol*mol^-1 | Gamma(2.0, 2.0) | [0.0, 0.1]   | _ | "N/C in reserve"
-    w_V::GMo     | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [15.0, 40.0] | _ | "Mol-weight of shoot structure"
-    w_N::GMo     | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [15.0, 40.0] | _ | "Mol-weight of shoot N-reserve"
-    # w_C::GMo   | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [12.0, 40.0] | _ | "Mol-weight of shoot C-reserve"
-    # w_E::GMo   | 25.0  | g*mol^-1   | Gamma(2.0, 2.0) | [15.0, 40.0] | _ | "Mol-weight of shoot reserve"
+@columns struct DEBCore{MoMo,GMo} <: AbstractDEBCore
+    y_V_E::MoMo  | 0.7   | _        | Beta(2.0, 2.0)  | [0.0, 1.0]   | _     | "From reserve to structure"
+    y_E_EC::MoMo | 0.7   | _        | Gamma(2.0, 2.0) | [1e-6, 1.0]  | true  | "From C-reserve to reserve, using nitrate"
+    y_E_EN::MoMo | 30.0  | _        | Gamma(2.0, 2.0) | [1.0, 50.0]  | false | "From N-reserve to reserve"
+    n_N_V::MoMo  | 0.03  | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in structure"
+    n_N_E::MoMo  | 0.025 | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in reserve"
+    w_V::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot structure"
+    w_N::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot N-reserve"
+    # w_C::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [12.0, 40.0] | _     | "Mol-weight of shoot C-reserve"
+    # w_E::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot reserve"
 end
 
 #    %   W   Rel n atoms
@@ -67,21 +67,21 @@ end
 
 
 " Model parameters shared between organs "
-@default_kw @selectable struct SharedParams{SU,Co,FB,TC,Tu,Mt}
-    # Field              | Selectable Types                             | Default
-    su_pars::SU          | Union{Nothing,AbstractSynthesizingUnit}      | ParallelComplementarySU()
-    core_pars::Co        | nothing                                      | Core()
-    feedback_pars::FB    | Union{Nothing,AbstractFeedback}              | nothing
-    tempcorr_pars::TC    | Union{Nothing,AbstractTemperatureCorrection} | nothing
-    catabolism_pars::Tu  | AbstractCatabolism                           | CatabolismCN()
-    maintenance_pars::Mt | AbstractMaintenance                          | Maintenance()
+@selectable @udefault_kw struct SharedParams{SU,Co,FB,TC,Tu,Mt}
+    # Field               | Default                   | Selectable Types
+    su_pars::SU           | ParallelComplementarySU() | AbstractSynthesizingUnit
+    core_pars::Co         | DEBCore()                 | _
+    feedback_pars::FB     | nothing                   | Union{Nothing,AbstractStateFeedback}
+    tempcorr_pars::TC     | nothing                   | Union{Nothing,AbstractTemperatureCorrection}
+    catabolism_pars::Tu   | CatabolismCN()            | AbstractCatabolism
+    maintenance_pars::Mt  | Maintenance()             | AbstractMaintenance
 end
 
 ###########################################################################################
 # Variables
 
 " Model variables "
-@units @default_kw struct Vars{V,F,MoMoD,C,M,T}
+@units @udefault_kw struct Vars{V,F,MoMoD,C,M,T}
     assimilation_vars::V | nothing | _
     shape::F             | [0.0]   | _
     rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1
@@ -94,13 +94,13 @@ end
 
 build_vars(vars, time) = begin
     len = length(time)
-    len == length(vars.rate) && return vars 
+    len == length(vars.rate) && return vars
 
     fields = []
     for fname in fieldnames(typeof(vars))
         ft = fieldtype(typeof(vars), fname)
         if ft <: AbstractArray
-            push!(fields, fill(getfield(vars, fname)[1], len)) 
+            push!(fields, fill(getfield(vars, fname)[1], len))
         else
             push!(fields, getfield(vars, fname))
         end
@@ -175,13 +175,14 @@ end
 
 "Outer construtor for defaults"
 Plant(; params = (ShootParamsCN(), RootParamsCN()),
-           vars = (ShootVars(), RootVars()),
-           shared = SharedParams(),
-           records = nothing,
-           environment = nothing,
-           time = 0hr:1hr:8760hr,
-           environment_start = setindex!(Array{typeof(1hr),0}(undef), 1hr)
-        ) = begin
+        vars = (ShootVars(), RootVars()),
+        shared = SharedParams(),
+        records = nothing,
+        environment = nothing,
+        time = 0hr:1hr:8760hr,
+        environment_start = setindex!(Array{typeof(1hr),0}(undef), 1hr),
+        dead = setindex!(Array{Bool,0}(undef), false)
+      ) = begin
     if records == nothing
         records = []
         for i = 1:length(params)
@@ -189,6 +190,5 @@ Plant(; params = (ShootParamsCN(), RootParamsCN()),
         end
         records = (records...,)
     end
-    dead = setindex!(Array{Bool,0}(undef), false)
     Plant(params, shared, records, environment, environment_start, dead)
 end

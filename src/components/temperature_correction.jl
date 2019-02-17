@@ -4,7 +4,7 @@ abstract type AbstractTemperatureCorrection{T} end
 # Temperature mixins
 @mix @columns struct Tbase{T}
     # Field       | Default | Unit | Prior            | Limits              | Description
-    reftemp::T    | 310.0   | K | Gamma(310.0, 1.0)   | [273.0, 325.0]     | _ | "Reference temperature for all rate parameters"
+    reftemp::T    | 300.0  | K | Gamma(310.0, 1.0)   | [273.0, 325.0]     | _ | "Reference temperature for all rate parameters"
     arrtemp::T    | 2000.0  | K | Gamma(2000.0, 1.0)  | [200.0, 4000.0]    | _ | "Arrhenius temperature"
 end
 

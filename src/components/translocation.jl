@@ -105,15 +105,15 @@ whichever is not the current organs.
 
 Will not run with less than 2 organs.
 """
-translocation!(organs::Tuple{Organ, Organ}) = begin
+translocation!(organs::Tuple{T1,T2}) where {T1, T2} = begin
     translocate_rejected!(organs[1], organs[2], 1.0)
     translocate_rejected!(organs[2], organs[1], 1.0)
     translocate!(organs[1], organs[2], 1.0)
     translocate!(organs[2], organs[1], 1.0)
 end
-translocation!(organs::Tuple) = translocation!(organs...)
+# translocation!(organs::Tuple) = translocation!(organs...)
+translocation!(organs::Tuple{T}) where T = nothing
 translocation!(organs::Tuple{}) = nothing
-translocation!(organs::Tuple{Organ}) = nothing
 
 
 """
@@ -121,15 +121,15 @@ Reallocate state rejected from synthesizing units.
 TODO: add a 1-organs method. How does this interact with assimilation?  
 """
 translocate_rejected!(source, dest, prop) = translocate_rejected!(rejection_pars(source), source, dest, prop)
-translocate_rejected!(rejected::Nothing, source, dest, prop) = nothing
-translocate_rejected!(rejected::DissipativeRejection, source, dest, prop) = begin
+translocate_rejected!(f::Nothing, source, dest, prop) = nothing
+translocate_rejected!(f::DissipativeRejection, source, dest, prop) = begin
     Js, J1s, Jd = flux(source), flux1(source), flux(dest)
     transC = J1s[:C,:rej] # * (1 - κEC(o))
     transN = J1s[:N,:rej] # * (1 - κEN(o))
     Js[:C,:rej] = -transC
     Js[:N,:rej] = -transN
-    Jd[:C,:tra] = y_EC_ECT(o) * transC
-    Jd[:N,:tra] = y_EN_ENT(o) * transN
+    Jd[:C,:tra] = f.y_EC_ECT * transC
+    Jd[:N,:tra] = f.y_EN_ENT * transN
     # J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
     # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
     nothing

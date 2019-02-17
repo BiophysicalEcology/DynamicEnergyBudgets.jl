@@ -24,7 +24,7 @@ abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 end                                                            
                                                                
 @columns struct ConstantNAssim{μMoMS} <: AbstractNAssim        
-    uptake::μMoMS | 0.03 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0)  | [0.0, 0.5]  | _   | "constant rate of N uptake" 
+    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0)  | [0.0, 0.5]  | _   | "constant rate of N uptake" 
 end
 
 @mix @columns struct SLA{MG}
@@ -83,7 +83,7 @@ end
 
 
 " Variables for carbon assimilation "
-@description @units @default_kw mutable struct CarbonVars{MoMS,MoL,KPA}
+@description @units @udefault_kw mutable struct CarbonVars{MoMS,MoL,KPA}
     J_L_F::MoMS              | watts_to_light_mol(800.0) | mol*m^-2*s^-1 | "flux of useful photons"
     X_C::MoL                 | (400.0/1e6)               | mol*L^-1      | "carbon dioxide concentration in air"
     X_O::MoL                 | 0.21 * gas_molpL          | mol*L^-1      | "oxygen concentration in air"
@@ -91,7 +91,7 @@ end
 end
 
 " Variables for nitgroen assimilation "
-@description @units @default_kw mutable struct NitrogenVars{F,KPA,MoL}
+@description @units @udefault_kw mutable struct NitrogenVars{F,KPA,MoL}
     # TODO work out the naming conventions here
     soilwaterpotential::KPA    | 1.0   | kPa      | "soil water potential"
     soilwaterconent::F         | 1.0   | _        | _

@@ -11,4 +11,4 @@ although this may not make sense. A curve could be better for this too.
 """
 is_germinated(o, u) = is_germinated(germination_pars(o), o, u)
 is_germinated(f::Nothing, o, u) = true
-is_germinated(f::ThresholdGermination, o, u) = u.V > g.germination_mass
+is_germinated(f::ThresholdGermination, o, u) = u.V > f.germination_mass
