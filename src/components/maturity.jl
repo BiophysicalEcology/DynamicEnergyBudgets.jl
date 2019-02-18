@@ -1,7 +1,7 @@
 abstract type AbstractMaturity end
 
 " Maturity parameters. Seperated to make maturity modeling optional, reducing complexity "
-@columns struct Maturity{MoMo,MoMoD,F,Mo} <: AbstractMaturity
+@columns struct Maturity{MoMoD,F,Mo} <: AbstractMaturity
     # Field            | Default         | Unit            | Prior           | Limits      | Log  | Description
     # n_N_M::MoMo        | 0.05            | mol*mol^-1      | Gamma(2.0, 2.0) | [0.0, 1.0]  | _    | "N/C use for maturity"
     j_E_mat_mai::MoMoD | 0.001           | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0, 0.1]  | _    | "Spec maturity maint costs "
