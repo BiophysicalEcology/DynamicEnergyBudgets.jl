@@ -5,7 +5,6 @@
 # A benefit of this is parameters can be easily moved between shared and specific 
 # parameter structs.
 
-
 # So we don't have to depend on all of Lazy.jl
 macro forward(ex, fs)
   @capture(ex, T_.field_) || error("Syntax: @forward T.x f, g, h")
@@ -16,40 +15,42 @@ macro forward(ex, fs)
     nothing)
 end
 
-dead(o::AbstractOrganism) = o.dead[]
-set_dead!(o::AbstractOrganism, val) = o.dead[] = val
 
-environment(o::AbstractOrganism) = o.environment
-vars(o::AbstractOrgan) = o.vars
 
-flux(o::AbstractOrgan) = o.J
-flux1(o::AbstractOrgan) = o.J1
+@inline dead(o::AbstractOrganism) = o.dead[]
+@inline set_dead!(o::AbstractOrganism, val) = o.dead[] = val
 
-tstep(v) = v.t[1]
-set_tstep!(v, val) = v.t[1] = val  
+@inline environment(o::AbstractOrganism) = o.environment
+@inline vars(o::AbstractOrgan) = o.vars
 
-assimilation_vars(v) = v.assimilation_vars
+@inline flux(o::AbstractOrgan) = o.J
+@inline flux1(o::AbstractOrgan) = o.J1
 
-shape(v) = v.shape[tstep(v)]
-set_shape!(v, val) = set_var!(v, :shape, val)
+@inline tstep(v) = v.t[1]
+@inline set_tstep!(v, val) = v.t[1] = val  
 
-rate(v) = v.rate[tstep(v)]
-set_rate!(v, val) = set_var!(v, :rate, val)
+@inline assimilation_vars(v) = v.assimilation_vars
 
-temp(v) = v.temp[tstep(v)]
-set_temp!(v, val) = set_var!(v, :temp, val)
+@inline shape(v) = v.shape[tstep(v)]
+@inline set_shape!(v, val) = v.shape[tstep(v)] = val
 
-θE(v) = v.θE[tstep(v)]
-set_θE!(v, val) = set_temp!(v, val) = set_var!(v, :θE, val)
+@inline rate(v) = v.rate[tstep(v)]
+@inline set_rate!(v, val) = v.rate[tstep(v)] = val
 
-tempcorrection(v) = v.tempcorrection[tstep(v)]
-set_tempcorrection!(v, val) = set_var!(v, :tempcorrection, val)
+@inline temp(v) = v.temp[tstep(v)]
+@inline set_temp!(v, val) = v.temp[tstep(v)] = val
 
-depth(v) = height(v)
-height(v) = v.height[tstep(v)]
-set_height!(v, val) = set_var!(v, :height, val)
+@inline θE(v) = v.θE[tstep(v)]
+@inline set_θE!(v, val) = v.θE[tstep(v)] = val
 
-set_var!(vars, fname, val) = getfield(vars, fname)[tstep(vars)] = val
+@inline tempcorrection(v) = v.tempcorrection[tstep(v)]
+@inline set_tempcorrection!(v, val) = v.tempcorrection[tstep(v)] = val
+
+@inline depth(v) = height(v)
+@inline height(v) = v.height[tstep(v)]
+@inline set_height!(v, val) = v.height[tstep(v)] = val
+
+@inline set_var!(vars, fname, val) = setfield!(getfield(vars, fname), tstep(vars), fname)
 
 rate_formula(p) = p.rate_formula
 assimilation_pars(p) = p.assimilation_pars
@@ -89,19 +90,19 @@ w_C(o::AbstractOrgan) = core_pars(o).w_C
 w_N(o::AbstractOrgan) = core_pars(o).w_N
 w_E(o::AbstractOrgan) = core_pars(o).w_E
 
-j_E_mai(o::AbstractOrgan) = maintenance_pars(o).j_E_mai
+@inline j_E_mai(o::AbstractOrgan) = maintenance_pars(o).j_E_mai
 
-κtra(o::AbstractOrgan) = κtra(trans_pars(o))
-κtra(trans_pars::AbstractTranslocation) = trans_pars.κtra
-κtra(o::Nothing) = 0.0
+@inline κtra(o::AbstractOrgan) = κtra(trans_pars(o))
+@inline κtra(trans_pars::AbstractTranslocation) = trans_pars.κtra
+@inline κtra(o::Nothing) = 0.0
 
-κmat(o::AbstractOrgan) = κmat(maturity_pars(o))
-κmat(maturity_pars::Maturity) = maturity_pars.κmat
-κmat(::Nothing) = 0.0
+@inline κmat(o::AbstractOrgan) = κmat(maturity_pars(o))
+@inline κmat(maturity_pars::Maturity) = maturity_pars.κmat
+@inline κmat(::Nothing) = 0.0
 
-k_EC(p::AbstractCatabolism) = p.k_E
-k_EN(p::AbstractCatabolism) = p.k_E
-k_E(p::AbstractCatabolism) = p.k_E
+@inline k_EC(p::AbstractCatabolism) = p.k_E
+@inline k_EN(p::AbstractCatabolism) = p.k_E
+@inline k_E(p::AbstractCatabolism) = p.k_E
 
-κsoma(o::AbstractOrgan) = (oneunit(κtra(o) - κtra(o) - κmat(o)))
-mass(o, u) = u.V * w_V(o)
+@inline κsoma(o::AbstractOrgan) = (oneunit(κtra(o) - κtra(o) - κmat(o)))
+@inline mass(o, u) = u.V * w_V(o)

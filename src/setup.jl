@@ -63,6 +63,23 @@ end
 (o::Plant)(du, u, p::Nothing, t::Number) = o(du, u, t, define_organs(o, t))
 
 
+" update vars and flux to record for time t "
+define_organs(o, t) = define_organs(o.params, o.shared, o.records, t)
+define_organs(params::Tuple{P,Vararg}, shared, records::Tuple{R,Vararg}, t) where {P,R} = begin
+    rec = records[1]
+    t = calc_tstep(rec.vars, t)
+    rec.vars.t[1] = t
+    vJ = view(rec.J, :, :, t)
+    vJ1 = view(rec.J1, :, :, t)
+    J = LArray{Tuple{STATE,TRANS}}(vJ)
+    J1 = LArray{Tuple{STATE1,TRANS1}}(vJ1)
+
+    organ = Organ(params[1], shared, rec.vars, J, J1)
+    (organ, define_organs(tail(params), shared, tail(records), t)...)
+end
+define_organs(params::Tuple{}, shared, records::Tuple{}, t) = ()
+
+
 check_params(o::Tuple) = apply(check_params, o)
 check_params(o::Organ) = begin 
     y_V_E(o) <= n_N_V(o)/n_N_E(o) || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (y_V_E(o), n_N_V(o), n_N_E(o) ))

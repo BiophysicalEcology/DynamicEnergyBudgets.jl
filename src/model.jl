@@ -74,14 +74,14 @@ catabolism!(p::CatabolismCNE, o, u) = begin
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
 
     r = calc_rate(rate_formula(o), su_pars(o), rel_reserve, turnover, corr_j_E_mai, y_E_EC(o), y_E_EN(o), y_V_E(o), κsoma(o))
-    set_var!(o, :rate, r)
+    set_rate!(o, r)
     r < zero(r) && return false
 
     J1[:C,:ctb], J1[:N,:ctb], J1[:EE,:ctb] = non_growth_flux.(reserve, turnover, r)
     J1[:C,:rej], J1[:N,:rej], J1[:CN,:ctb] = stoich_merge(su_pars(o), J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
 
     J1[:E,:ctb] = J1[:EE,:ctb] + J1[:CN,:ctb] # Total catabolic flux
-    set_var!(o, :θE, J1[:EE,:ctb]/J1[:E,:ctb]) # Proportion of general reserve flux in total catabolic flux
+    set_θE!(o, J1[:EE,:ctb]/J1[:E,:ctb]) # Proportion of general reserve flux in total catabolic flux
     true
 end
 catabolism!(p::CatabolismCN, o, u) = begin
@@ -92,7 +92,7 @@ catabolism!(p::CatabolismCN, o, u) = begin
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
 
     r = calc_rate(rate_formula(o), su_pars(o), rel_reserve, turnover, corr_j_E_mai, y_E_EC(o), y_E_EN(o), y_V_E(o), κsoma(o))
-    set_var!(o, :rate, r)
+    set_rate!(o, r)
     r < zero(r) && return false
 
     J1[:C,:ctb], J1[:N,:ctb] = non_growth_flux.(reserve, turnover, r)
