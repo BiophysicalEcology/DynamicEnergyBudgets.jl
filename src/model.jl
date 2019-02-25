@@ -91,9 +91,16 @@ catabolism!(p::CatabolismCN, o, u) = begin
     rel_reserve = reserve ./ u.V
     corr_j_E_mai = j_E_mai(o) * tempcorrection(v)
 
-    r = calc_rate(rate_formula(o), su_pars(o), rel_reserve, turnover, corr_j_E_mai, y_E_EC(o), y_E_EN(o), y_V_E(o), κsoma(o))
-    set_rate!(o, r)
-    r < zero(r) && return false
+    r, found = calc_rate(rate_formula(o), su_pars(o), rel_reserve, turnover, corr_j_E_mai, y_E_EC(o), y_E_EN(o), y_V_E(o), κsoma(o))
+    if !found
+        println("Root for rate not found at t - $(tstep(o))")
+       return false # dead
+    elseif r < zero(r) 
+        println("Rate is less than zero at t - $(tstep(o))")
+        return false # dead
+    else
+        set_rate!(o, r)
+    end
 
     J1[:C,:ctb], J1[:N,:ctb] = non_growth_flux.(reserve, turnover, r)
     J1[:C,:rej], J1[:N,:rej], J1[:E,:ctb] = stoich_merge(su_pars(o), J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
