@@ -181,7 +181,7 @@ Plant(; params = (ShootParamsCN(), RootParamsCN()),
         environment = nothing,
         time = 0hr:1hr:8760hr,
         environment_start = setindex!(Array{typeof(1hr),0}(undef), 1hr),
-        dead = setindex!(Array{Bool,0}(undef), false)
+        dead = Ref(false)
       ) = begin
     if records == nothing
         records = []
