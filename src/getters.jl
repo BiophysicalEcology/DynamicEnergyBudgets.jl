@@ -75,20 +75,21 @@ maintenance_pars(p) = p.maintenance_pars
 @forward AbstractOrgan.params rate_formula, assimilation_pars, shape_pars, allometry_pars, maturity_pars,
                               trans_pars, production_pars, rejection_pars, germination_pars, turnover_pars
 
-@forward AbstractOrgan.shared maintenance_pars, feedback_pars, su_pars, tempcorr_pars, catabolism_pars, core_pars
+@forward AbstractOrgan.shared maintenance_pars, feedback_pars, su_pars, tempcorr_pars, catabolism_pars, core_pars,
+                              y_V_E, y_E_EC, y_E_EN, n_N_P, n_N_V, n_N_E, n_N_EC, n_N_EN, w_V, w_C, w_N, w_E
 
-y_V_E(o::AbstractOrgan) = core_pars(o).y_V_E
-y_E_EC(o::AbstractOrgan) = core_pars(o).y_E_EC
-y_E_EN(o::AbstractOrgan) = core_pars(o).y_E_EN
-n_N_P(o::AbstractOrgan) = production_pars(o).n_N_P
-n_N_V(o::AbstractOrgan) = core_pars(o).n_N_V
-n_N_E(o::AbstractOrgan) = core_pars(o).n_N_E
-n_N_EC(o::AbstractOrgan) = core_pars(o).n_N_EC
-n_N_EN(o::AbstractOrgan) = core_pars(o).n_N_EN
-w_V(o::AbstractOrgan) = core_pars(o).w_V
-w_C(o::AbstractOrgan) = core_pars(o).w_C 
-w_N(o::AbstractOrgan) = core_pars(o).w_N
-w_E(o::AbstractOrgan) = core_pars(o).w_E
+n_N_P(p) = production_pars(p).n_N_P
+y_V_E(p) = core_pars(p).y_V_E
+y_E_EC(p) = core_pars(p).y_E_EC
+y_E_EN(p) = core_pars(p).y_E_EN
+n_N_V(p) = core_pars(p).n_N_V
+n_N_E(p) = core_pars(p).n_N_E
+n_N_EC(p) = core_pars(p).n_N_EC
+n_N_EN(p) = core_pars(p).n_N_EN
+w_V(p) = core_pars(p).w_V
+w_C(p) = core_pars(p).w_C 
+w_N(p) = core_pars(p).w_N
+w_E(p) = core_pars(p).w_E
 
 @inline j_E_mai(o::AbstractOrgan) = maintenance_pars(o).j_E_mai
 
