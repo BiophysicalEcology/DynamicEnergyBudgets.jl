@@ -20,18 +20,18 @@ end
 apply_environment!(a::FvCBPhotosynthesis, o, u, shootenv, rootenv) = begin
     va = assimilation_vars(o)
 
-    va.tair = temp = airtemperature(env)
-    va.windspeed = windspeed(env)
-    va.rh = relhumidity(env)
-    va.rnet = radiation(env)
-    va.par = radiation(env) * parconv
-    va.soilmoist = soilwatercontent(env)
-    va.swp = mean_soilwaterpotential(env)
+    va.tair = temp = airtemperature(shootenv)
+    va.windspeed = windspeed(shootenv)
+    va.rh = relhumidity(shootenv)
+    va.rnet = radiation(shootenv)
+    va.par = radiation(shootenv) * parconv
+    # va.soilmoist = mean_soilwatercontent(rootenv)
+    va.swp = mean_soilwaterpotential(rootenv.microclimate, depth(o), rootenv.t)
 
     update_temp!(o, temp)
 
     if is_germinated(o, u)
-        phototranspiration!(va, assimilation_pars(o).photoparams)
+        run_enbal!(assimilation_pars(o).photoparams, va)
     else
         va.tleaf = va.tair
     end
@@ -39,7 +39,7 @@ end
 
 apply_environment!(a::AbstractCAssim, o, u, shootenv, rootenv) = begin
     update_temp!(o, airtemperature(shootenv))
-    assimilation_vars(o).J_L_F = radiation(shootenv) * 4.57mol*W^-1*s^-1
+    assimilation_vars(o).J_L_F = radiation(shootenv) * parconv
     # Use the mean soil water potential between zero and the full root depth 
     assimilation_vars(o).soilwaterpotential = mean_soilwaterpotential(rootenv.microclimate, depth(o), rootenv.t)
 end

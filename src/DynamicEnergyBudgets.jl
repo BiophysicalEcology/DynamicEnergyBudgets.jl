@@ -29,8 +29,8 @@ using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, m
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @selectable,
-                      prior, default, description, units, limits, logscaled, flattenable, selectable
+import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @plottable, @selectable,
+                      prior, default, description, units, limits, logscaled, flattenable, plottable, selectable
 import Photosynthesis: potential_dependence                      
 
 

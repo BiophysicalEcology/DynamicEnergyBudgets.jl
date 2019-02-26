@@ -141,10 +141,10 @@ define_organs(params::Tuple{}, shared, records::Tuple{}, t) = ()
 
 
 "Records of mutable variables and flux for ploting and analysis"
-struct Records{V,F,F1}
-    vars::V
-    J::F
-    J1::F1
+@plottable struct Records{V,F,F1}
+    vars::V | true
+    J::F    | false
+    J1::F1  | false 
 end
 "Constructor for records. Arrays use the length of the current timespan"
 Records(params, vars, time, val, typ) = begin
