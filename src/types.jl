@@ -81,15 +81,15 @@ end
 # Variables
 
 " Model variables "
-@units @udefault_kw struct Vars{V,F,MoMoD,C,M,T}
-    assimilation_vars::V | nothing | _
-    shape::F             | [0.0]   | _
-    rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1
-    θE::F                | [0.0]   | _
-    temp::C              | [25.0]  | K
-    tempcorrection::F    | [1.0]   | _
-    height::M            | [0.0]   | m
-    t::T                 | [1]     | _
+@plottable @units @udefault_kw struct Vars{V,F,MoMoD,C,M,T}
+    assimilation_vars::V | nothing | _                 | _
+    shape::F             | [0.0]   | _                 | _
+    rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1   | _
+    θE::F                | [0.0]   | _                 | _
+    temp::C              | [25.0]  | K                 | _
+    tempcorrection::F    | [1.0]   | _                 | _
+    height::M            | [0.0]   | m                 | _
+    t::T                 | [1]     | _                 | false
 end
 
 build_vars(vars, time) = begin
