@@ -3,12 +3,12 @@ abstract type AbstractAllometry end
 
 @columns @flattenable struct SqrtAllometry{B0,B1} <: AbstractAllometry
     # Field       | Flatn | Default | Unit | Pror            | Limits         | Log  | Description
-    β0::B0        | true  | 1e-4*24 | g    | Gamma(2.0, 0.2) | [1e-6, 10.00]  | true | "Intercept"
+    β0::B0        | false | 1e-4*24 | g    | Gamma(2.0, 0.2) | [1e-6, 10.00]  | true | "Intercept"
     β1::B1        | true  | 0.1     | m    | Gamma(2.0, 0.2) | [1e-2, 1.0]    | true | "Scalar"
 end
 
 @columns @flattenable struct Allometry{B0,B1,A} <: AbstractAllometry
-    β0::B0        | true  | 1e-4*24 | g    | Gamma(2.0, 0.2) | [1e-6, 10.00]  | true | "Intercept"
+    β0::B0        | false | 1e-4*24 | g    | Gamma(2.0, 0.2) | [1e-6, 10.00]  | true | "Intercept"
     β1::B1        | true  | 0.1     | m    | Gamma(2.0, 0.2) | [1e-5, 10.00]  | true | "Scalar"
     α::A          | true  | 0.1     | _    | Gamma(2.0, 0.2) | [1e-3, 100.00] | true | "Exponent"
 end
