@@ -88,7 +88,7 @@ check_params(o::Organ) = begin
     # (2n_N_E(o), n_N_EC(o), y_E_EC(o), n_N_EN(o), y_E_EN(o)))
     2n_N_E(o) <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for N conservation ", 
                                                    (n_N_E(o), y_E_EC(o), y_E_EN(o)))
-    check_params(production_pars(o), o::Organ)
+    check_params(production_pars(o), o)
 
     # These will be required if structures can have different reserve N ratios
     # y_E_ET(o) < n_N_E/n_N_E
@@ -97,6 +97,6 @@ check_params(o::Organ) = begin
 end
 check_params(p::Nothing, o::Organ) = nothing 
 check_params(p::Production, o::Organ) = begin 
-    p.y_P_V <= n_N_P(o)/n_N_V(o) || error("y_P_V too high for N conservation ", (p.y_P_V, p.n_N_P, n_N_V(o)))
+    p.y_P_V <= p.n_N_P/n_N_V(o) || error("y_P_V too high for N conservation ", (p.y_P_V, p.n_N_P, n_N_V(o)))
     p.j_P_mai <= j_E_mai(o) || error("j_P_mai must be lower than j_E_mai ", (p.j_P_mai, j_E_mai(o)))
 end

@@ -144,3 +144,6 @@ translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
     Jd[:N,:tra] = transN
     nothing
 end
+
+
+κtra(trans_pars::AbstractTranslocation) = trans_pars.κtra

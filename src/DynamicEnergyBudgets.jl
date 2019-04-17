@@ -25,7 +25,7 @@ using Unitful,
       Apply,
       Flatten
 
-using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ
+using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ, R
 using Base: tail
 
 import FieldDefaults: get_default
@@ -61,9 +61,9 @@ export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, Kfamily
 
 export AbstractRate, SimpleRate, FZeroRate
 
-export AbstractStateFeedback, LosslessAutophagy, DissipativeAutophagy
+export AbstractStateFeedback, LosslessAutophagy, StructuralLossAutophagy, DissipativeAutophagy
 
-export AbstractTemperatureCorrection, TempCorr, TempCorrLower, TempCorrLowerUpper
+export AbstractTemperatureCorrection, TempCorr, TempCorrLower, TempCorrLowerUpper, ParentTardieu
 
 export AbstractScaling, KooijmanArea
 
@@ -81,7 +81,7 @@ export AbstractShape, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph
 
 export AbstractRejection, LosslessRejection, DissipativeRejection
 
-export AbstractCatabolism, CatabolismE, CatabolismCN, CatabolismCNE
+export AbstractCatabolism, Catabolism, CatabolismCN, CatabolismCNshared, CatabolismCNE
 
 export AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultipleTranslocation,
        LosslessTranslocation, DissipativeTranslocation
@@ -125,12 +125,14 @@ include("components/germination.jl")
 include("components/maturity.jl")
 include("components/production.jl")
 include("components/translocation.jl")
+include("components/catabolism.jl")
+include("components/maintenance.jl")
 include("types.jl")
 include("environment.jl")
-include("model.jl")
 include("getters.jl")
 include("functions.jl")
 include("setup.jl")
+include("model.jl")
 include("aliases.jl")
 
 end # module

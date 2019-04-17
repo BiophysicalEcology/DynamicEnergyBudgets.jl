@@ -1,60 +1,32 @@
-abstract type AbstractCatabolism end
-
-@mix @columns struct CatabolismCN{MoMoD}
-    k_EC::MoMoD | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
-    k_EN::MoMoD | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "N-reserve turnover rate"
-end
-
-@mix @columns struct CatabolismE{MoMoD}
-    k_E::MoMoD  | 0.2 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _  | "C-reserve turnover rate"
-end
-
-@CatabolismE struct CatabolismE{} <: AbstractCatabolism end
-@CatabolismE struct CatabolismCN{} <: AbstractCatabolism end
-@CatabolismE @CatabolismCN struct CatabolismCNE{} <: AbstractCatabolism end
-
-# Unnecessary and probably suboptimal
-# κEC::F             | 0.3             | _               | Beta(2.0, 2.0)  | [0.0,1.0]  | _ | "Non-processed C-reserve returned to C-reserve"
-# κEN::F             | 0.3             | _               | Beta(2.0, 2.0)  | [0.0,1.0]  | _ | "Non-processed N-reserve returned to N-reserve"
-
-
-abstract type AbstractMaintenance end
-
-@columns struct Maintenance{MoMoD} <: AbstractMaintenance
-    j_E_mai::MoMoD       | 0.01 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [1e-4, 1.0] | true | "Spec somatic maint costs."
-end
-
-
-abstract type AbstractParams end
-
-" Model parameters that vary between organs "
-@selectable @flattenable @default_kw struct Params{A,S,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
-    # Field              | Default                | _     | Selectable Types
-    name::Symbol         | :organ                 | false | _
-    rate_formula         | FZeroRate()            | _     | _
-    assimilation_pars::A | ConstantCAssim()       | _     | Union{Nothing,AbstractAssim}
-    shape_pars::S        | Plantmorph()           | _     | Union{Nothing,AbstractShape}
-    allometry_pars::Al   | nothing                | _     | Union{Nothing,AbstractAllometry}
-    maturity_pars::Ma    | nothing                | _     | Union{Nothing,AbstractMaturity}
-    trans_pars::Tr       | nothing                | _     | Union{Nothing,AbstractTranslocation}
-    rejection_pars::Re   | LosslessRejection()    | _     | AbstractRejection
-    germination_pars::Ge | ThresholdGermination() | _     | Union{Nothing,AbstractGermination}
-    production_pars::Pr  | Production()           | _     | Union{Nothing,AbstractProduction}
-end
-
-
 abstract type AbstractDEBCore end
 
 @columns struct DEBCore{MoMo,GMo} <: AbstractDEBCore
     y_V_E::MoMo  | 0.7   | _        | Beta(2.0, 2.0)  | [0.0, 1.0]   | _     | "From reserve to structure"
-    y_E_EC::MoMo | 0.7   | _        | Gamma(2.0, 2.0) | [1e-6, 1.0]  | true  | "From C-reserve to reserve, using nitrate"
+    y_E_EC::MoMo | 0.7   | _        | Gamma(2.0, 2.0) | [1e-6, 1.0]  | false | "From C-reserve to reserve, using nitrate"
     y_E_EN::MoMo | 30.0  | _        | Gamma(2.0, 2.0) | [1.0, 50.0]  | false | "From N-reserve to reserve"
     n_N_V::MoMo  | 0.03  | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in structure"
     n_N_E::MoMo  | 0.025 | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in reserve"
     w_V::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot structure"
-    w_N::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot N-reserve"
+    # w_N::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot N-reserve"
     # w_C::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [12.0, 40.0] | _     | "Mol-weight of shoot C-reserve"
     # w_E::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot reserve"
+end
+
+abstract type AbstractParams end
+
+" Model parameters that vary between organs "
+@selectable @flattenable @default_kw struct Params{As,Sh,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
+    # Field               | Default                | _     | Selectable Types
+    name::Symbol          | :organ                 | false | _
+    rate_formula          | FZeroRate()            | _     | _
+    assimilation_pars::As | ConstantCAssim()       | _     | Union{Nothing,AbstractAssim}
+    shape_pars::Sh        | Plantmorph()           | _     | Union{Nothing,AbstractShape}
+    allometry_pars::Al    | nothing                | _     | Union{Nothing,AbstractAllometry}
+    maturity_pars::Ma     | nothing                | _     | Union{Nothing,AbstractMaturity}
+    trans_pars::Tr        | nothing                | _     | Union{Nothing,AbstractTranslocation}
+    rejection_pars::Re    | LosslessRejection()    | _     | AbstractRejection
+    germination_pars::Ge  | ThresholdGermination() | _     | Union{Nothing,AbstractGermination}
+    production_pars::Pr   | Production()           | _     | Union{Nothing,AbstractProduction}
 end
 
 #    %   W   Rel n atoms
@@ -67,22 +39,22 @@ end
 
 
 " Model parameters shared between organs "
-@selectable @udefault_kw struct SharedParams{SU,Co,FB,TC,Tu,Mt}
+@selectable @udefault_kw struct SharedParams{SU,Co,Fe,Te,Ca,Mt}
     # Field               | Default                   | Selectable Types
     su_pars::SU           | ParallelComplementarySU() | AbstractSynthesizingUnit
     core_pars::Co         | DEBCore()                 | _
-    feedback_pars::FB     | nothing                   | Union{Nothing,AbstractStateFeedback}
-    tempcorr_pars::TC     | nothing                   | Union{Nothing,AbstractTemperatureCorrection}
-    catabolism_pars::Tu   | CatabolismCN()            | AbstractCatabolism
+    feedback_pars::Fe     | nothing                   | Union{Nothing,AbstractStateFeedback}
+    tempcorr_pars::Te     | nothing                   | Union{Nothing,AbstractTemperatureCorrection}
+    catabolism_pars::Ca   | CatabolismCN()            | AbstractCatabolism
     maintenance_pars::Mt  | Maintenance()             | AbstractMaintenance
 end
 
 ###########################################################################################
 # Variables
 
+
 " Model variables "
-@plottable @units @udefault_kw struct Vars{V,F,MoMoD,C,M,T}
-    assimilation_vars::V | nothing | _                 | _
+@plottable @units @udefault_kw struct Vars{F,MoMoD,C,M,T}
     shape::F             | [0.0]   | _                 | _
     rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1   | _
     θE::F                | [0.0]   | _                 | _
@@ -175,7 +147,7 @@ end
 
 "Outer construtor for defaults"
 Plant(; params = (ShootParamsCN(), RootParamsCN()),
-        vars = (ShootVars(), RootVars()),
+        vars = (Vars(), Vars()),
         shared = SharedParams(),
         records = nothing,
         environment = nothing,

@@ -22,6 +22,8 @@ update_height!(o, u) = update_height!(allometry_pars(o), o, u)
 update_height!(f::Nothing, o, u) = nothing
 update_height!(f, o, u) = set_height!(o, allometric_height(f, mass(o, u)))
 
-allometric_height(f::SqrtAllometry, mass) = sqrt((mass - f.β0) / unit(f.β0)) * f.β1
-allometric_height(f::Allometry, mass) = f.β1 * ((max(zero(mass), mass - f.β0))/unit(f.β0))^f.α
 allometric_height(f::FixedAllometry, mass) = f.height
+allometric_height(f::SqrtAllometry, mass) = sqrt((mass - f.β0) / unit(f.β0)) * f.β1
+allometric_height(f::Allometry, mass) = begin
+    f.β1 * ((max(zero(mass), mass - f.β0))/unit(f.β0))^f.α
+end
