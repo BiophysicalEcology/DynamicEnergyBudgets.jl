@@ -29,7 +29,7 @@ using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, m
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @description, @units, @limits, @logscaled, @flattenable, @plottable, @selectable,
+import FieldMetadata: @prior, @default, @redefault, @description, @units, @limits, @logscaled, @flattenable, @plottable, @selectable,
                       prior, default, description, units, limits, logscaled, flattenable, plottable, selectable
 import Photosynthesis: potential_dependence                      
 
@@ -55,13 +55,13 @@ export AbstractAssimilation,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
-       KooijmanNH4_NO3Assim, FvCBPhotosynthesis, ConstantCAssim
+       KooijmanNH4_NO3Assim, AbstractFvCBCAssim, BallBerryCAssim, EmaxCAssim, ConstantCAssim
 
 export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, KfamilySU
 
 export AbstractRate, SimpleRate, FZeroRate
 
-export AbstractStateFeedback, LosslessAutophagy, StructuralLossAutophagy, DissipativeAutophagy
+export AbstractResorption, LosslessResorption, StructuralLossResorption, DissipativeResorption
 
 export AbstractTemperatureCorrection, TempCorr, TempCorrLower, TempCorrLowerUpper, ParentTardieu
 
@@ -119,7 +119,7 @@ include("components/temperature_correction.jl")
 include("components/rate.jl")
 include("components/shape.jl")
 include("components/allometry.jl")
-include("components/autophagy.jl")
+include("components/resorption.jl")
 include("components/assimilation.jl")
 include("components/germination.jl")
 include("components/maturity.jl")

@@ -46,7 +46,7 @@ production_pars(p) = p.production_pars
 rejection_pars(p) = p.rejection_pars
 germination_pars(p) = p.germination_pars
 turnover_pars(p) = p.turnover_pars
-feedback_pars(p) = p.feedback_pars
+resorption_pars(p) = p.resorption_pars
 tempcorr_pars(p) = p.tempcorr_pars
 core_pars(p) = p.core_pars
 su_pars(p) = p.su_pars
@@ -59,7 +59,7 @@ maintenance_pars(p) = p.maintenance_pars
 @forward AbstractOrgan.params rate_formula, assimilation_pars, shape_pars, allometry_pars, maturity_pars,
                               trans_pars, production_pars, rejection_pars, germination_pars, turnover_pars
 
-@forward AbstractOrgan.shared maintenance_pars, feedback_pars, su_pars, tempcorr_pars, catabolism_pars, core_pars,
+@forward AbstractOrgan.shared maintenance_pars, resorption_pars, su_pars, tempcorr_pars, catabolism_pars, core_pars,
                               y_V_E, y_E_EC, y_E_EN, n_N_P, n_N_V, n_N_E, n_N_EC, n_N_EN, w_V, w_C, w_N, w_E
 
 n_N_P(p) = production_pars(p).n_N_P

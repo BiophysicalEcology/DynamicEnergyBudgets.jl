@@ -7,7 +7,7 @@ end
 
 apply_environment!(plant, organs, u, t) = 
     apply_environment!(plant, environment(plant), organs, u, t)
-apply_environment!(plant, ::Nothing, organs, u, t) = nothing
+apply_environment!(plant, env::Nothing, organs, u, t) = nothing
 apply_environment!(plant, env::ManualTemperature, organs, u, t) = begin
     envpos = ustrip(calc_envtime(plant, t))
     shoot, root = organs
@@ -36,7 +36,7 @@ apply_environment!(plant, env::MicroclimControl, organs, u, t) = begin
     nothing
 end
 
-apply_environment!(a::FvCBPhotosynthesis, o, u, shootenv, rootenv) = begin
+apply_environment!(a::AbstractFvCBCAssim, o, u, shootenv, rootenv) = begin
     v = a.vars
 
     v.tair = temp = airtemperature(shootenv)
@@ -44,15 +44,13 @@ apply_environment!(a::FvCBPhotosynthesis, o, u, shootenv, rootenv) = begin
     v.rh = relhumidity(shootenv)
     v.rnet = radiation(shootenv)
     v.par = radiation(shootenv) * parconv
+    v.vpd = vapour_pressure_deficit(v.tair, v.rh)
     # v.soilmoist = mean_soilwatercontent(rootenv)
+    v.swp = mean_soilwaterpotential(rootenv.microclimate, depth(o), rootenv.t)
 
-    update_temp!(o, temp)
+    enbal!(assimilation_pars(o).photoparams, v)
 
-    if is_germinated(o, u)
-        run_enbal!(assimilation_pars(o).photoparams, v)
-    else
-        v.tleaf = v.tair
-    end
+    update_temp!(o, v.tleaf)
 end
 
 apply_environment!(a::AbstractAssim, o, u, shootenv, rootenv) = 

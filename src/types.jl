@@ -43,7 +43,7 @@ end
     # Field               | Default                   | Selectable Types
     su_pars::SU           | ParallelComplementarySU() | AbstractSynthesizingUnit
     core_pars::Co         | DEBCore()                 | _
-    feedback_pars::Fe     | nothing                   | Union{Nothing,AbstractStateFeedback}
+    resorption_pars::Fe   | nothing                   | Union{Nothing,AbstractResorption}
     tempcorr_pars::Te     | nothing                   | Union{Nothing,AbstractTemperatureCorrection}
     catabolism_pars::Ca   | CatabolismCN()            | AbstractCatabolism
     maintenance_pars::Mt  | Maintenance()             | AbstractMaintenance

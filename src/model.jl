@@ -56,7 +56,7 @@ metabolism!(o::AbstractOrgan, u) = begin
     growth!(o, u)
     maturity!(o, u)
     maintenence!(o, u)
-    feedback!(o, u)
+    resorption!(o, u)
     return true
 end
 

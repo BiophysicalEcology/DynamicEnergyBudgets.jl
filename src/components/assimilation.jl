@@ -40,21 +40,43 @@ abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
     # Field       | Def | Unit              | Prior            | Limits      | Log | Description
-    uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | Gamma(2.0, 2.0)  | [0.0, 10.0] | _   | "constant rate of C uptake"
+    c_uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | Gamma(2.0, 2.0)  | [0.0, 10.0] | _   | "constant rate of C uptake"
 end                                                            
                                                                
 @columns struct ConstantNAssim{μMoMS} <: AbstractNAssim        
-    uptake::μMoMS | 0.1  | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0)  | [0.0, 0.5]  | _   | "constant rate of N uptake" 
+    n_uptake::μMoMS | 0.1  | μmol*mol^-1*s^-1 | Gamma(2.0, 2.0)  | [0.0, 0.5]  | _   | "constant rate of N uptake" 
 end
 
 @mix @columns struct SLA{MG}
     SLA::MG       | 24.0 | m^2*kg^-1        | Gamma(10.0, 1.0) | [5.0, 30.0] | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
+
+abstract type AbstractFvCBCAssim <: AbstractCAssim end
+
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
-@SLA struct FvCBPhotosynthesis{P,V} <: AbstractCAssim
-    vars::V        | Photosynthesis.PhotoVars           | _ | _ | _ | _ | _
-    photoparams::P | Photosynthesis.FvCBEnergyBalance() | _ | _ | _ | _ | _
+@mix @columns @flattenable struct MixinFvCB{P,V,MG}
+    vars::V        | false | Photosynthesis.EmaxVars() | _ | _ | _ | _ | _
+    photoparams::P | true  | FvCB() | _ | _ | _ | _ | _
+    SLA::MG        | true  | 24.0   | m^2*kg^-1  | Gamma(10.0, 1.0) | [5.0, 30.0] | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
+end
+
+# @MixinFvCB struct EmaxCAssim{} <: AbstractFvCBCAssim end
+
+# @redefault struct EmaxCAssim
+#     vars        | Photosynthesis.EmaxVars()
+#     photoparams | Photosynthesis.FvCBEnergyBalance(photosynthesis=EmaxPhotosynthesis())
+# end
+
+@MixinFvCB struct BallBerryCAssim{} <: AbstractFvCBCAssim end
+
+@redefault struct BallBerryCAssim
+    vars        | Photosynthesis.EmaxVars()
+    photoparams | Photosynthesis.FvCBEnergyBalance(
+                      photosynthesis=FvCBPhotosynthesis(
+                          stomatal_conductance=BallBerryStomatalConductance(
+                              soilmethod = PotentialSoilMethod())))
+                      
 end
 
 @mix @SLA @columns struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
@@ -65,9 +87,9 @@ end
     K_C::MoL            | 50*1e-6/gas_molpL | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]    | true | "Half-saturation concentration of carbon dioxide"
     K_O::MoL            | 0.0021/gas_molpL  | mol*L^-1         | Gamma(2.0, 2.0) | [1e-7, 100.0]    | true | "Half-saturation concentration of oxygen"
     J_L_K::MoMS         | 2000.0            | mol*m^-2*s^-1    | Gamma(2.0, 2.0) | [1e-3, 100000.0] | true | "Half-saturation flux of useful photons"
-    j_L_Amax::μMoMS     | 100.01            | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [1e-4, 10000.0]  | true | "Max spec uptake of useful photons"
-    j_C_Amax::μMoMS     | 20.0              | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [5.0,  100.0]    | true | "Max spec uptake of carbon dioxide"
-    j_O_Amax::μMoMS     | 0.1               | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [0.01,  50.0]    | true | "Max spec uptake of oxygen"
+    j_L_Amax::μMoMS     | 100.01            | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [1e-4, 10000.0]  | true | "Maximum specific uptake of useful photons"
+    j_C_Amax::μMoMS     | 20.0              | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [5.0,  100.0]    | true | "Maximum specific uptake of carbon dioxide"
+    j_O_Amax::μMoMS     | 0.1               | μmol*m^-2*s^-1   | Gamma(2.0, 2.0) | [0.01,  50.0]    | true | "Maximum specific uptake of oxygen"
 end
 
 abstract type AbstractKooijmanPhoto <: AbstractCAssim end
@@ -134,7 +156,8 @@ assimilation!(p::HasCNE, f::AbstractCAssim, o, u) = begin
     # J1[:N,:los] += ln
 end
 assimilation!(::HasCN, f::AbstractCAssim, o, u) = begin
-    flux(o)[:C,:ass] = photosynthesis(f, o, u) * u.V * shape(o)
+    c = photosynthesis(f, o, u) 
+    flux(o)[:C,:ass] = max(c, zero(c)) * u.V * shape(o)
 end
 
 """
@@ -187,13 +210,13 @@ end
     photosynthesis(f::ConstantCAssim, o, u)
 Returns a constant rate of carbon assimilation.
 """
-photosynthesis(f::ConstantCAssim, o, u) = f.uptake
+photosynthesis(f::ConstantCAssim, o, u) = f.c_uptake
 
 """
-    photosynthesis(f::FvCBPhotosynthesis, o, u)
-Returns carbon assimilated in mols per time.
+    photosynthesis(f::AbstractFvCBCAssimilation, o, u)
+Returns carbon assimilated in mols per unit time.
 """
-photosynthesis(f::FvCBPhotosynthesis, o, u) = f.vars.aleaf * f.SLA * w_V(o)
+photosynthesis(f::AbstractFvCBCAssim, o, u) = f.vars.aleaf * f.SLA * w_V(o)
 
 """
     photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
@@ -228,7 +251,7 @@ photosynthesis(f::KooijmanWaterPotentialPhotosynthesis, o, u) = begin
     j1_l = half_saturation(f.j_L_Amax, f.J_L_K, va.J_L_F) * mass_area_coef / 2
 
     # Modify CO2 and O2 intake by water availability to simulate stomatal closure. 
-    potentialcorrection = potential_dependence(f.potential_modifier, va.soilwaterpotential)
+    potentialcorrection = Photosynthesis.non_stomatal_potential_dependence(f.potential_modifier, va.soilwaterpotential)
     j1_c = half_saturation(f.j_C_Amax, f.K_C, va.X_C) * mass_area_coef * potentialcorrection * tempcorrection(o)
     j1_o = half_saturation(f.j_O_Amax, f.K_O, va.X_O) * mass_area_coef * potentialcorrection * tempcorrection(o)
 
@@ -258,7 +281,7 @@ end
     nitrogen_uptake(f::ConstantNAssim, o, u)
 Returns constant nitrogen assimilation.
 """
-nitrogen_uptake(f::ConstantNAssim, o, u) = f.uptake * tempcorrection(o)
+nitrogen_uptake(f::ConstantNAssim, o, u) = f.n_uptake * tempcorrection(o)
 
 """
     nitrogen_uptake(f::KooijmanNH4_NO3Assim, o, u)
