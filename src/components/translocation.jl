@@ -2,33 +2,19 @@ abstract type AbstractTranslocation end
 abstract type AbstractDissipativeTranslocation <: AbstractTranslocation end
 abstract type AbstractLosslessTranslocation <: AbstractTranslocation end
 
-@mix @columns @flattenable struct Trans{F}
-    κtra::F        | 0.6     | _   | Beta(2.0, 2.0)  | [0.0,1.0]      | _ | "Reserve flux allocated to translocation"
+@mix @flattenable @columns struct Trans{F}
+#   Field          | Flat  | Default  | Unit | Bounds |
+    κtra::F        | true  | 0.6      | _ | [0.0,1.0] | _ | "Reserve flux allocated to translocation"
 end
 
-@mix @columns @flattenable struct MultiTrans{D,P}
-    destnames::D   | false | (:leaf,) | _ | _              | _         | _ | "The organ/s translocated to"
-    proportions::P | true  | (1.0,)   | _ | Beta(2.0, 2.0) | [0.0,1.0] | _ | "The proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
+@mix @flattenable @columns struct MultiTrans{D,P}
+    destnames::D   | false | (:leaf,) | _ | _         | _ | "The organ/s translocated to"
+    proportions::P | true  | (1.0,)   | _ | [0.0,1.0] | _ | "The proportion of translocation sent in the first translocation. Only for inetermediaries. nothing = 100%"
 end
 
-@mix @columns @flattenable struct DissTrans{MoMo}
-    y_E_ET::MoMo   | true | 0.8       | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0]    | _ | "Translocated reserve:"
+@mix @flattenable @columns struct DissTrans{MoMo}
+    y_E_ET::MoMo   | true | 0.8       | mol*mol^-1   | [0.0,1.0] | _ | "Translocated reserve:"
 end
-
-# Dissipation types
-@Trans @MultiTrans @DissTrans struct DissipativeMultipleTranslocation{} <: AbstractDissipativeTranslocation end
-@Trans @DissTrans struct DissipativeTranslocation{} <: AbstractDissipativeTranslocation  end
-@Trans @MultiTrans struct LosslessMultipleTranslocation{} <: AbstractLosslessTranslocation end
-@Trans struct LosslessTranslocation{} <: AbstractLosslessTranslocation end
-
-
-abstract type AbstractRejection end
-
-@columns struct DissipativeRejection{MoMo} <: AbstractRejection
-    y_EC_ECT::MoMo       | 1.0             | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Translocated C-reserve"
-    y_EN_ENT::MoMo       | 1.0             | mol*mol^-1      | Beta(2.0, 2.0)  | [0.0,1.0] | _ | "Translocated N-reserve"
-end
-struct LosslessRejection <: AbstractRejection end
 
 
 
@@ -69,6 +55,11 @@ whichever is not the current organs. Will not run with less than 2 organs.
 """
 translocate!(o1, o2, prop) = translocate!(trans_pars(o1), o1, o2, prop)
 translocate!(p::Nothing, o1, o2, prop) = nothing
+
+
+
+@Trans @DissTrans struct DissipativeTranslocation{} <: AbstractDissipativeTranslocation  end
+
 translocate!(p::AbstractDissipativeTranslocation, o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[:E,:ctb]
@@ -84,6 +75,9 @@ translocate!(p::AbstractDissipativeTranslocation, o1, o2, prop) = begin
     nothing
 end
 
+
+@Trans struct LosslessTranslocation{} <: AbstractLosslessTranslocation end
+
 translocate!(p::AbstractLosslessTranslocation, o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[:E,:ctb]
@@ -97,6 +91,10 @@ translocate!(p::AbstractLosslessTranslocation, o1, o2, prop) = begin
     nothing
 end
 
+
+# Not implemented yet
+@Trans @MultiTrans struct LosslessMultipleTranslocation{} <: AbstractLosslessTranslocation end
+@Trans @MultiTrans @DissTrans struct DissipativeMultipleTranslocation{} <: AbstractDissipativeTranslocation end
 
 """
 Translocation occurs between adjacent organs.
@@ -116,12 +114,24 @@ translocation!(organs::Tuple{T}) where T = nothing
 translocation!(organs::Tuple{}) = nothing
 
 
+
+abstract type AbstractRejection end
+
 """
 Reallocate state rejected from synthesizing units.
 TODO: add a 1-organs method. How does this interact with assimilation?  
 """
 translocate_rejected!(source, dest, prop) = translocate_rejected!(rejection_pars(source), source, dest, prop)
 translocate_rejected!(f::Nothing, source, dest, prop) = nothing
+
+"""
+    DissipativeRejection(y_EC_ECT, y_EN_ENT)
+"""
+@columns struct DissipativeRejection{MoMo} <: AbstractRejection
+    y_EC_ECT::MoMo       | 1.0             | mol*mol^-1      | [0.0,1.0] | _ | "Translocated C-reserve"
+    y_EN_ENT::MoMo       | 1.0             | mol*mol^-1      | [0.0,1.0] | _ | "Translocated N-reserve"
+end
+
 translocate_rejected!(f::DissipativeRejection, source, dest, prop) = begin
     Js, J1s, Jd = flux(source), flux1(source), flux(dest)
     transC = J1s[:C,:rej] # * (1 - κEC(o))
@@ -134,6 +144,9 @@ translocate_rejected!(f::DissipativeRejection, source, dest, prop) = begin
     # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
     nothing
 end
+
+struct LosslessRejection <: AbstractRejection end
+
 translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
     Js, J1s, Jd = flux(source), flux1(source), flux(dest)
     transC = J1s[:C,:rej] # * (1 - κEC(o))

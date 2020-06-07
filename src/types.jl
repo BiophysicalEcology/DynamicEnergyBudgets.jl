@@ -1,16 +1,15 @@
-abstract type AbstractDEBCore end
 
-@columns struct DEBCore{MoMo,GMo} <: AbstractDEBCore
-    y_V_E::MoMo  | 0.7   | _        | Beta(2.0, 2.0)  | [0.0, 1.0]   | _     | "From reserve to structure"
-    y_E_EC::MoMo | 0.7   | _        | Gamma(2.0, 2.0) | [1e-6, 1.0]  | false | "From C-reserve to reserve, using nitrate"
-    y_E_EN::MoMo | 30.0  | _        | Gamma(2.0, 2.0) | [1.0, 50.0]  | false | "From N-reserve to reserve"
-    n_N_V::MoMo  | 0.03  | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in structure"
-    n_N_E::MoMo  | 0.025 | _        | Gamma(2.0, 2.0) | [0.0, 0.1]   | _     | "N/C in reserve"
-    w_V::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot structure"
-    # w_N::GMo     | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot N-reserve"
-    # w_C::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [12.0, 40.0] | _     | "Mol-weight of shoot C-reserve"
-    # w_E::GMo   | 25.0  | g*mol^-1 | Gamma(2.0, 2.0) | [15.0, 40.0] | _     | "Mol-weight of shoot reserve"
+
+# So we don't have to depend on all of Lazy.jl
+macro forward(ex, fs)
+  @capture(ex, T_.field_) || error("Syntax: @forward T.x f, g, h")
+  T = esc(T)
+  fs = isexpr(fs, :tuple) ? map(esc, fs.args) : [esc(fs)]
+  :($([:($f(x::$T, args...) = (Base.@_inline_meta; $f(x.$field, args...)))
+       for f in fs]...);
+    nothing)
 end
+
 
 abstract type AbstractParams end
 
@@ -28,6 +27,32 @@ abstract type AbstractParams end
     germination_pars::Ge  | ThresholdGermination() | _     | Union{Nothing,AbstractGermination}
     production_pars::Pr   | Production()           | _     | Union{Nothing,AbstractProduction}
 end
+
+
+rate_formula(p) = p.rate_formula
+assimilation_pars(p) = p.assimilation_pars
+shape_pars(p) = p.shape_pars
+allometry_pars(p) = p.allometry_pars
+maturity_pars(p) = p.maturity_pars
+trans_pars(p) = p.trans_pars
+rejection_pars(p) = p.rejection_pars
+germination_pars(p) = p.germination_pars
+production_pars(p) = p.production_pars
+
+# turnover_pars(p) = p.turnover_pars
+
+n_N_P(p) = production_pars(p).n_N_P
+y_V_E(p) = core_pars(p).y_V_E
+y_E_EC(p) = core_pars(p).y_E_EC
+y_E_EN(p) = core_pars(p).y_E_EN
+n_N_V(p) = core_pars(p).n_N_V
+n_N_E(p) = core_pars(p).n_N_E
+n_N_EC(p) = core_pars(p).n_N_EC
+n_N_EN(p) = core_pars(p).n_N_EN
+w_V(p) = core_pars(p).w_V
+w_C(p) = core_pars(p).w_C 
+w_N(p) = core_pars(p).w_N
+w_E(p) = core_pars(p).w_E
 
 #    %   W   Rel n atoms
 # C  45  12  30857
@@ -49,20 +74,41 @@ end
     maintenance_pars::Mt  | Maintenance()             | AbstractMaintenance
 end
 
+su_pars(p) = p.su_pars
+core_pars(p) = p.core_pars
+resorption_pars(p) = p.resorption_pars
+tempcorr_pars(p) = p.tempcorr_pars
+catabolism_pars(p) = p.catabolism_pars
+maintenance_pars(p) = p.maintenance_pars
+
 ###########################################################################################
 # Variables
 
 
 " Model variables "
-@plottable @units @udefault_kw struct Vars{F,MoMoD,C,M,T}
+@plottable @units @udefault_kw struct Vars{F,MoMoD,C,WP,M,T}
     shape::F             | [0.0]   | _                 | _
     rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1   | _
     θE::F                | [0.0]   | _                 | _
     temp::C              | [25.0]  | K                 | _
     tempcorrection::F    | [1.0]   | _                 | _
+    swp::WP              | [1.0]   | kPa               | _
+    soilcorrection::F    | [1.0]   | _                 | _
     height::M            | [0.0]   | m                 | _
     t::T                 | [1]     | _                 | false
 end
+
+# Define `shape` and `setshape` etc. methods
+for field in [:shape, :rate, :temp, :θE, :tempcorrection, :soilcorrection, :height, :swp]
+    set = Symbol.(:set_, f, :!)
+    @eval @inline ($field)(vars) = vars.$field[tstep(vars)]
+    @eval @inline ($set)(vars, val) = vars.$field[tstep(vars)] = val  
+end
+
+
+tstep(v) = v.t[1]
+set_tstep!(v, val) = v.t[1] = val  
+depth(v) = height(v)
 
 build_vars(vars, time) = begin
     len = length(time)
@@ -86,6 +132,25 @@ end
 
 abstract type AbstractOrgan end
 
+j_E_mai(o::AbstractOrgan) = j_E_mai(maintenance_pars(o))
+
+κtra(o::AbstractOrgan) = κtra(trans_pars(o))
+κtra(o::Nothing) = 0.0
+
+κmat(o::AbstractOrgan) = κmat(maturity_pars(o))
+κmat(::Nothing) = 0.0
+
+κsoma(o::AbstractOrgan) = oneunit(κtra(o)) - κtra(o) - κmat(o)
+
+@forward AbstractOrgan.vars θE, temp, set_temp!, set_swp!, swp, set_soilcorrection!, soilcorrection, tempcorrection, set_tempcorrection!, 
+         height, set_height!, rate, set_rate!, shape, set_shape!, tstep, set_tstep!
+
+@forward AbstractOrgan.params rate_formula, assimilation_pars, shape_pars, allometry_pars, maturity_pars,
+                              trans_pars, production_pars, rejection_pars, germination_pars, turnover_pars
+
+@forward AbstractOrgan.shared maintenance_pars, resorption_pars, su_pars, tempcorr_pars, catabolism_pars, core_pars,
+                              y_V_E, y_E_EC, y_E_EN, n_N_P, n_N_V, n_N_E, n_N_EC, n_N_EN, w_V, w_C, w_N, w_E
+
 " Basic model components. For a plants, organs might be roots, stem and leaves "
 struct Organ{P,S,V,F,F1} <: AbstractOrgan
     params::P
@@ -96,7 +161,7 @@ struct Organ{P,S,V,F,F1} <: AbstractOrgan
 end
 
 " update vars and flux to record for time t "
-define_organs(o, t) = define_organs(o.params, o.shared, o.records, t)
+define_organs(o, t) = define_organs(params(o), shared(o), records(o), t)
 define_organs(params::Tuple{P,Vararg}, shared, records::Tuple{R,Vararg}, t) where {P,R} = begin
     rec = records[1]
     t = calc_tstep(rec.vars, t)
@@ -115,8 +180,8 @@ define_organs(params::Tuple{}, shared, records::Tuple{}, t) = ()
 "Records of mutable variables and flux for ploting and analysis"
 @plottable struct Records{V,F,F1}
     vars::V | true
-    J::F    | false
-    J1::F1  | false 
+    J::F    | true
+    J1::F1  | true 
 end
 "Constructor for records. Arrays use the length of the current timespan"
 Records(params, vars, time, val, typ) = begin
@@ -135,12 +200,20 @@ build_flux(one_flux, T, x, y, time) = zeros(typeof(one_flux), length(x), length(
 
 abstract type AbstractOrganism end
 
+dead(o::AbstractOrganism) = o.dead[]
+set_dead!(o::AbstractOrganism, val) = o.dead[] = val
+environment(o::AbstractOrganism) = o.environment
+
+vars(o::AbstractOrgan) = o.vars
+flux(o::AbstractOrgan) = o.J
+flux1(o::AbstractOrgan) = o.J1
+
 "An organism, made up of organs"
 @flattenable mutable struct Plant{P,S,R,E,ES,D} <: AbstractOrganism
     params::P             | true
     shared::S             | true
     records::R            | false
-    environment::E        | false
+    environment::E        | true
     environment_start::ES | false
     dead::D               | false
 end
@@ -152,7 +225,7 @@ Plant(; params = (ShootParamsCN(), RootParamsCN()),
         records = nothing,
         environment = nothing,
         time = 0hr:1hr:8760hr,
-        environment_start = setindex!(Array{typeof(1hr),0}(undef), 1hr),
+        environment_start = Ref(1hr),
         dead = Ref(false)
       ) = begin
     if records == nothing

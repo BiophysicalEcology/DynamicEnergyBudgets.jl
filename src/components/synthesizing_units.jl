@@ -5,7 +5,7 @@ struct ParallelComplementarySU <: AbstractSynthesizingUnit end
 struct MinimumRuleSU <: AbstractSynthesizingUnit end
 
 @columns struct KfamilySU{K} <: AbstractSynthesizingUnit 
-    k::K | 1.0 | _ | Gamma(2.0, 2.0) | [0.0, 10.0]  | _ | "Synthesizing unit parameter. Effiency = 2^-1/k"
+    k::K | 1.0 | _ | [0.0, 10.0]  | _ | "Synthesizing unit parameter. Effiency = 2^-1/k"
 end
 
 """

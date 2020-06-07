@@ -8,9 +8,9 @@ ShootParamsCN(;kwargs...) = Params(;name=:shoot, assimilation_pars=KooijmanSLAPh
 RootParamsCN(;kwargs...) = Params(;name=:root, assimilation_pars=NAssim(), kwargs...)
 PlantCN(;kwargs...) = Plant(;params=(ShootParamsCN(), RootParamsCN()), kwargs...)
 
-FvCBShootParams(;kwargs...) = Params(;name=:shoot, assimilation_pars=FvCBPhotosynthesis(), kwargs...)
+FvCBShootParams(;kwargs...) = Params(;name=:shoot, assimilation_pars=BallBerryCAssim(), kwargs...)
 FvCBRootParams(;kwargs...) = Params(;name=:root, assimilation_pars=NAssim(), kwargs...)
-FvCBLeafParams3(;kwargs...) = Params(;name=:leaf, assimilation_pars=FvCBPhotosynthesis(),
+FvCBLeafParams3(;kwargs...) = Params(;name=:leaf, assimilation_pars=BallBerryCAssim(),
                                     trans_pars=LosslessMultipleTranslocation(destnames=:stem), kwargs...)
 FvCBRootParams3(;kwargs...) = Params(;name=:root, trans_pars=LosslessMultipleTranslocation(destnames=:stem), 
                                     assimilation_pars=NAssim(), kwargs...)

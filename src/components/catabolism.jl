@@ -26,6 +26,19 @@ kN(p::AbstractCatabolism) = p.kN
 kE(p::AbstractCatabolism) = p.k
 
 """
+Allocates reserves to growth.
+"""
+growth!(o, u) = begin
+    flux(o)[:V,:gro] = growth = rate(o) * u.V
+    drain = (1/y_V_E(o)) * growth 
+    product = growth_production!(o, growth)
+    reserve_drain!(o, Val(:gro), drain)
+    # loss = drain - growth - product
+    # reserve_loss!(o, loss)
+    # conversion_loss!(o, growth, n_N_V(o))
+end
+
+"""
     catabolism!(o, u, t::Number)
 Catabolism for E, C and N, or C, N and E reserves.
 Does not alter flux in J - operates only on J1 (intermediate storage)
@@ -67,15 +80,13 @@ catabolism!(p::AbstractCatabolismCN, o, u) = begin
         set_rate!(o, r)
     end
 
-    J1[:C,:ctb], J1[:N,:ctb] = non_growth_flux.(reserve, turnover, r)
+    J1[:C,:ctb], J1[:N,:ctb] = reserve .* (turnover .- r)
     J1[:C,:rej], J1[:N,:rej], J1[:E,:ctb] = stoich_merge(su_pars(o), J1[:C,:ctb], J1[:N,:ctb], y_E_EC(o), y_E_EN(o))
     true
 end
 
 
 abstract type AbstractRate end
-
-struct SimpleRate <: AbstractRate end
 
 struct FZeroRate <: AbstractRate end
 
@@ -99,42 +110,20 @@ Rate formulas for E, CN or CNE reserves
 """
 rate_formula(r, su, rel_reserve::NTuple{1}, turnover::NTuple{1},
              j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
-    (j_E,) = non_growth_flux.(rel_reserve, turnover, r)
+    (j_E,) = rel_reserve .* (turnover .- r)
     y_V_E * (κsoma * j_E - j_E_mai) - r
 
     j_E = reserve * (turnover - y_V_E * (κsoma * j_E - j_E_mai))
 end
 rate_formula(r, su, rel_reserve::NTuple{2}, turnover::NTuple{2},
              j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
-    j_Ea, j_Eb = non_growth_flux.(rel_reserve, turnover, r)
+    j_Ea, j_Eb = rel_reserve .* (turnover .- r)
     j_E = synthesizing_unit(su, j_Ea * y_E_Ea, j_Eb * y_E_Eb)
     y_V_E * (κsoma * j_E - j_E_mai) - r
 end
 rate_formula(r, su, rel_reserve::NTuple{3}, turnover::NTuple{3},
              j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
-    j_Ea, j_Eb, j_E = non_growth_flux.(rel_reserve, turnover, r)
+    j_Ea, j_Eb, j_E = rel_reserve .* (turnover .- r)
     j_E += synthesizing_unit(su, j_Ea * y_E_Ea, j_Eb * y_E_Eb)
     r = y_V_E * (κsoma * j_E - j_E_mai)
 end
-
-
-calc_rate(::SimpleRate, su, rel_reserve::NTuple{2}, turnover::NTuple{2}, 
-          j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
-    j_Ea, j_Eb = rel_reserve .* turnover
-    j_E = synthesizing_unit(j_Ea * y_E_Ea, j_Eb * y_E_Eb)
-    j_E - j_E_mai
-end
-calc_rate(::SimpleRate, su, rel_reserve::NTuple{3}, turnover::NTuple{3}, 
-          j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
-    j_Ea, j_Eb, j_E = rel_reserve .* turnover
-    j_E += synthesizing_unit(su, j_Ea * y_E_Ea, j_Eb * y_E_Eb)
-    j_E - j_E_mai
-end
-
-"""
-    non_growth_flux(ureserve, turnover, r)
-Returns the current non_growth_flux flux at rate r,
-or the flux as a proportion of u[V], depending on ureserve values.
-"""
-non_growth_flux(reserve, turnover, r) = reserve * (turnover - r)
-

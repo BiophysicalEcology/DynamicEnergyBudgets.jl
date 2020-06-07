@@ -22,15 +22,14 @@ using Unitful,
       FieldDefaults,
       Photosynthesis,
       Microclimate,
-      Apply,
       Flatten
 
 using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ, R
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @prior, @default, @redefault, @description, @units, @limits, @logscaled, @flattenable, @plottable, @selectable,
-                      prior, default, description, units, limits, logscaled, flattenable, plottable, selectable
+import FieldMetadata: @default, @redefault, @description, @units, @bounds, @logscaled, @flattenable, @plottable, @selectable,
+                      default, description, units, limits, logscaled, flattenable, plottable, selectable
 import Photosynthesis: potential_dependence                      
 
 
@@ -55,7 +54,7 @@ export AbstractAssimilation,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
-       KooijmanNH4_NO3Assim, AbstractFvCBCAssim, BallBerryCAssim, EmaxCAssim, ConstantCAssim
+       KooijmanNH4_NO3Assim, AbstractFvCBCAssim, BBPotentialCAssim, BallBerryCAssim, EmaxCAssim, ConstantCAssim
 
 export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, KfamilySU
 
@@ -102,17 +101,18 @@ export AbstractParams, Params, SharedParams,
     """
 
 # Field metadata columns
-@chain columns @description @logscaled @limits @prior @units @udefault_kw
+@chain columns @udefault_kw @units @bounds @logscaled @description 
 
-const STATELEN = 6
 
-const STATE = (:P, :V, :M, :C, :N, :E)
+# const STATE = (:P, :V, :M, :C, :N, :E)
+const STATE = (:V, :C, :N)
 const STATE1 = (:EE, :CN, :C, :N, :E)
-const TRANS = (:ass, :gro, :mai, :mat, :rej, :tra, :fbk)
+const TRANS = (:ass, :gro, :mai, :mat, :rej, :tra, :res)
 const TRANS1 = (:ctb, :rej, :los)
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
+include("apply.jl")
 include("traits.jl")
 include("components/synthesizing_units.jl")
 include("components/temperature_correction.jl")
@@ -122,11 +122,13 @@ include("components/allometry.jl")
 include("components/resorption.jl")
 include("components/assimilation.jl")
 include("components/germination.jl")
+include("components/growth.jl")
 include("components/maturity.jl")
 include("components/production.jl")
 include("components/translocation.jl")
 include("components/catabolism.jl")
 include("components/maintenance.jl")
+include("components/core.jl")
 include("types.jl")
 include("environment.jl")
 include("getters.jl")

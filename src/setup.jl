@@ -1,9 +1,9 @@
 
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
-    v = view(u, offset+1:offset+STATELEN)
+    v = view(u, offset+1:offset+length(STATE))
     lv = LArray{STATE}(v)
-    (lv, split_state(tail(o), u, offset + STATELEN)...)
+    (lv, split_state(tail(o), u, offset + length(STATE))...)
 end
 split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 
