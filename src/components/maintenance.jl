@@ -1,7 +1,8 @@
 abstract type AbstractMaintenance end
 
 @columns struct Maintenance{MoMoD} <: AbstractMaintenance
-    j_E_mai::MoMoD       | 0.01 | mol*mol^-1*d^-1 | Beta(2.0, 2.0)  | [1e-4, 1.0] | true | "Specific somatic maintenance costs"
+    # Field        | Def  | Unit            | Bounds      | Log  | Description
+    j_E_mai::MoMoD | 0.01 | mol*mol^-1*d^-1 | (1e-4, 1.0) | true | "Specific somatic maintenance costs"
 end
 
 """

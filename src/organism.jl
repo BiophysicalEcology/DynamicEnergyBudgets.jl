@@ -14,7 +14,7 @@ end
 abstract type AbstractParams end
 
 " Model parameters that vary between organs "
-@selectable @flattenable @default_kw struct Params{As,Sh,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
+@default_kw @flattenable @selectable struct Params{As,Sh,Al,Ma,Tr,Re,Ge,Pr} <: AbstractParams
     # Field               | Default                | _     | Selectable Types
     name::Symbol          | :organ                 | false | _
     rate_formula          | FZeroRate()            | _     | _
@@ -64,7 +64,7 @@ w_E(p) = core_pars(p).w_E
 
 
 " Model parameters shared between organs "
-@selectable @udefault_kw struct SharedParams{SU,Co,Fe,Te,Ca,Mt}
+@udefault_kw @selectable struct SharedParams{SU,Co,Fe,Te,Ca,Mt}
     # Field               | Default                   | Selectable Types
     su_pars::SU           | ParallelComplementarySU() | AbstractSynthesizingUnit
     core_pars::Co         | DEBCore()                 | _
@@ -86,7 +86,7 @@ maintenance_pars(p) = p.maintenance_pars
 
 
 " Model variables "
-@plottable @units @udefault_kw struct Vars{F,MoMoD,C,WP,M,T}
+@udefault_kw @units @plottable struct Vars{F,MoMoD,C,WP,M,T}
     shape::F             | [0.0]   | _                 | _
     rate::MoMoD          | [0.0]   | mol*mol^-1*d^-1   | _
     θE::F                | [0.0]   | _                 | _
@@ -100,7 +100,7 @@ end
 
 # Define `shape` and `setshape` etc. methods
 for field in [:shape, :rate, :temp, :θE, :tempcorrection, :soilcorrection, :height, :swp]
-    set = Symbol.(:set_, f, :!)
+    set = Symbol.(:set_, field, :!)
     @eval @inline ($field)(vars) = vars.$field[tstep(vars)]
     @eval @inline ($set)(vars, val) = vars.$field[tstep(vars)] = val  
 end
@@ -131,6 +131,12 @@ end
 
 
 abstract type AbstractOrgan end
+
+params(o::AbstractOrgan) = o.params
+shared(o::AbstractOrgan) = o.shared
+vars(o::AbstractOrgan) = o.vars
+flux(o::AbstractOrgan) = o.J
+flux1(o::AbstractOrgan) = o.J1
 
 j_E_mai(o::AbstractOrgan) = j_E_mai(maintenance_pars(o))
 
@@ -200,13 +206,14 @@ build_flux(one_flux, T, x, y, time) = zeros(typeof(one_flux), length(x), length(
 
 abstract type AbstractOrganism end
 
+params(o::AbstractOrganism) = o.params
+shared(o::AbstractOrganism) = o.shared
+records(o::AbstractOrganism) = o.records
+environment(o::AbstractOrganism) = o.environment
+environment_start(o::AbstractOrganism) = o.environment_start
 dead(o::AbstractOrganism) = o.dead[]
 set_dead!(o::AbstractOrganism, val) = o.dead[] = val
-environment(o::AbstractOrganism) = o.environment
 
-vars(o::AbstractOrgan) = o.vars
-flux(o::AbstractOrgan) = o.J
-flux1(o::AbstractOrgan) = o.J1
 
 "An organism, made up of organs"
 @flattenable mutable struct Plant{P,S,R,E,ES,D} <: AbstractOrganism
@@ -219,14 +226,14 @@ flux1(o::AbstractOrgan) = o.J1
 end
 
 "Outer construtor for defaults"
-Plant(; params = (ShootParamsCN(), RootParamsCN()),
-        vars = (Vars(), Vars()),
-        shared = SharedParams(),
-        records = nothing,
-        environment = nothing,
-        time = 0hr:1hr:8760hr,
-        environment_start = Ref(1hr),
-        dead = Ref(false)
+Plant(; params=(ShootParamsCN(), RootParamsCN()),
+        vars=(Vars(), Vars()),
+        shared=SharedParams(),
+        records=nothing,
+        environment=nothing,
+        time=0hr:1hr:8760hr,
+        environment_start=Ref(1hr),
+        dead=Ref(false)
       ) = begin
     if records == nothing
         records = []

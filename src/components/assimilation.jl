@@ -8,23 +8,29 @@ fraction_per_litre_gas_to_mols(frac) = frac / 22.4
 
 
 """
+    CarbonVars(J_L_F, X_C, X_O, soilwaterpotential)
+
 Variables for carbon assimilation 
 """
-@flattenable @udefault_kw @units @limits @description mutable struct CarbonVars{MoMS,MoL,KPA}
-    J_L_F::MoMS              | false | watts_to_light_mol(800.0) | mol*m^-2*s^-1 | watts_to_light_mol.([0.0, 2000.0]) | "Flux of useful photons"
-    X_C::MoL                 | false | 400.0*1e-6                | mol*L^-1      | [200.0, 700.0] .* 1e-6             | "Carbon dioxide concentration in air"
-    X_O::MoL                 | false | 0.21 * gas_molpL          | mol*L^-1      | [0.1, 0.3] .* gas_molpL            | "Oxygen concentration in air"
-    soilwaterpotential::KPA  | false | -100.0                    | kPa           | [0.0, -10000.0]                    | "Soil water potential"
+@flattenable @udefault_kw @units @bounds @description mutable struct CarbonVars{MoMS,MoL,KPA}
+    # Field                  | Flatn | Default i                 | Unit          | Bounds                             | Description
+    J_L_F::MoMS              | false | watts_to_light_mol(800.0) | mol*m^-2*s^-1 | watts_to_light_mol.((0.0, 2000.0)) | "Flux of useful photons"
+    X_C::MoL                 | false | 400.0*1e-6                | mol*L^-1      | (200.0, 700.0) .* 1e-6             | "Carbon dioxide concentration in air"
+    X_O::MoL                 | false | 0.21 * gas_molpL          | mol*L^-1      | (0.1, 0.3) .* gas_molpL            | "Oxygen concentration in air"
+    soilwaterpotential::KPA  | false | -100.0                    | kPa           | (0.0, -10000.0)                    | "Soil water potential"
 end
 
-" Variables for nitgroen assimilation "
-@flattenable @udefault_kw @units @limits @description mutable struct NitrogenVars{F,KPA,MoL}
-    # TODO work out the naming conventions here
-    soilwaterpotential::KPA  | false | -100.0 | kPa      | [0.0, -10000.0] | "Soil water potential"
-    soilwaterconent::F       | false | -100.0 | _        | [0.0, -10000.0] | _
-    X_NH::MoL                | false | 0.005  | mol*L^-1 | [0.0, 0.1]      | "Concentration of ammonia"
-    X_NO::MoL                | false | 0.01   | mol*L^-1 | [0.0, 0.1]      | "Concentration of nitrate see e.g. [_@crawford1998molecular]"
-    X_H::MoL                 | false | 10.0   | mol*L^-1 | [0.0, 20.0]     | _
+"""
+    NitrogenVars(soilwaterpotential, soilwaterconent, X_NH, X_NO, X_H)
+
+Variables for nitgroen assimilation.
+"""
+@flattenable @udefault_kw @units @bounds @description mutable struct NitrogenVars{F,KPA,MoL}
+    soilwaterpotential::KPA  | false | -100.0 | kPa      | (0.0, -10000.0) | "Soil water potential"
+    soilwaterconent::F       | false | -100.0 | _        | (0.0, -10000.0) | _
+    X_NH::MoL                | false | 0.005  | mol*L^-1 | (0.0, 0.1)      | "Concentration of ammonia"
+    X_NO::MoL                | false | 0.01   | mol*L^-1 | (0.0, 0.1)      | "Concentration of nitrate see e.g. (_@crawford1998molecular)"
+    X_H::MoL                 | false | 10.0   | mol*L^-1 | (0.0, 20.0)     | _
 end
 
 " Assimilation "
@@ -45,7 +51,7 @@ abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 C is assimilated at a constant rate, without control from the environment
 """
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
-    # Field         | Def | Unit              | Limits      | Log | Description
+    # Field         | Def | Unit              | Bounds      | Log | Description
     c_uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | [0.0, 10.0] | _   | "Constant rate of C uptake"
 end
 
@@ -109,7 +115,7 @@ end
 
 
 @mix @columns @SLA struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
-    #Field              | Default           | Unit             | Limits           | Log  | Description
+    #Field              | Default           | Unit             | Bounds           | Log  | Description
     vars::V             | CarbonVars()      | _                | _                | _    | _
     k_C_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | [1e-5, 2000.0]   | true | "Scaling rate for carbon dioxide"
     k_O_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | [1e-5, 2000.0]   | true | "Scaling rate for oxygen"

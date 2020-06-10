@@ -1,22 +1,20 @@
-using Revise,
-      LinearAlgebra,
+using LinearAlgebra,
       Unitful,
       LabelledArrays,
       DynamicEnergyBudgets,
       Test
 
-using DynamicEnergyBudgets: reuse_rejected!, translocate!, maintenence!, growth!, sum_flux!,
-                            reserve_drain!, reserve_loss!, maturity!, metabolism!, catabolism!,
-                            assimilation!, translocation!, shape, set_var!,
-                            uptake_nitrogen, photosynthesis, STATELEN,
-                            define_organs, default, units, set_var!, rate, unpack, tempcorrection, θE
+using DynamicEnergyBudgets: translocate!, maintenence!, growth!, sum_flux!,
+                            reserve_drain!, maturity!, metabolism!, catabolism!,
+                            assimilation!, translocation!, shape, 
+                            photosynthesis, define_organs, 
+                            default, units
 
-construct_organ(; params=Params(), shared=SharedParams(), vars=Vars()) = begin
-    define_organs(Organism(params=(params,), vars=(vars,), shared=shared), 1)[1]
-end
+construct_organ(; params=Params(), shared=SharedParams(), vars=Vars()) =
+    define_organs(Plant(params=(params,), vars=(vars,), shared=shared), 1)[1]
 
 
-sh = Organism().shared
+sh = Plant().shared
 global n_ratios = [sh.n_N_P, sh.n_N_V, sh.n_N_M, sh.n_N_EC, sh.n_N_EN, sh.n_N_E]
 # global n_ratios = [0.0, 0.14, 0.21, 0.01, 10.3, 0.24]
 

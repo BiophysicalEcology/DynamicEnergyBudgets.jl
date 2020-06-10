@@ -7,7 +7,7 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 [Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
 
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """ 
+for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """
 module DynamicEnergyBudgets
 
 using Unitful,
@@ -15,7 +15,7 @@ using Unitful,
       DocStringExtensions,
       MacroTools,
       Distributions,
-      LabelledArrays,
+      DimensionalData,
       SimpleRoots,
       Mixers,
       FieldMetadata,
@@ -28,10 +28,11 @@ using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, m
 using Base: tail
 
 import FieldDefaults: get_default
-import FieldMetadata: @default, @redefault, @description, @units, @bounds, @logscaled, @flattenable, @plottable, @selectable,
-                      default, description, units, limits, logscaled, flattenable, plottable, selectable
-import Photosynthesis: potential_dependence                      
+import FieldMetadata: @default, @description, @units, @bounds, @logscaled, @flattenable, @plottable,
+                      default, description, units, bounds, logscaled, flattenable, plottable
+import Photosynthesis: potential_dependence
 
+@metadata selectable false
 
 export tempcorr,
        rate_bracket,
@@ -53,7 +54,7 @@ export integrate,
 export AbstractAssimilation,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
-       KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis, 
+       KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis,
        KooijmanNH4_NO3Assim, AbstractFvCBCAssim, BBPotentialCAssim, BallBerryCAssim, EmaxCAssim, ConstantCAssim
 
 export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, KfamilySU
@@ -88,9 +89,9 @@ export AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultiple
 export AbstractAllometry, Allometry, SqrtAllometry, FixedAllometry
 
 export AbstractParams, Params, SharedParams,
-       Vars, CarbonVars, NitrogenVars, Records,
-       AbstractOrgan, Organ,
-       AbstractOrganism, Plant
+       Vars, CarbonVars, NitrogenVars, Records
+
+export AbstractOrgan, Organ, AbstractOrganism, Plant
 
 
 # Auto docstrings
@@ -101,7 +102,7 @@ export AbstractParams, Params, SharedParams,
     """
 
 # Field metadata columns
-@chain columns @udefault_kw @units @bounds @logscaled @description 
+@chain columns @udefault_kw @units @bounds @logscaled @description
 
 
 # const STATE = (:P, :V, :M, :C, :N, :E)
@@ -116,22 +117,19 @@ include("apply.jl")
 include("traits.jl")
 include("components/synthesizing_units.jl")
 include("components/temperature_correction.jl")
-include("components/rate.jl")
 include("components/shape.jl")
 include("components/allometry.jl")
 include("components/resorption.jl")
 include("components/assimilation.jl")
 include("components/germination.jl")
-include("components/growth.jl")
 include("components/maturity.jl")
 include("components/production.jl")
 include("components/translocation.jl")
 include("components/catabolism.jl")
 include("components/maintenance.jl")
 include("components/core.jl")
-include("types.jl")
+include("organism.jl")
 include("environment.jl")
-include("getters.jl")
 include("functions.jl")
 include("setup.jl")
 include("model.jl")

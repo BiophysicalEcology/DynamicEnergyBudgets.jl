@@ -2,15 +2,14 @@ abstract type AbstractGermination end
 
 """
     ThresholdGermination(germination_mass)
-    ThresholdGermination(; germination_mass=1d-5)
 
 Germination occurs past a threshhold structural mass. 
 
 This causes a hard switch in behaviour between
 """
 @columns struct ThresholdGermination{Mo} <: AbstractGermination
-    # Field              | Def  | Unit | Limits      | Log  | Description
-    germination_mass::Mo | 1e-5 | mol  | [1e-10,5.0] | true | "Structural mass at germination"
+    # Field              | Def  | Unit | Bounds      | Log  | Description
+    germination_mass::Mo | 1e-5 | mol  | (1e-10,5.0) | true | "Structural mass at germination"
 end
 
 """

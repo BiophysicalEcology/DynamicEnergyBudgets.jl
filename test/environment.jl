@@ -16,11 +16,11 @@ u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
 
 
 @testset "apply environment to deb vars" begin
-    global o = DynamicEnergyBudgets.Plant(environment=environment)
-    global o1, o2 = define_organs(o, 1)
-    global v1 = o1.vars; v2 = o2.vars
-    global va1 = v1.assimilation 
-    global va2 = v2.assimilation
+    o = DynamicEnergyBudgets.Plant(environment=environment)
+    o1, o2 = define_organs(o, 1)
+    v1 = o1.vars; v2 = o2.vars
+    va1 = v1.assimilation 
+    va2 = v2.assimilation
 
     apply(apply_environment!, (o1, o2), u, :not_nothing, 1)
     @test temp(v1) == 23.7u"°C"

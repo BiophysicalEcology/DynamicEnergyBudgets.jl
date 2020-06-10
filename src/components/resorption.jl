@@ -4,8 +4,8 @@ Resorption. Parameters for reabsorbtion of nutrients from structures when metabo
 abstract type AbstractResorption end
 
 @mix @columns struct MixinResorption{Mo}
-    # Field          | Default  | Unit | Pror           | Limits       | Log  | Description
-    K_resorption::Mo | 0.000001 | _    | Beta(2.0, 2.0) | [1e-8, 1e-3] | true | "Half saturation metabolic rate for resorption of tissues."
+    # Field          | Default  | Unit | Bounds       | Log  | Description
+    K_resorption::Mo | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
 end
 
 resorption!(o, u) = resorption!(resorption_pars(o), o, u)
@@ -44,9 +44,9 @@ end
 Some structure is distributed back to C an N reserves with a proportion lost to the environment.
 """
 @MixinResorption struct DissipativeResorption{MoMo} <: AbstractResorption
-    # Field         | Default  | Unit       | Pror            | Limits      | Log  | Description
-    r_EC_V::MoMo    | 0.0      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _    | "Proportion of C recovered from structure"
-    r_EN_V::MoMo    | 0.5      | mol*mol^-1 | Beta(2.0, 2.0)  | [0.0,1.0]   | _    | "Proportion of N recovered from structure"
+    # Field         | Default  | Unit       | Bounds      | Log  | Description
+    r_EC_V::MoMo    | 0.0      | mol*mol^-1 | (0.0, 1.0)  | _    | "Proportion of C recovered from structure"
+    r_EN_V::MoMo    | 0.5      | mol*mol^-1 | (0.0, 1.0)  | _    | "Proportion of N recovered from structure"
 end
 resorption!(f::DissipativeResorption, o, u) = begin
     aph = resorption(f, o, u)

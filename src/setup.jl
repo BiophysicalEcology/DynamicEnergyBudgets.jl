@@ -1,30 +1,16 @@
 
+"""
+    split_state(o::Tuple, u::AbstractArray)
+
+Split state vector into multiple views for each organ.
+"""
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
     v = view(u, offset+1:offset+length(STATE))
-    lv = LArray{STATE}(v)
+    lv = DimensionalArray(v, (X(Val(STATE)),))
     (lv, split_state(tail(o), u, offset + length(STATE))...)
 end
 split_state(o::Tuple{}, u::AbstractArray, offset) = ()
-
-
-" Sum flux matrix " 
-sum_flux!(du, organs::Tuple) = begin
-    offset_apply(sum_flux!, du, organs, 0)
-    du
-end
-sum_flux!(du, organ::Organ, offset::Int) = begin
-    J = flux(organ)
-    z = zero(J[1,1])
-    for i in 1:size(J, 1) 
-        s = z 
-        for j in 1:size(J, 2)
-            s += J[i,j]
-        end
-        du[i+offset] = s
-    end
-    offset + size(J, 1)
-end
 
 
 update_tstep!(o::Organ, t) = set_tstep!(o, calc_tstep(o, t))
@@ -40,6 +26,7 @@ zero_flux!(o) = begin
 end
 
 
+# Deal with du, u, p with/without units
 (o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number) = begin
     println("Real/Real")
     u1 = u .* mol
@@ -63,22 +50,32 @@ end
 (o::Plant)(du, u, p::Nothing, t::Number) = o(du, u, t, define_organs(o, t))
 
 
-" update vars and flux to record for time t "
-define_organs(o, t) = define_organs(o.params, o.shared, o.records, t)
-define_organs(params::Tuple{P,Vararg}, shared, records::Tuple{R,Vararg}, t) where {P,R} = begin
-    rec = records[1]
-    t = calc_tstep(rec.vars, t)
-    rec.vars.t[1] = t
-    vJ = view(rec.J, :, :, t)
-    vJ1 = view(rec.J1, :, :, t)
-    J = LArray{Tuple{STATE,TRANS}}(vJ)
-    J1 = LArray{Tuple{STATE1,TRANS1}}(vJ1)
+""" 
+    define_organs(o, t)
 
-    organ = Organ(params[1], shared, rec.vars, J, J1)
-    (organ, define_organs(tail(params), shared, tail(records), t)...)
+Update vars and flux to record for time t.
+"""
+define_organs(o, t) = 
+    map((p, r) -> define_organ(p, shared(o), r, t), params(o), records(o))
+define_organ(params, shared, records, t) = begin
+    t = calc_tstep(records.vars, t)
+    records.vars.t[1] = t
+    vJ = view(records.J, :, :, t)
+    vJ1 = view(records.J1, :, :, t)
+    J = DimensionalArray(vJ, (X(Val(STATE)), Y(Val(TRANS))))
+    J1 = DimensionalArray(vJ1, (X(Val(STATE1)), Y(Val(TRANS1))))
+
+    Organ(params, shared, records.vars, J, J1)
 end
-define_organs(params::Tuple{}, shared, records::Tuple{}, t) = ()
 
+
+"""
+    check_params(o)
+
+Check DEB parameters to avoid breaking mass balance. Can be pased an organ or
+tuple of organs.
+"""
+function check_params end
 
 check_params(o::Tuple) = apply(check_params, o)
 check_params(o::Organ) = begin 
@@ -100,3 +97,27 @@ check_params(p::Production, o::Organ) = begin
     p.y_P_V <= p.n_N_P/n_N_V(o) || error("y_P_V too high for N conservation ", (p.y_P_V, p.n_N_P, n_N_V(o)))
     p.j_P_mai <= j_E_mai(o) || error("j_P_mai must be lower than j_E_mai ", (p.j_P_mai, j_E_mai(o)))
 end
+
+
+""" 
+    sum_flux!(du, organs::Tuple)
+
+Sum flux matrix and write to `du`.
+""" 
+sum_flux!(du, organs::Tuple) = begin
+    offset_apply(sum_flux!, du, organs, 0)
+    du
+end
+sum_flux!(du, organ::Organ, offset::Int) = begin
+    J = flux(organ)
+    z = zero(J[1,1])
+    for i in 1:size(J, 1) 
+        s = z 
+        for j in 1:size(J, 2)
+            s += J[i,j]
+        end
+        du[i+offset] = s
+    end
+    offset + size(J, 1)
+end
+

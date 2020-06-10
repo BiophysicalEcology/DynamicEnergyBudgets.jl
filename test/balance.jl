@@ -6,7 +6,7 @@
 end
 
 @testset "reserve drain and loss match" begin
-    global o, p, u, du = factory();
+    o, p, u, du = factory();
     set_var!(o.vars, :θE, 0.4)
     reserve_drain!(o, :gro, 1.0u"mol*hr^-1")
     @test o.J[:C,:gro] ≈ -1.0u"mol*hr^-1" * (1 - 0.4)/o.params.y_E_CH_NO
