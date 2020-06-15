@@ -3,34 +3,32 @@ Resorption. Parameters for reabsorbtion of nutrients from structures when metabo
 """
 abstract type AbstractResorption end
 
-@mix @columns struct MixinResorption{Mo}
-    # Field          | Default  | Unit | Bounds       | Log  | Description
-    K_resorption::Mo | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
-end
 
 resorption!(o, u) = resorption!(resorption_pars(o), o, u)
 resorption!(f::Nothing, o, u) = nothing
 
 """
-    LosslessResorption(K_resorption) 
+    StructuralLossResorption(K_resorption) 
 
-Complete nutrient resorption without losses to the environment.
-
-# TODO this seems erroneous 
+Structure is lost while reserves are retained.
 """
-@MixinResorption struct LosslessResorption{} <: AbstractResorption end
-resorption!(f::LosslessResorption, o, u) = begin
+@columns struct StructuralLossResorption{R} <: AbstractResorption 
+    K_resorption::R | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
+end
+resorption!(f::StructuralLossResorption, o, u) = begin
     o.J[:V,:res] -= resorption(f, o, u)
     nothing
 end
 
 """
-    StructuralLossResorption(K_resorption)
+    LosslessResorption(K_resorption)
 
 Structure is distributed back to C an N reserves without loss.
 """
-@MixinResorption struct StructuralLossResorption{} <: AbstractResorption end
-resorption!(f::StructuralLossResorption, o, u) = begin
+@columns struct LosslessResorption{R} <: AbstractResorption 
+    K_resorption::R | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
+end
+resorption!(f::AbstractResorption, o, u) = begin
     aph = resorption(f, o, u)
     o.J[:C,:res] += aph
     o.J[:N,:res] += aph * n_N_V(o)
@@ -42,11 +40,14 @@ end
     DissipativeResorption(r_EN_V, r_EN_V, K_resorption) 
 
 Some structure is distributed back to C an N reserves with a proportion lost to the environment.
+
+This model has parameters for controlling differential fractions of C an N resorption.
 """
-@MixinResorption struct DissipativeResorption{MoMo} <: AbstractResorption
-    # Field         | Default  | Unit       | Bounds      | Log  | Description
-    r_EC_V::MoMo    | 0.0      | mol*mol^-1 | (0.0, 1.0)  | _    | "Proportion of C recovered from structure"
-    r_EN_V::MoMo    | 0.5      | mol*mol^-1 | (0.0, 1.0)  | _    | "Proportion of N recovered from structure"
+@columns struct DissipativeResorption{R,P} <: AbstractResorption
+    # Field         | Default  | Unit       | Bounds       | Log  | Description
+    K_resorption::R | 0.000001 | _          | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
+    r_EC_V::P       | 0.0      | mol*mol^-1 | (0.0, 1.0)   | _    | "Proportion of C recovered from structure"
+    r_EN_V::P       | 0.5      | mol*mol^-1 | (0.0, 1.0)   | _    | "Proportion of N recovered from structure"
 end
 resorption!(f::DissipativeResorption, o, u) = begin
     aph = resorption(f, o, u)
@@ -56,5 +57,12 @@ resorption!(f::DissipativeResorption, o, u) = begin
     nothing
 end
 
-@inline resorption(f, o, u) = resorption(u.V, rate(o.vars) / shape(o), f.K_resorption)
-@inline resorption(v::Number, r::Number, a::Number) = v * (oneunit(r) - 1 / (oneunit(1/r) + a / r))
+"""
+    resorption(m::AbstractResorption, o::Organ, u) 
+
+Resoption of structure `V` with shape-adjusted metabolic rate
+"""
+@inline resorption(m, o, u) = 
+    resorption(u[:V], rate(o.vars) / shape(o), m.K_resorption)
+@inline resorption(v::Number, r::Number, a::Number) = 
+    v * (oneunit(r) - 1 / (oneunit(1 / r) + a / r))

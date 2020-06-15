@@ -1,29 +1,35 @@
-using OrdinaryDiffEq
+using Test, DynamicEnergyBudgets, Unitful, OrdinaryDiffEq, DimensionalData
 
-global u0 = [0.0u"mol", 1e-4u"mol", 0.0u"mol", 1e-4u"mol", 1e-4u"mol", 1e-4u"mol", 0.0u"mol", 
-      1e-4u"mol", 0.0u"mol", 1e-4u"mol", 1e-4u"mol", 10.0u"mol"] # Initial value
-global du0 = fill(0.0u"mol/hr", 12); nothing
+u0 = [1e-4, 1e-4, 1.0, 1e-4, 1e-4, 10.0]u"mol" # Initial value
+du0 = fill(0.0u"mol/hr", 6); nothing
 
 @testset "all state actually changes every timestep" begin
-    global organism = Organism(time = 0u"hr":1u"hr":8001u"hr")
-    global du = deepcopy(du0)
-    global u = deepcopy(u0)
-    global duref = deepcopy(du)
-    organism(du, u, nothing, 1u"hr")    
-    @test_broken all(duref .!= du) # P is 0.0. Prob because y_P_mai is broken
+    plant = Plant(time = 0u"hr":1u"hr":8001u"hr")
+    du = deepcopy(du0)
+    u = deepcopy(u0)
+    duref = deepcopy(du)
+    plant(du, u, nothing, 1u"hr")    
+    flatten(plant)
+    @test all(duref .!= du)
 end
 
 @testset "diffeq works" begin
-    global du = deepcopy(du0)
-    global u = deepcopy(u0)
-    global environment = nothing
+    du = deepcopy(du0)
+    u = deepcopy(u0)
+    environment = nothing
 
-    global organism = Organism(time = 0u"hr":1u"hr":8001u"hr")
-    organism(du, u, nothing, 1.0u"hr"); 
-    global prob = DiscreteProblem(organism, u, (0u"hr", 8000u"hr"))
-    global sol = solve(prob, FunctionMap(scale_by_time = true))
-    global prob = DiscreteProblem(organism, u0, (0u"hr", 1000u"hr"));
-    @test_nowarn sol = solve(prob, FunctionMap(scale_by_time = true)); nothing
+    plant = Plant(time=0.0u"hr":1.0u"hr":8001.0u"hr")
+    plant(du, u, nothing, 1.0u"hr"); 
+
+    @testset "unitfull state solver" begin
+        prob = DiscreteProblem(plant, u0, (0.0u"hr", 1000.0u"hr"));
+        @test_nowarn sol = solve(prob, FunctionMap(scale_by_time = true))
+    end
+
+    @testset "unitless state solver" begin
+        prob = DiscreteProblem(plant, ustrip(u0), (0.0u"hr", 1000.0u"hr"));
+        @test_nowarn sol = solve(prob, FunctionMap(scale_by_time = true))
+    end
 
     # TODO test some actual results
 end

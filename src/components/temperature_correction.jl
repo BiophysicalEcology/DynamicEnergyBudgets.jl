@@ -71,7 +71,7 @@ Simple 3 parameter temperature correction method.
 Growth response to temperature has smoother transients in plants than in animals, 
 and a simpler formulaiton is more applicable.
 """
-@columns @flattenable struct ParentTardieu{Δ,Al,T,A} <: AbstractTemperatureCorrection{T}
+@flattenable @columns struct ParentTardieu{Δ,Al,T,A} <: AbstractTemperatureCorrection{T}
     ΔH_A::Δ | true  | 63.5  | kJ*mol^-1 | (55.0, 65.0)   | _ | "The enthalpy of activation of the reaction. Determines the curvature at low temperature"
     α::Al   | true  | 3.5   | _         | (1.0, 10.0)    | _ | "The ratio ΔH_D / ΔH_A"
     t0::T   | true  | 300.0 | K         | (273.0, 325.0) | _ | "Reference temperature"

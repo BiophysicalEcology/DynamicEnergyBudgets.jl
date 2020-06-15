@@ -1,16 +1,17 @@
+using Microclimate
 import DynamicEnergyBudgets: get_environment, temp
 
-soiltemperature = [15.4u"°C"]
-soilwatercontent = [0.7]
-soilwaterpotential = [100.0u"Pa"]
-airtemperature = [23.7u"°C"]
-windspeed = [3.7u"m*s^-1"]
-relhumidity = [0.74]
-radiation = [985.0u"W*m^-2"]
 par = [3130.0u"mol*m^-2*s^-1"]
 
-environment = Env(soiltemperature, soilwatercontent, soilwaterpotential, 
-                  airtemperature, windspeed, relhumidity, radiation, par)
+environment = MicroclimPoint(
+    soiltemperature = [15.4u"°C"],
+    soilwatercontent = [0.7],
+    soilwaterpotential = [100.0u"Pa"],
+    airtemperature = [23.7u"°C"],
+    windspeed = [3.7u"m*s^-1"],
+    relhumidity = [0.74],
+    radiation = [985.0u"W*m^-2"],
+)
 
 u = [9.0u"mol",8.0u"mol",7.0u"mol",6.0u"mol",5.0u"mol",4.0u"mol"]
 

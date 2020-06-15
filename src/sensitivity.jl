@@ -9,7 +9,7 @@ using ForwardDiff: Dual
 dualize_records(o, du, u) = begin
     vars1 = dualize_vars(o.records[1].vars[1], zero(u[1]))
     vars2 = dualize_vars(o.records[2].vars[1], zero(u[1]))
-    Records(o.params, vars=(vars1, vars2), val=zero(du[1]))
+    Records(vars=(vars1, vars2), val=zero(du[1]))
 end
 
 dualize_vars(vars, val) = begin

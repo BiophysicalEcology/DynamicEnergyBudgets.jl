@@ -1,6 +1,6 @@
 """
-This is a generalised DEB model. It was developed for plant modelling, but can potentially
-model any organisms and symbioses.
+This package is a generalised DEB model. It was developed for plant modelling,
+but can potentially be used to model any organisms and symbioses.
 
 This model can also be run in microclimates provided by the NicheMapr R package, and
 can use wide a range of photosynthesis and stomatal conductance formulations from
@@ -20,6 +20,7 @@ using Unitful,
       Mixers,
       FieldMetadata,
       FieldDefaults,
+      FieldDocTables,
       Photosynthesis,
       Microclimate,
       Flatten
@@ -27,12 +28,11 @@ using Unitful,
 using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ, R
 using Base: tail
 
-import FieldDefaults: get_default
-import FieldMetadata: @default, @description, @units, @bounds, @logscaled, @flattenable, @plottable,
-                      default, description, units, bounds, logscaled, flattenable, plottable
+import FieldMetadata: @default, @description, @units, @bounds, @logscaled, @flattenable, @plottable, @selectable,
+                      default, description, units, bounds, logscaled, flattenable, plottable, selectable
 import Photosynthesis: potential_dependence
 
-@metadata selectable false
+
 
 export tempcorr,
        rate_bracket,
@@ -94,22 +94,23 @@ export AbstractParams, Params, SharedParams,
 export AbstractOrgan, Organ, AbstractOrganism, Plant
 
 
+const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
+                                    (description, default, bounds);
+                                    truncation=(100,40,100))
+
+const DEAD, ALIVE = false, true
+
 # Auto docstrings
 @template TYPES =
     """
     $(TYPEDEF)
     $(DOCSTRING)
+    $(FIELDDOCTABLE)
     """
 
 # Field metadata columns
 @chain columns @udefault_kw @units @bounds @logscaled @description
 
-
-# const STATE = (:P, :V, :M, :C, :N, :E)
-const STATE = (:V, :C, :N)
-const STATE1 = (:EE, :CN, :C, :N, :E)
-const TRANS = (:ass, :gro, :mai, :mat, :rej, :tra, :res)
-const TRANS1 = (:ctb, :rej, :los)
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
@@ -118,6 +119,7 @@ include("traits.jl")
 include("components/synthesizing_units.jl")
 include("components/temperature_correction.jl")
 include("components/shape.jl")
+include("components/rate.jl")
 include("components/allometry.jl")
 include("components/resorption.jl")
 include("components/assimilation.jl")

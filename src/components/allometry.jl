@@ -15,7 +15,7 @@ multiplied by the scalar `β1`.
 @flattenable @columns struct SqrtAllometry{B0,B1} <: AbstractAllometry
     # Field       | Flatn | Default | Unit | Bounds         | Log  | Description
     β0::B0        | false | 1e-4*24 | g    | (1e-6, 10.00)  | true | "Intercept. Mass at Om"
-    β1::B1        | true  | 0.1     | m    | (1e-2, 1.0)    | true | "Scalar for conversion to metres"
+    β1::B1        | true  | 0.1     | m    | (1e-2, 1.0)    | true | "Scalar for conversion to meters"
 end
 
 allometric_height(f::SqrtAllometry, mass) =
@@ -28,12 +28,12 @@ Simple allometric relationship between mass and height
 """
 @flattenable @columns struct Allometry{B0,B1,A} <: AbstractAllometry
     β0::B0        | false | 1e-4*24 | g    | (1e-6, 10.00)  | true | "Intercept. Mass at Om"
-    β1::B1        | true  | 0.1     | m    | (1e-5, 10.00)  | true | "Scalar for conversion to metres"
+    β1::B1        | true  | 0.1     | m    | (1e-5, 10.00)  | true | "Scalar for conversion to meters"
     α::A          | true  | 0.1     | _    | (1e-3, 100.00) | true | "Exponent relating mass to vertical dimension"
 end
 
 allometric_height(f::Allometry, mass) =
-    f.β1 * ((max(zero(mass), mass - f.β0))/unit(f.β0))^f.α
+    f.β1 * ((max(zero(mass), mass - f.β0)) / unit(f.β0))^f.α
 
 """
     FixedAllometry(height)
@@ -46,4 +46,7 @@ end
 
 allometric_height(f::FixedAllometry, mass) = f.height
 
-mass(o, u) = u.V * w_V(o)
+mass(o, u) = begin
+    println("u[:V], w_V(o): ", (u[:V], w_V(o)))
+    u[:V] * w_V(o)
+end

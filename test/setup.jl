@@ -25,7 +25,7 @@ using DynamicEnergyBudgets: Records, define_organs, split_state, sum_flux!
     or2.J .= oneunit(or2.J[1,1]) * 2
     du = fill(0.0u"mol/hr", 6)
     sum_flux!(du, (or1, or2))
-    @test du == [7.0, 7.0, 7.0, 14.0, 14.0, 14.0] .* u"mol/hr" 
+    @test du == [5.0, 5.0, 5.0, 10.0, 10.0, 10.0] .* u"mol/hr" 
 end
 
 @testset "split_state" begin

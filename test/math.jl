@@ -23,7 +23,7 @@ end
     @test c ≈ 0.09
 end
 
-@testset "Rate" begin
+@testset "Rate CNE" begin
     j_E_mai    = 0.003
     y_E_CH_NO  = 1.0/1.5
     y_E_EN     = 1.0/0.7
@@ -40,11 +40,10 @@ end
     @test rf == 0.002874195250659631
 
     @testset "test rate with units" begin
-        j_E_mai   = 0.003u"mol/mol*d^-1"
+        j_E_mai = 0.003u"mol/mol*d^-1"
         turnover = ((0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1", 0.2u"mol/mol*d^-1") .* 0.05)
         mass = (1.0u"mol/mol", 1.0u"mol/mol", 1.0u"mol/mol")
         r = 0.001u"mol/mol*d^-1"
-        @test_nowarn non_growth_flux.(mass, turnover, r)
         rf = rate_formula(r, su, reserve, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
         @test rf == 0.002874195250659631u"mol/mol*d^-1"
     end

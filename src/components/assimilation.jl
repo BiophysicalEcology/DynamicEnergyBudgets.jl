@@ -52,7 +52,7 @@ C is assimilated at a constant rate, without control from the environment
 """
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
     # Field         | Def | Unit              | Bounds      | Log | Description
-    c_uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | [0.0, 10.0] | _   | "Constant rate of C uptake"
+    c_uptake::μMoMS | 0.1 | μmol*mol^-1*s^-1  | (0.0, 10.0) | _   | "Constant rate of C uptake"
 end
 
 """
@@ -61,21 +61,21 @@ end
 N is assimilated at a constant rate, without control from the environment
 """
 @columns struct ConstantNAssim{μMoMS} <: AbstractNAssim
-    n_uptake::μMoMS | 0.1  | μmol*mol^-1*s^-1 | [0.0, 0.5]  | _   | "Constant rate of N uptake"
+    n_uptake::μMoMS | 0.1  | μmol*mol^-1*s^-1 | (0.0, 0.5)  | _   | "Constant rate of N uptake"
 end
 
 @mix @columns struct SLA{MG}
-    SLA::MG         | 24.0 | m^2*kg^-1        | [5.0, 30.0] | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
+    SLA::MG         | 24.0 | m^2*kg^-1        | (5.0, 30.0) | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
 
 abstract type AbstractFvCBCAssim <: AbstractCAssim end
 
 " Uses FvCB photosynthesis model from Photosynthesis.jl "
-@mix @columns @flattenable struct MixinFvCB{P,V,MG}
+@mix @flattenable @columns struct MixinFvCB{P,V,MG}
     vars::V        | false | Photosynthesis.EmaxVars() | _ | _ | _ | _
     photoparams::P | true  | nothing | _         | _           | _ | _
-    SLA::MG        | true  | 24.0    | m^2*kg^-1 | [5.0, 30.0] | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
+    SLA::MG        | true  | 24.0    | m^2*kg^-1 | (5.0, 30.0) | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
 # @MixinFvCB struct EmaxCAssim{} <: AbstractFvCBCAssim end
@@ -117,14 +117,14 @@ end
 @mix @columns @SLA struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
     #Field              | Default           | Unit             | Bounds           | Log  | Description
     vars::V             | CarbonVars()      | _                | _                | _    | _
-    k_C_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | [1e-5, 2000.0]   | true | "Scaling rate for carbon dioxide"
-    k_O_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | [1e-5, 2000.0]   | true | "Scaling rate for oxygen"
-    K_C::MoL            | 50*1e-6/gas_molpL | mol*L^-1         | [1e-7, 100.0]    | true | "Half-saturation concentration of carbon dioxide"
-    K_O::MoL            | 0.0021/gas_molpL  | mol*L^-1         | [1e-7, 100.0]    | true | "Half-saturation concentration of oxygen"
-    J_L_K::MoMS         | 2000.0            | mol*m^-2*s^-1    | [1e-3, 100000.0] | true | "Half-saturation flux of useful photons"
-    j_L_Amax::μMoMS     | 100.01            | μmol*m^-2*s^-1   | [1e-4, 10000.0]  | true | "Maximum specific uptake of useful photons"
-    j_C_Amax::μMoMS     | 20.0              | μmol*m^-2*s^-1   | [5.0,  100.0]    | true | "Maximum specific uptake of carbon dioxide"
-    j_O_Amax::μMoMS     | 0.1               | μmol*m^-2*s^-1   | [0.01,  50.0]    | true | "Maximum specific uptake of oxygen"
+    k_C_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | (1e-5, 2000.0)   | true | "Scaling rate for carbon dioxide"
+    k_O_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | (1e-5, 2000.0)   | true | "Scaling rate for oxygen"
+    K_C::MoL            | 50*1e-6/gas_molpL | mol*L^-1         | (1e-7, 100.0)    | true | "Half-saturation concentration of carbon dioxide"
+    K_O::MoL            | 0.0021/gas_molpL  | mol*L^-1         | (1e-7, 100.0)    | true | "Half-saturation concentration of oxygen"
+    J_L_K::MoMS         | 2000.0            | mol*m^-2*s^-1    | (1e-3, 100000.0) | true | "Half-saturation flux of useful photons"
+    j_L_Amax::μMoMS     | 100.01            | μmol*m^-2*s^-1   | (1e-4, 10000.0)  | true | "Maximum specific uptake of useful photons"
+    j_C_Amax::μMoMS     | 20.0              | μmol*m^-2*s^-1   | (5.0,  100.0)    | true | "Maximum specific uptake of carbon dioxide"
+    j_O_Amax::μMoMS     | 0.1               | μmol*m^-2*s^-1   | (0.01,  50.0)    | true | "Maximum specific uptake of oxygen"
 end
 
 abstract type AbstractKooijmanPhoto <: AbstractCAssim end
@@ -138,28 +138,28 @@ abstract type AbstractKooijmanPhoto <: AbstractCAssim end
 end
 
 # @columns struct WaterPotentialCutoff{KPA}
-    # cutoff::KPA    | -250.0  | kPa  | [0.0, -500.0] | _ | "Max spec uptake of oxygen"
+    # cutoff::KPA    | -250.0  | kPa  | (0.0, -500.0) | _ | "Max spec uptake of oxygen"
 # end
 
 
 " Parameters for Ammonia/Nitrate assimilation "
 @columns struct KooijmanNH4_NO3Assim{μMoMS,F,MoMo,MoL,V} <: AbstractNH4_NO3Assim
     vars::V          | NitrogenVars() | _         | _             | _ | _
-    j_NH_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | [0.1, 1000.0] | _ | "Max spec uptake of ammonia"
-    j_NO_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | [0.1, 1000.0] | _ | "Max spec uptake of nitrate"
-    ρNO::F           | 0.7     | _                | [1e-4, 1.0]   | _ | "Weights preference for nitrate relative to ammonia." # 1 or less but why?
-    y_E_CH_NH::MoMo  | 1.25    | mol*mol^-1       | [1e-4, 4.0]   | _ | "From roots C-reserve to reserve using ammonia"
-    K_NH::MoL        | 0.01    | mol*L^-1         | [1e-4, 10.0]  | _ | "Half-saturation concentration of ammonia"
-    K_NO::MoL        | 0.01    | mol*L^-1         | [1e-4, 10.0]  | _ | "Half-saturation concentration of nitrate"
-    K_H::MoL         | 10.0    | mol*L^-1         | [5.0, 20.0]   | _ | "Half-saturation concentration of water"
+    j_NH_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | (0.1, 1000.0) | _ | "Max spec uptake of ammonia"
+    j_NO_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | (0.1, 1000.0) | _ | "Max spec uptake of nitrate"
+    ρNO::F           | 0.7     | _                | (1e-4, 1.0)   | _ | "Weights preference for nitrate relative to ammonia." # 1 or less but why?
+    y_E_CH_NH::MoMo  | 1.25    | mol*mol^-1       | (1e-4, 4.0)   | _ | "From roots C-reserve to reserve using ammonia"
+    K_NH::MoL        | 0.01    | mol*L^-1         | (1e-4, 10.0)  | _ | "Half-saturation concentration of ammonia"
+    K_NO::MoL        | 0.01    | mol*L^-1         | (1e-4, 10.0)  | _ | "Half-saturation concentration of nitrate"
+    K_H::MoL         | 10.0    | mol*L^-1         | (5.0, 20.0)   | _ | "Half-saturation concentration of water"
 end
 
 " Parameters for lumped Nitrogen assimilation "
 @columns struct NAssim{μMoS,MoL,V} <: AbstractNAssim
     vars::V          | NitrogenVars() | _         | _             | _ | _
-    j_N_Amax::μMoS   | 50.0    | μmol*mol^-1*s^-1 | [0.1, 1000.0] | _ | "Max spec uptake of ammonia"
-    K_N::MoL         | 0.01    | mol*L^-1         | [1e-4, 1.0]   | _ | "Half-saturation concentration of nitrate"
-    K_H::MoL         | 10.0    | mol*L^-1         | [1e-2, 100.0] | _ | "Half-saturation concentration of water"
+    j_N_Amax::μMoS   | 50.0    | μmol*mol^-1*s^-1 | (0.1, 1000.0) | _ | "Max spec uptake of ammonia"
+    K_N::MoL         | 0.01    | mol*L^-1         | (1e-4, 1.0)   | _ | "Half-saturation concentration of nitrate"
+    K_H::MoL         | 10.0    | mol*L^-1         | (1e-2, 100.0) | _ | "Half-saturation concentration of water"
 end
 
 
@@ -184,19 +184,19 @@ and combines N with translocated C.
 """
 assimilation!(p::HasCNE, f::AbstractCAssim, o, u) = begin
     J = flux(o)
-    c_uptake = photosynthesis(f, o, u) * u.V * shape(o)
+    c_uptake = photosynthesis(f, o, u) * u[:V] * shape(o)
     n_tra = J[:N,:tra]
     # Merge rejected N from root and photosynthesized C into reserves
-    J[:C,:ass], J[:N,:tra], J[:E,:ass] = stoich_merge(c_uptake, n_tra, y_E_CH_NO(o), y_E_EN(o))
+    J[:C,:asi], J[:N,:tra], J[:E,:asi] = stoich_merge(c_uptake, n_tra, y_E_CH_NO(o), y_E_EN(o))
 
-    # lc, ln = stoich_merge_losses(c_uptake, n_tra, J[:C,:ass], J[:N,:tra], J[:E,:ass],
+    # lc, ln = stoich_merge_losses(c_uptake, n_tra, J[:C,:asi], J[:N,:tra], J[:E,:asi],
                                  # 1, 1, n_N_E(o))
     # J1[:C,:los] += lc
     # J1[:N,:los] += ln
 end
 assimilation!(::HasCN, f::AbstractCAssim, o, u) = begin
     c = photosynthesis(f, o, u)
-    flux(o)[:C,:ass] = max(c, zero(c)) * u.V * shape(o)
+    flux(o)[:C,:asi] = max(c, zero(c)) * u[:V] * shape(o)
 end
 
 """
@@ -207,7 +207,7 @@ Unused ammonia is discarded.
 """
 assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     J = flux(o)
-    J_N_ass, J_NO_ass, J_NH_ass = nitrogen_uptake(f, o, u) .* u.V * shape(o)
+    J_N_ass, J_NO_ass, J_NH_ass = nitrogen_uptake(f, o, u) .* u[:V] * shape(o)
 
     θNH = J_NH_ass/J_N_ass                          # Fraction of ammonia in arriving N-flux
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
@@ -216,11 +216,11 @@ assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     C_tra = J[:C,:tra]
 
     # Merge rejected C from shoot and uptaken N into reserves
-    J[:C,:tra], J[:N,:ass], J[:E,:ass] = stoich_merge(C_tra, J_N_ass, y_E_EC, 1/n_N_E(o))
-    # stoich_merge_losses(c_tra, J_N_ass, J[:C,:tra], J[:N,:ass], J[:E,:ass], 1, 1, n_N_E(o))
+    J[:C,:tra], J[:N,:asi], J[:E,:asi] = stoich_merge(C_tra, J_N_ass, y_E_EC, 1/n_N_E(o))
+    # stoich_merge_losses(c_tra, J_N_ass, J[:C,:tra], J[:N,:asi], J[:E,:asi], 1, 1, n_N_E(o))
 
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
-    J[:N,:ass] = (J_NO_ass - θNO * n_N_E(o) * J[:E,:ass]) * 1/n_N_EN(o)
+    J[:N,:asi] = (J_NO_ass - θNO * n_N_E(o) * J[:E,:asi]) * 1/n_N_EN(o)
 end
 
 """
@@ -230,21 +230,17 @@ Runs nitrogen uptake, and combines N with translocated C.
 """
 assimilation!(::HasCNE, f::AbstractNAssim, o, u) = begin
     J = flux(o)
-    J_N_assim = nitrogen_uptake(f, o, u) * u.V * shape(o)
-    c_tra = J[:C,:tra]
-
+    J_N_assim = nitrogen_uptake(f, o, u) * u[:V] * shape(o)
     # Merge rejected C from shoot and uptaken N into reserves
     # treating N as N reserve now carbon has been incorporated.
-    J[:C,:tra], J[:N,:ass], J[:E,:ass] = stoich_merge(c_tra, J_N_assim, y_E_CH_NO(o), y_E_EN(o))
-    # lc, ln = stoich_merge_losses(c_tra, J_N_assim, J[:C,:tra], J[:N,:ass], J[:E,:ass], 1, 1, n_N_E(o))
+    J[:C,:tra], J[:N,:asi], J[:E,:asi] = stoich_merge(su_pars(o), J[:C,:tra], J_N_assim, y_E_CH_NO(o), y_E_EN(o))
+    # lc, ln = stoich_merge_losses(c_tra, J_N_assim, J[:C,:tra], J[:N,:asi], J[:E,:asi], 1, 1, n_N_E(o))
     # J1[:C,:los] += lc
     # J1[:N,:los] += ln
 end
 assimilation!(::HasCN, f::AbstractNAssim, o, u) = begin
     J = flux(o)
-    max_N = nitrogen_uptake(f, o, u) * u.V * shape(o)
-    unused_C, unused_N, J[:N,:ass] = stoich_merge(su_pars(o), J[:C,:tra], max_N, 1.0, 1.0)
-    J[:C,:ass] = unused_C - J[:C,:tra]
+    J[:N,:asi] = nitrogen_uptake(f, o, u) * u[:V] * shape(o)
 end
 
 """

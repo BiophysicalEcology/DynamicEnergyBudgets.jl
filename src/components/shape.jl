@@ -55,4 +55,4 @@ end
 
 shape_correction(f::Plantmorph, V) = (V / f.M_Vref)^(-V / f.M_Vscaling)
 
-update_shape!(o, u) = set_shape!(o, shape_correction(shape_pars(o), u.V))
+update_shape!(o, u) = set_shape!(o, shape_correction(shape_pars(o), u[:V]))

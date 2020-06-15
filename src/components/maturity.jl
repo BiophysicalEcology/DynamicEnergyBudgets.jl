@@ -36,10 +36,10 @@ end
 # w_M::GMo         | 25.0            | g*mol^-1        | [0.0, 1.0]   | _    | "Mol-weight of shoot maturity reserve:"
 
 maturity!(f::Maturity, o, u) = begin
-    seedset = u.M > f.threshold ? u.M : zero(u.M) 
+    seedset = u[:M] > f.threshold ? u[:M] : zero(u[:M]) 
     mat = κmat(f) * flux1(o)[:E,:ctb]
     flux(o)[:M,:gro] = mat - seedset * unit(mat)/unit(seedset)
-    mat_mai = f.j_E_mat_mai * tempcorrection(o) * u.V
+    mat_mai = f.j_E_mat_mai * tempcorrection(o) * u[:V]
     drain = mat + mat_mai
     reserve_drain!(o, Val(:mat), drain)
     # reserve_loss!(o, mat_mai)

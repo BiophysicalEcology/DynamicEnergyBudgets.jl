@@ -41,9 +41,7 @@ synthesizing_unit(f::KfamilySU, v, w) = (v^-f.k + w^-f.k)^(-1/f.k)
 Merge fluxes stoichiometrically into general reserve Eab based on yeild
 fractions ya and yb. An unmixed proportion is returned as unmixed reserves Ea and Eb.
 """
-stoich_merge(su, Ja, Jb, ya, yb) = begin
-    JEab = synthesizing_unit(su, Ja * ya, Jb * yb)
-    Ja1 = Ja - JEab/ya
-    Jb1 = Jb - JEab/yb
-    (Ja1, Jb1, JEab)
+stoich_merge(su, Jv, Jw, yv, yw) = begin
+    JEvw = synthesizing_unit(su, Jv * yv, Jw * yw)
+    (Jv - JEvw / yv), (Jw - JEvw / yw), JEvw
 end

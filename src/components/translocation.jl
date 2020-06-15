@@ -1,3 +1,56 @@
+# Translocation of reserve rejected from the SU during catabolism
+
+abstract type AbstractRejection end
+
+"""
+    translocate_rejected!(source, dest, prop)
+
+Reallocate state rejected from synthesizing units.
+
+TODO: add a 1-organs method. How does this interact with assimilation?
+"""
+translocate_rejected!(source, dest, prop) =
+    translocate_rejected!(rejection_pars(source), source, dest, prop)
+translocate_rejected!(f::Nothing, source, dest, prop) = nothing
+
+"""
+    DissipativeRejection(y_EC_ECT, y_EN_ENT)
+
+Substrate rejected from synthesizing units during catabolism is returned to
+reserve, but with some fraction of loss specified by yield parameters.
+"""
+@columns struct DissipativeRejection{MoMo} <: AbstractRejection
+#   Field          | Default | Unit       | Bounds     | Log | Description
+    y_EC_ECT::MoMo | 1.0     | mol*mol^-1 | (0.0, 1.0) | _   | "yield of translocated C-reserve"
+    y_EN_ENT::MoMo | 1.0     | mol*mol^-1 | (0.0, 1.0) | _   | "yield of Translocated N-reserve"
+end
+
+translocate_rejected!(f::DissipativeRejection, source, dest, prop) = begin
+    Js, Jd = flux(source), flux(dest)
+    Jd[:C,:tra] = -Js[:C,:rej] * f.y_EC_ECT
+    Jd[:N,:tra] = -Js[:N,:rej] * f.y_EN_ENT
+    nothing
+end
+
+"""
+    LosslessRejection)
+
+Parameterless rejection where substrate rejected from synthesizing units
+during catabolism is returned to reserve without loss.
+"""
+struct LosslessRejection <: AbstractRejection end
+
+translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
+    Js, Jd = flux(source), flux(dest)
+    Jd[:C,:tra] = -Js[:C,:rej]
+    Jd[:N,:tra] = -Js[:N,:rej]
+    nothing
+end
+
+
+# Active translocation. Not required in practice, as
+# translocation of rejected reserves gives resonable behaviour.
+
 abstract type AbstractTranslocation end
 
 @mix @flattenable @columns struct Trans{F}
@@ -67,7 +120,7 @@ Translocation with dissipative losses to the environment.
 translocate!(p::DissipativeTranslocation, o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[:E,:ctb]
-    reserve_drain!(o1, Val(:tra), trans)
+    reserve_drain!(o1, :tra, trans)
 
     # incoming translocation
     transx = κtra(o2) * o2.J1[:E,:ctb]
@@ -92,7 +145,7 @@ Perfect translocation between structures.
 translocate!(p::LosslessTranslocation, o1, o2, prop) = begin
     # outgoing translocation
     trans = κtra(o1) * o1.J1[:E,:ctb]
-    reserve_drain!(o1, Val(:tra), trans)
+    reserve_drain!(o1, :tra, trans)
 
     # incoming translocation
     transx = κtra(o2) * o2.J1[:E,:ctb]
@@ -123,62 +176,3 @@ end
 # translocation!(organs::Tuple) = translocation!(organs...)
 translocation!(organs::Tuple{T}) where T = nothing
 translocation!(organs::Tuple{}) = nothing
-
-
-
-abstract type AbstractRejection end
-
-"""
-    translocate_rejected!(source, dest, prop) 
-
-Reallocate state rejected from synthesizing units.
-
-TODO: add a 1-organs method. How does this interact with assimilation?  
-"""
-translocate_rejected!(source, dest, prop) = 
-    translocate_rejected!(rejection_pars(source), source, dest, prop)
-translocate_rejected!(f::Nothing, source, dest, prop) = nothing
-
-"""
-    DissipativeRejection(y_EC_ECT, y_EN_ENT)
-
-Substrate rejected from synthesizing units during catabolism is returned to
-reserve, but with some fraction of loss specified by yield parameters.
-"""
-@columns struct DissipativeRejection{MoMo} <: AbstractRejection
-#   Field          | Default | Unit       | Bounds     | Log | Description
-    y_EC_ECT::MoMo | 1.0     | mol*mol^-1 | (0.0, 1.0) | _   | "yield of translocated C-reserve"
-    y_EN_ENT::MoMo | 1.0     | mol*mol^-1 | (0.0, 1.0) | _   | "yield of Translocated N-reserve"
-end
-
-translocate_rejected!(f::DissipativeRejection, source, dest, prop) = begin
-    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
-    transC = J1s[:C,:rej] # * (1 - κEC(o))
-    transN = J1s[:N,:rej] # * (1 - κEN(o))
-    Js[:C,:rej] = -transC
-    Js[:N,:rej] = -transN
-    Jd[:C,:tra] = f.y_EC_ECT * transC
-    Jd[:N,:tra] = f.y_EN_ENT * transN
-    # J1[:C,:los] += transC * (1 - y_EC_ECT(o)) + transN * (1 - y_EN_ENT(o))
-    # J1[:N,:los] += (transC * (1 - y_EC_ECT(o)), transN * (1 - y_EN_ENT(o))) ⋅ (n_N_EC(o), n_N_EN(o))
-    nothing
-end
-
-"""
-    LosslessRejection)
-
-Parameterless rejection where substrate rejected from synthesizing units
-during catabolism is returned to reserve without loss.
-"""
-struct LosslessRejection <: AbstractRejection end
-
-translocate_rejected!(rejected::LosslessRejection, source, dest, prop) = begin
-    Js, J1s, Jd = flux(source), flux1(source), flux(dest)
-    transC = J1s[:C,:rej] # * (1 - κEC(o))
-    transN = J1s[:N,:rej] # * (1 - κEN(o))
-    Js[:C,:rej] = -transC
-    Js[:N,:rej] = -transN
-    Jd[:C,:tra] = transC
-    Jd[:N,:tra] = transN
-    nothing
-end

@@ -3,15 +3,20 @@
     split_state(o::Tuple, u::AbstractArray)
 
 Split state vector into multiple views for each organ.
+
+We do this recursively for type stabilitya.
 """
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
-    v = view(u, offset+1:offset+length(STATE))
-    lv = DimensionalArray(v, (X(Val(STATE)),))
-    (lv, split_state(tail(o), u, offset + length(STATE))...)
+    statedim = dims(o[1].J, X)
+    v = view(parent(u), offset+1:offset+length(statedim))
+    lv = DimensionalArray(v, (statedim,))
+    (lv, split_state(tail(o), u, offset + length(statedim))...)
 end
 split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 
+unwrap(::Val{X}) where X = X
+unwrap(::Type{Val{X}}) where X = X
 
 update_tstep!(o::Organ, t) = set_tstep!(o, calc_tstep(o, t))
 
@@ -25,50 +30,6 @@ zero_flux!(o) = begin
     o.J1 .= zero(eltype(o.J1))
 end
 
-
-# Deal with du, u, p with/without units
-(o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Number) = begin
-    println("Real/Real")
-    u1 = u .* mol
-    o1 = reconstruct(o, p)
-    du1 = du .* (mol/hr)
-    rec = Records(o.params)
-    o1(du1, u1, t * (hr), define_organs(o1.params, rec, o1, t))
-    du2 = ustrip.(du1)
-    if eltype(du2) == eltype(du)
-        du .= du2
-    end
-    du2
-end
-(o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::Nothing, t::Number) = begin 
-    t = t * (hr)
-    du1 = du .* (mol/hr)
-    u1 = u .* (mol)
-    o(du1, u1, t, define_organs(o, t))
-    du .= ustrip.(du1)
-end
-(o::Plant)(du, u, p::Nothing, t::Number) = o(du, u, t, define_organs(o, t))
-
-
-""" 
-    define_organs(o, t)
-
-Update vars and flux to record for time t.
-"""
-define_organs(o, t) = 
-    map((p, r) -> define_organ(p, shared(o), r, t), params(o), records(o))
-define_organ(params, shared, records, t) = begin
-    t = calc_tstep(records.vars, t)
-    records.vars.t[1] = t
-    vJ = view(records.J, :, :, t)
-    vJ1 = view(records.J1, :, :, t)
-    J = DimensionalArray(vJ, (X(Val(STATE)), Y(Val(TRANS))))
-    J1 = DimensionalArray(vJ1, (X(Val(STATE1)), Y(Val(TRANS1))))
-
-    Organ(params, shared, records.vars, J, J1)
-end
-
-
 """
     check_params(o)
 
@@ -77,7 +38,7 @@ tuple of organs.
 """
 function check_params end
 
-check_params(o::Tuple) = apply(check_params, o)
+check_params(organs::Tuple) = map(check_params, organs)
 check_params(o::Organ) = begin 
     y_V_E(o) <= n_N_V(o)/n_N_E(o) || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (y_V_E(o), n_N_V(o), n_N_E(o) ))
     2 <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for C conservation ", (y_E_EC(o), y_E_EN(o)))

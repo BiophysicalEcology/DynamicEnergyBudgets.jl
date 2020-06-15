@@ -16,5 +16,5 @@ growth_production!(p::Production, o, growth) = flux(o)[:P,:gro] = growth * p.y_P
 growth_production!(p, o, growth) = zero(growth)
 
 maintenance_production!(o, u) = maintenance_production!(production_pars(o), o, u)
-maintenance_production!(p::Production, o, u) = flux(o)[:P,:mai] = p.j_P_mai * tempcorrection(o) * u.V
+maintenance_production!(p::Production, o, u) = flux(o)[:P,:mai] = p.j_P_mai * tempcorrection(o) * u[:V]
 maintenance_production!(p, o, u) = zero(eltype(flux(o)))

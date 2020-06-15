@@ -1,9 +1,56 @@
-"""
-    (organism::Plant)(du, u, t::Number, organs)
 
-Run a DEB organism model (i.e. from DiffEq).
 """
-(organism::Plant)(du, u, t::Number, organs) = begin
+    debmodel!(organs::Tuple, u::Tuple{AbstractArray}, env)
+
+A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
+
+Applies metabolism, translocation and assimilation methods to 2 organs.
+
+settings is a struct with required model data, DEBSettings or similar.
+t is the timestep
+"""
+debmodel!(organs::Tuple, u::Tuple, env) = begin
+    # Quit if it dies
+    false in metabolism!(organs, u) && return false
+    translocation!(organs)
+    assimilation!(organs, u)
+    return true
+end
+
+"""
+    metabolism!(organs::Tuple, u)
+
+Metabolism is an identical process for all organs, with potentially
+different parameters or area and rate functions.
+"""
+metabolism!(organs::Tuple, u::Tuple) = map(metabolism!, organs, u)
+metabolism!(o::AbstractOrgan, u::AbstractVector) = begin
+    # Quit and fail if growth rate is negative or not found (death)
+    catabolism!(o, u) || return false
+    growth!(o, u)
+    maintenence!(o, u)
+    maturity!(o, u)
+    resorption!(o, u)
+    return true
+end
+
+"""
+    (organism::Plant)(du, u, p, t::Number)
+
+The `Plant` struct can be used as a function to run the DEB model in a solver,
+such as (i.e. from DiffEq).
+
+`du` is the change in state vector written to by the model, 
+`u` is the vector of current state, p is a tuple or vector of parameter values, 
+and t is time.
+
+If `p` is not `nothing` the model will be rebuilt with the new parameters. Note
+that this works with any model combination automatically as long as the number
+of parameters matches the number of parameters in the model. 
+"""
+(o::Plant)(du::AbstractVector{<:Unitful.Quantity}, u::AbstractVector{<:Unitful.Quantity}, p, t::Unitful.Quantity) = 
+    o(du, u, t, define_organs(o, t))
+(organism::Plant)(du, u, t::Number, organs::Tuple) = begin
     dead(organism) && return
 
     # Make sure the parameters don't any physical laws
@@ -13,10 +60,10 @@ Run a DEB organism model (i.e. from DiffEq).
     ux = split_state(organs, u)
 
     # Set up variables for this timestep and the current state
-    apply(update_tstep!, organs, t)
-    apply(zero_flux!, organs)
-    apply(update_height!, organs, ux)
-    apply(update_shape!, organs, ux)
+    map(update_tstep!, organs, t)
+    map(zero_flux!, organs)
+    map(update_height!, organs, ux)
+    map(update_shape!, organs, ux)
     try
         apply_environment!(organism, organs, ux, t)
     catch
@@ -34,63 +81,35 @@ Run a DEB organism model (i.e. from DiffEq).
 
     # Sum the flux matrix to the state change vector
     sum_flux!(du, organs)
-    nothing
+    return
 end
-
-"""
-    debmodel!(organs::Tuple, u::Tuple{AbstractArray}, env)
-
-A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
-
-Applies metabolism, translocation and assimilation methods to 2 organs.
-
-settings is a struct with required model data, DEBSettings or similar.
-t is the timestep
-"""
-debmodel!(organs::Tuple, u::Tuple, env) = begin
-    # Quit if it dies
-    false in metabolism!(organs, u) && return false
-    translocation!(organs)
-    assimilation!(organs, u)
-    true
+# Deal with du, u, p without units
+(o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Real) = begin
+    # Create unitful state vectors
+    du1 = du .* (mol/hr)
+    u1 = u .* mol
+    t1 = t * hr
+    # Reconstruct the model with new parameters
+    o1 = reconstruct(o, p, Real)
+    # Run the model
+    o1(du1, u1, t1, define_organs(o1.params, records(o1), o1, t1))
+    # Copy the result to the unitless state change vector
+    du2 = du1 ./ (mol/hr)
+    if eltype(du2) == eltype(du)
+        du .= du2
+    end
+    du2
 end
-
-"""
-    metabolism!(organs::Tuple, u)
-
-Metabolism is an identical process for all organs, with potentially
-different parameters or area and rate functions.
-"""
-metabolism!(organs::Tuple, u) = apply(metabolism!, organs, u)
-metabolism!(o::AbstractOrgan, u) = begin
-    # Quit and fail if growth rate is negative or not found (death)
-    catabolism!(o, u) || return false
-    growth!(o, u)
-    maturity!(o, u)
-    maintenence!(o, u)
-    resorption!(o, u)
-    return true
-end
-
-"""
-    reserve_drain!(o::AbstractOrgan, column, drain)
-
-Generalised reserve drain for any flux column (ie :gro) specified by its `Symbol` or `Int`
-"""
-@inline reserve_drain!(o::AbstractOrgan, col, drain) = reserve_drain!(has_reserves(o), o, col, drain)
-@inline reserve_drain!(::HasCNE, o, col, drain) = begin
-    ΘE, J = θE(o), flux(o)
-    J_CN = -drain * (1 - θ) # fraction on drain from C and N reserves
-    @inbounds J[:C,col] = J_CN/y_E_EC(o)
-    @inbounds J[:N,col] = J_CN/y_E_EN(o)
-    @inbounds J[:E,col] = -drain * ΘE
-    nothing
-end
-@inline reserve_drain!(::HasCN, o, col, drain) = begin
-    J = flux(o)
-    @inbounds J[:C,col] = -drain/y_E_EC(o)
-    @inbounds J[:N,col] = -drain/y_E_EN(o)
-    nothing
+# Deal with du and u without units
+(o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p, t::Real) = begin 
+    # Create unitful state vectors
+    du1 = du .* (mol/hr)
+    u1 = u .* mol
+    t1 = t * hr
+    # Run the model
+    o(du1, u1, t1, define_organs(o, t1))
+    # Copy the result to the unitless state change vector
+    du .= du1 ./ (mol/hr)
 end
 
 #= J: Flux matrix diagram. rows=state, columns=transformations

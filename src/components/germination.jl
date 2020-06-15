@@ -20,4 +20,4 @@ The default with no formulation is that germination occurs immediately.
 """
 is_germinated(o, u) = is_germinated(germination_pars(o), o, u)
 is_germinated(f::Nothing, o, u) = true
-is_germinated(f::ThresholdGermination, o, u) = u.V > f.germination_mass
+is_germinated(f::ThresholdGermination, o, u) = u[:V] > f.germination_mass

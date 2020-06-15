@@ -5,78 +5,127 @@ Modules = [DynamicEnergyBudgets]
 Order   = [:module]
 ```
 
-## Index
-
-### Types
-
-```@index
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-```
-
-### Functions
-
-```@index
-Modules = [DynamicEnergyBudgets]
-Order   = [:function]
-```
-
-## Parameters and Types
-
-DynamicEnergyBudgets uses the julia type system to organise 
-both the parameters and the logic of the model. This means the model is
-completely modular and customisable.
-
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["types.jl"]
-```
-
 ## Model
 
 Core functions of the model.
 
 ```@autodocs
 Modules = [DynamicEnergyBudgets]
-Order   = [:function]
-Pages   = ["model.jl"]
+Order   = [:type, :function]
+Pages   = ["organism.jl", "model.jl"]
 ```
 
-## Environment
+### Core Parameters
 
 ```@autodocs
 Modules = [DynamicEnergyBudgets]
-Order   = [:function]
-Pages   = ["environment.jl"]
+Pages   = ["core.jl"]
 ```
 
-## Assimilation
+## Components
 
-Carbon and nitrogen assimilation functions. These are the main points of
-difference between organs.
+### Allometry
 
 ```@autodocs
 Modules = [DynamicEnergyBudgets]
-Order   = [:function]
+Order   = [:type]
+Pages   = ["allometry.jl"]
+```
+
+### Assimilation
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
 Pages   = ["assimilation.jl"]
 ```
 
-## Functions
+### Catabolism
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["catabolism.jl"]
+```
+
+### Environment
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["environment.jl"]
+```
+
+### Maintenance
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["maintenance.jl"]
+```
+
+### Maturity
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["maturity.jl"]
+```
+
+### Rate
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["rate.jl"]
+```
+
+### Resorption
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["resorption.jl"]
+```
+
+### Shape
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["shape.jl"]
+```
+
+### Synthesizing Units
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["synthesizing_units.jl"]
+```
+
+### Temperature Correction
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["temperature_correction.jl"]
+```
+
+### Translocation
+
+```@autodocs
+Modules = [DynamicEnergyBudgets]
+Order   = [:type]
+Pages   = ["translocation.jl"]
+```
+
+## Other functions
 
 Low-level DEB theory functions
 
 ```@autodocs
 Modules = [DynamicEnergyBudgets]
 Order   = [:function]
-Pages   = ["functions.jl"]
-```
-
-## Setup and utilities
-
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:function]
-Pages   = ["apply.jl"]
-Pages   = ["setup.jl"]
+Pages   = ["functions.jl","apply.jl","setup.jl"]
 ```
