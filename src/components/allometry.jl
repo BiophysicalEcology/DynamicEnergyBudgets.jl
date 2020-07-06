@@ -46,7 +46,4 @@ end
 
 allometric_height(f::FixedAllometry, mass) = f.height
 
-mass(o, u) = begin
-    println("u[:V], w_V(o): ", (u[:V], w_V(o)))
-    u[:V] * w_V(o)
-end
+mass(o, u) = u[:V] * w_V(o)

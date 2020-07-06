@@ -11,10 +11,14 @@ abstract type AbstractProduction end
     w_P::GMo       | 25.0    | g*mol^-1        | (10.0, 40.0) | _   | "Mol-weight of shoot product (wood)"
 end                                                                                        
 
+for fn in fieldnames(Production)
+    @eval $fn(p::Production) = p.$fn
+end
+
 growth_production!(o, growth) = growth_production!(production_pars(o), o, growth)
 growth_production!(p::Production, o, growth) = flux(o)[:P,:gro] = growth * p.y_P_V
-growth_production!(p, o, growth) = zero(growth)
+growth_production!(p::Nothing, o, growth) = zero(growth)
 
 maintenance_production!(o, u) = maintenance_production!(production_pars(o), o, u)
 maintenance_production!(p::Production, o, u) = flux(o)[:P,:mai] = p.j_P_mai * tempcorrection(o) * u[:V]
-maintenance_production!(p, o, u) = zero(eltype(flux(o)))
+maintenance_production!(p::Nothing, o, u) = zero(eltype(flux(o)))

@@ -1,5 +1,23 @@
 
 """
+    metabolism!(organs::Tuple, u)
+
+Metabolism is an identical process for all organs, with potentially
+different parameters or area and rate functions.
+"""
+metabolism!(organs::Tuple, u::Tuple) = map(metabolism!, organs, u)
+metabolism!(o::AbstractOrgan, u::AbstractVector) = begin
+    alive = catabolism!(o, u) 
+    alive || return false
+
+    growth!(o, u)
+    maintenence!(o, u)
+    maturity!(o, u)
+    resorption!(o, u)
+    return true
+end
+
+"""
     debmodel!(organs::Tuple, u::Tuple{AbstractArray}, env)
 
 A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
@@ -18,23 +36,6 @@ debmodel!(organs::Tuple, u::Tuple, env) = begin
 end
 
 """
-    metabolism!(organs::Tuple, u)
-
-Metabolism is an identical process for all organs, with potentially
-different parameters or area and rate functions.
-"""
-metabolism!(organs::Tuple, u::Tuple) = map(metabolism!, organs, u)
-metabolism!(o::AbstractOrgan, u::AbstractVector) = begin
-    # Quit and fail if growth rate is negative or not found (death)
-    catabolism!(o, u) || return false
-    growth!(o, u)
-    maintenence!(o, u)
-    maturity!(o, u)
-    resorption!(o, u)
-    return true
-end
-
-"""
     (organism::Plant)(du, u, p, t::Number)
 
 The `Plant` struct can be used as a function to run the DEB model in a solver,
@@ -48,11 +49,13 @@ If `p` is not `nothing` the model will be rebuilt with the new parameters. Note
 that this works with any model combination automatically as long as the number
 of parameters matches the number of parameters in the model. 
 """
-(o::Plant)(du::AbstractVector{<:Unitful.Quantity}, u::AbstractVector{<:Unitful.Quantity}, p, t::Unitful.Quantity) = 
-    o(du, u, t, define_organs(o, t))
+(o::Plant)(du::AbstractVector{<:Unitful.Quantity}, u::AbstractVector{<:Unitful.Quantity}, p, t::Unitful.Quantity) = begin
+    DynamicEnergyBudgets.dead(o) && return
+    o(du, u, t, update_organs(organs(o), t))
+    return
+end
 (organism::Plant)(du, u, t::Number, organs::Tuple) = begin
-    dead(organism) && return
-
+    DynamicEnergyBudgets.dead(organism) && return
     # Make sure the parameters don't any physical laws
     check_params(organs)
 
@@ -63,19 +66,21 @@ of parameters matches the number of parameters in the model.
     map(update_tstep!, organs, t)
     map(zero_flux!, organs)
     map(update_height!, organs, ux)
-    map(update_shape!, organs, ux)
-    try
+    map(update_scaling!, organs, ux)
+    #try
         apply_environment!(organism, organs, ux, t)
-    catch
-        du .= zero(eltype(du))
-        set_dead!(organism, true)
-        return
-    end
+    #catch e
+        # du .= zero(eltype(du))
+        # set_dead!(organism, true)
+        # @warn "dead at $t due to error: $e"
+        # return
+    #end
 
     # Run the model, tag the organism as dead if it breaks.
     if !debmodel!(organs, ux, environment(organism))
         du .= zero(eltype(du))
         set_dead!(organism, true)
+        @warn "dead at $t due to growth rate"
         return
     end
 
@@ -85,6 +90,7 @@ of parameters matches the number of parameters in the model.
 end
 # Deal with du, u, p without units
 (o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Real) = begin
+    DynamicEnergyBudgets.dead(o) && return
     # Create unitful state vectors
     du1 = du .* (mol/hr)
     u1 = u .* mol
@@ -92,24 +98,26 @@ end
     # Reconstruct the model with new parameters
     o1 = reconstruct(o, p, Real)
     # Run the model
-    o1(du1, u1, t1, define_organs(o1.params, records(o1), o1, t1))
+    o1(du1, u1, t1, update_organs(organs(o1), t1))
     # Copy the result to the unitless state change vector
     du2 = du1 ./ (mol/hr)
     if eltype(du2) == eltype(du)
         du .= du2
     end
-    du2
+    return
 end
 # Deal with du and u without units
 (o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p, t::Real) = begin 
+    DynamicEnergyBudgets.dead(o) && return
     # Create unitful state vectors
     du1 = du .* (mol/hr)
     u1 = u .* mol
     t1 = t * hr
     # Run the model
-    o(du1, u1, t1, define_organs(o, t1))
+    o(du1, u1, t1, update_organs(organs(o), t1))
     # Copy the result to the unitless state change vector
     du .= du1 ./ (mol/hr)
+    return
 end
 
 #= J: Flux matrix diagram. rows=state, columns=transformations

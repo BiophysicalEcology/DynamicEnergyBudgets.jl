@@ -69,51 +69,6 @@ end
 end
 
 
-abstract type AbstractFvCBCAssim <: AbstractCAssim end
-
-" Uses FvCB photosynthesis model from Photosynthesis.jl "
-@mix @flattenable @columns struct MixinFvCB{P,V,MG}
-    vars::V        | false | Photosynthesis.EmaxVars() | _ | _ | _ | _
-    photoparams::P | true  | nothing | _         | _           | _ | _
-    SLA::MG        | true  | 24.0    | m^2*kg^-1 | (5.0, 30.0) | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
-end
-
-# @MixinFvCB struct EmaxCAssim{} <: AbstractFvCBCAssim end
-
-# @redefault struct EmaxCAssim
-#     vars        | Photosynthesis.EmaxVars()
-#     photoparams | Photosynthesis.FvCBEnergyBalance(photosynthesis=EmaxPhotosynthesis())
-# end
-
-@MixinFvCB struct BallBerryCAssim{} <: AbstractFvCBCAssim end
-
-@default BallBerryCAssim begin
-    vars        | Photosynthesis.EmaxVars()
-    photoparams | Photosynthesis.FvCBEnergyBalance(
-                      photosynthesis=FvCBPhotosynthesis(
-                          stomatal_conductance=BallBerryStomatalConductance(
-                              soilmethod = PotentialSoilMethod()
-                          ),
-                          flux=Flux(),
-                         ))
-
-end
-
-@MixinFvCB struct BBPotentialCAssim{} <: AbstractFvCBCAssim end
-
-@default BBPotentialCAssim begin
-    vars        | Photosynthesis.EmaxVars()
-    photoparams | Photosynthesis.FvCBEnergyBalance(
-                      photosynthesis=FvCBPhotosynthesis(
-                          stomatal_conductance=BallBerryStomatalConductance(
-                              soilmethod = PotentialSoilMethod()
-                          ),
-                          flux=PotentialModifiedFlux(),
-                      ))
-
-end
-
-
 @mix @columns @SLA struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
     #Field              | Default           | Unit             | Bounds           | Log  | Description
     vars::V             | CarbonVars()      | _                | _                | _    | _
@@ -131,11 +86,6 @@ abstract type AbstractKooijmanPhoto <: AbstractCAssim end
 
 " Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "
 @KooijmanPhoto struct KooijmanSLAPhotosynthesis{} <: AbstractKooijmanPhoto end
-
-
-@KooijmanPhoto struct KooijmanWaterPotentialPhotosynthesis{PL} <: AbstractKooijmanPhoto
-    potential_modifier::PL | Photosynthesis.ZhouPotentialDependence() | _ | _ | _ | _ | "Modify photosynthesis with a water potential model"
-end
 
 # @columns struct WaterPotentialCutoff{KPA}
     # cutoff::KPA    | -250.0  | kPa  | (0.0, -500.0) | _ | "Max spec uptake of oxygen"
@@ -163,42 +113,28 @@ end
 end
 
 
+
 """
     assimilation!(o, u)
 
 Runs assimilation methods, depending on formulation and state.
 """
-assimilation!(organs::Tuple, u) = apply(assimilation!, organs, u)
+assimilation!(organs::Tuple, u) = map(assimilation!, organs, u)
 assimilation!(o, u) = begin
     is_germinated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
     nothing
 end
 assimilation!(::Nothing, x, o, u, env) = nothing
-
-
 """
     assimilation!(::HasCNE, f::AbstractCAssim, o, u)
 
 Runs photosynthesis for organs with C, N, and E reserves,
 and combines N with translocated C.
 """
-assimilation!(p::HasCNE, f::AbstractCAssim, o, u) = begin
-    J = flux(o)
-    c_uptake = photosynthesis(f, o, u) * u[:V] * shape(o)
-    n_tra = J[:N,:tra]
-    # Merge rejected N from root and photosynthesized C into reserves
-    J[:C,:asi], J[:N,:tra], J[:E,:asi] = stoich_merge(c_uptake, n_tra, y_E_CH_NO(o), y_E_EN(o))
-
-    # lc, ln = stoich_merge_losses(c_uptake, n_tra, J[:C,:asi], J[:N,:tra], J[:E,:asi],
-                                 # 1, 1, n_N_E(o))
-    # J1[:C,:los] += lc
-    # J1[:N,:los] += ln
-end
-assimilation!(::HasCN, f::AbstractCAssim, o, u) = begin
+assimilation!(::Any, f::AbstractCAssim, o, u) = begin
     c = photosynthesis(f, o, u)
-    flux(o)[:C,:asi] = max(c, zero(c)) * u[:V] * shape(o)
+    flux(o)[:C,:asi] = max(c, zero(c)) * u[:V] * scaling(o)
 end
-
 """
     assimilation!(f::AbstractNH4_NO3Assim, o, u)
 
@@ -207,7 +143,7 @@ Unused ammonia is discarded.
 """
 assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     J = flux(o)
-    J_N_ass, J_NO_ass, J_NH_ass = nitrogen_uptake(f, o, u) .* u[:V] * shape(o)
+    J_N_ass, J_NO_ass, J_NH_ass = nitrogen_uptake(f, o, u) .* u[:V] * scaling(o)
 
     θNH = J_NH_ass/J_N_ass                          # Fraction of ammonia in arriving N-flux
     θNO = 1 - θNH                                   # Fraction of nitrate in arriving N-flux
@@ -222,26 +158,17 @@ assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     # Unused NH₄ remainder is lost so we recalculate N assimilation for NO₃ only
     J[:N,:asi] = (J_NO_ass - θNO * n_N_E(o) * J[:E,:asi]) * 1/n_N_EN(o)
 end
-
 """
     assimilation!(f::AbstractNAssim, o, u)
 
 Runs nitrogen uptake, and combines N with translocated C.
 """
-assimilation!(::HasCNE, f::AbstractNAssim, o, u) = begin
-    J = flux(o)
-    J_N_assim = nitrogen_uptake(f, o, u) * u[:V] * shape(o)
-    # Merge rejected C from shoot and uptaken N into reserves
-    # treating N as N reserve now carbon has been incorporated.
-    J[:C,:tra], J[:N,:asi], J[:E,:asi] = stoich_merge(su_pars(o), J[:C,:tra], J_N_assim, y_E_CH_NO(o), y_E_EN(o))
-    # lc, ln = stoich_merge_losses(c_tra, J_N_assim, J[:C,:tra], J[:N,:asi], J[:E,:asi], 1, 1, n_N_E(o))
-    # J1[:C,:los] += lc
-    # J1[:N,:los] += ln
+assimilation!(::Any, f::AbstractNAssim, o, u) = begin
+    n = nitrogen_uptake(f, o, u)
+    flux(o)[:N,:asi] = max(n, zero(n)) * u[:V] * scaling(o)
 end
-assimilation!(::HasCN, f::AbstractNAssim, o, u) = begin
-    J = flux(o)
-    J[:N,:asi] = nitrogen_uptake(f, o, u) * u[:V] * shape(o)
-end
+
+
 
 """
     photosynthesis(f::ConstantCAssim, o, u)
@@ -249,13 +176,6 @@ end
 Returns a constant rate of carbon assimilation.
 """
 photosynthesis(f::ConstantCAssim, o, u) = f.c_uptake
-
-"""
-    photosynthesis(f::AbstractFvCBCAssimilation, o, u)
-
-Returns carbon assimilated in mols per unit time.
-"""
-photosynthesis(f::AbstractFvCBCAssim, o, u) = f.vars.aleaf * f.SLA * w_V(o)
 
 """
     photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
@@ -283,39 +203,9 @@ photosynthesis(f::KooijmanSLAPhotosynthesis, o, u) = begin
 
     j_c_intake / (1 + bound_c + bound_o + co_l)
 end
+    
+    
 
-photosynthesis(f::KooijmanWaterPotentialPhotosynthesis, o, u) = begin
-    va = f.vars
-    mass_area_coef = w_V(o) * f.SLA
-
-    j1_l = half_saturation(f.j_L_Amax, f.J_L_K, va.J_L_F) * mass_area_coef / 2
-
-    # Modify CO2 and O2 intake by water availability to simulate stomatal closure.
-    potentialcorrection = Photosynthesis.non_stomatal_potential_dependence(f.potential_modifier, va.soilwaterpotential)
-    j1_c = half_saturation(f.j_C_Amax, f.K_C, va.X_C) * mass_area_coef * potentialcorrection * tempcorrection(o)
-    j1_o = half_saturation(f.j_O_Amax, f.K_O, va.X_O) * mass_area_coef * potentialcorrection * tempcorrection(o)
-
-
-    # photorespiration.
-    bound_o = j1_o/f.k_O_binding # mol/mol
-    bound_c = j1_c/f.k_C_binding # mol/mol
-
-    # C flux
-    j_c_intake = (j1_c - j1_o)
-
-    j1_co = j1_c + j1_o
-    co_l = j1_co/j1_l - j1_co/(j1_l + j1_co)
-
-    j_c_intake / (1 + bound_c + bound_o + co_l)
-end
-
-
-# photosynthesis(f::KooijmanWaterPotentialCutoffPhotosynthesis, o, u) =
-    # if f.vars.soilwaterpotential > assimilation_pars(o).potential_cutoff
-        # kooijman_photosynthesis(f, o, u)
-    # else
-        # zero(kooijman_photosynthesis(f, o, u))
-    # end
 
 """
     nitrogen_uptake(f::ConstantNAssim, o, u)

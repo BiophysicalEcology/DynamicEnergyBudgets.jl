@@ -9,28 +9,31 @@ can use wide a range of photosynthesis and stomatal conductance formulations fro
 It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
 for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """
 module DynamicEnergyBudgets
+@doc let
+    path = joinpath(dirname(@__DIR__), "README.md")
+    include_dependency(path)
+    read(path, String)
+end DynamicEnergyBudgets
 
-using Unitful,
-      OrdinaryDiffEq,
-      DocStringExtensions,
-      MacroTools,
-      Distributions,
+using ConstructionBase,
       DimensionalData,
-      SimpleRoots,
-      Mixers,
+      DocStringExtensions,
       FieldMetadata,
       FieldDefaults,
       FieldDocTables,
-      Photosynthesis,
-      Microclimate,
-      Flatten
+      Flatten,
+      Mixers,
+      OrdinaryDiffEq,
+      Setfield,
+      SimpleRoots,
+      Requires,
+      Unitful
 
 using Unitful: °C, K, Pa, kPa, MPa, J, kJ, W, L, g, kg, cm, m, s, hr, d, mol, mmol, μmol, σ, R
 using Base: tail
 
 import FieldMetadata: @default, @description, @units, @bounds, @logscaled, @flattenable, @plottable, @selectable,
                       default, description, units, bounds, logscaled, flattenable, plottable, selectable
-import Photosynthesis: potential_dependence
 
 
 
@@ -77,19 +80,18 @@ export AbstractGermination, ThresholdGermination
 
 export AbstractProduction, Production
 
-export AbstractShape, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph
+export AbstractScaling, Isomorph, V0morph, V1morph, V1V0morph, Plantmorph
 
-export AbstractRejection, LosslessRejection, DissipativeRejection
+export PassiveTranslocation, LosslessPassiveTranslocation, DissipativePassiveTranslocation
+
+export ActiveTranslocation, LosslessActiveTranslocation, DissipativeActiveTranslocation
 
 export AbstractCatabolism, Catabolism, CatabolismCN, CatabolismCNshared, CatabolismCNE
-
-export AbstractTranslocation, LosslessMultipleTranslocation, DissipativeMultipleTranslocation,
-       LosslessTranslocation, DissipativeTranslocation
 
 export AbstractAllometry, Allometry, SqrtAllometry, FixedAllometry
 
 export AbstractParams, Params, SharedParams,
-       Vars, CarbonVars, NitrogenVars, Records
+       Vars, PlottableVars, CarbonVars, NitrogenVars, Records, PlottableRecords
 
 export AbstractOrgan, Organ, AbstractOrganism, Plant
 
@@ -114,12 +116,10 @@ const DEAD, ALIVE = false, true
 const BI_XTOL = 1e-10
 const BI_MAXITER = 100
 
-include("apply.jl")
 include("traits.jl")
 include("components/synthesizing_units.jl")
 include("components/temperature_correction.jl")
-include("components/shape.jl")
-include("components/rate.jl")
+include("components/scaling.jl")
 include("components/allometry.jl")
 include("components/resorption.jl")
 include("components/assimilation.jl")
@@ -127,14 +127,17 @@ include("components/germination.jl")
 include("components/maturity.jl")
 include("components/production.jl")
 include("components/translocation.jl")
-include("components/catabolism.jl")
-include("components/maintenance.jl")
 include("components/core.jl")
+include("components/catabolism.jl")
 include("organism.jl")
-include("environment.jl")
+include("components/environment.jl")
 include("functions.jl")
 include("setup.jl")
 include("model.jl")
-include("aliases.jl")
+
+function __init__()
+    @require Photosynthesis="5e10c064-2706-53a3-a67d-d473e313a663" include("components/fvcb.jl")
+    @require Microclimate="e0eb800d-4a9f-54ae-b0f8-217228d9d7c3" include("components/microclimate.jl")
+end
 
 end # module

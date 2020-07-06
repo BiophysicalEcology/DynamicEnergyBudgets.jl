@@ -37,13 +37,11 @@ end
 
 maturity!(f::Maturity, o, u) = begin
     seedset = u[:M] > f.threshold ? u[:M] : zero(u[:M]) 
-    mat = κmat(f) * flux1(o)[:E,:ctb]
+    mat = κmat(f) * E_ctb(o)
     flux(o)[:M,:gro] = mat - seedset * unit(mat)/unit(seedset)
     mat_mai = f.j_E_mat_mai * tempcorrection(o) * u[:V]
     drain = mat + mat_mai
     reserve_drain!(o, Val(:mat), drain)
-    # reserve_loss!(o, mat_mai)
-    # conversion_loss!(o, mat, f.n_N_M)
 end
 
 κmat(maturity_pars::Maturity) = maturity_pars.κmat

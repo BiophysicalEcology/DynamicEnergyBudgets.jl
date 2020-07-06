@@ -4,11 +4,11 @@
 
 Split state vector into multiple views for each organ.
 
-We do this recursively for type stabilitya.
+We do this recursively for type stability.
 """
 split_state(o::Tuple, u::AbstractArray) = split_state(o, u, 0)
 split_state(o::Tuple{O,Vararg}, u::AbstractArray, offset) where O = begin
-    statedim = dims(o[1].J, X)
+    statedim = dims(flux(o[1]), X)
     v = view(parent(u), offset+1:offset+length(statedim))
     lv = DimensionalArray(v, (statedim,))
     (lv, split_state(tail(o), u, offset + length(statedim))...)
@@ -21,14 +21,11 @@ unwrap(::Type{Val{X}}) where X = X
 update_tstep!(o::Organ, t) = set_tstep!(o, calc_tstep(o, t))
 
 calc_tstep(o::Organ, t) = calc_tstep(vars(o), t)
-calc_tstep(vars, t) = length(vars.rate) != 1 ? floor(Int, ustrip(t)) : 1
+calc_tstep(vars, t) = length(rate(vars)) != 1 ? floor(Int, ustrip(t)) : 1
 
 calc_envtime(o, t) = t + o.environment_start[]
 
-zero_flux!(o) = begin
-    o.J .= zero(eltype(o.J))
-    o.J1 .= zero(eltype(o.J1))
-end
+zero_flux!(o) = flux(o) .= zero(eltype(flux(o)))
 
 """
     check_params(o)
@@ -41,17 +38,18 @@ function check_params end
 check_params(organs::Tuple) = map(check_params, organs)
 check_params(o::Organ) = begin 
     y_V_E(o) <= n_N_V(o)/n_N_E(o) || error("y_V_E too high for these valuse of n_N_V and n_N_E ", (y_V_E(o), n_N_V(o), n_N_E(o) ))
-    2 <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for C conservation ", (y_E_EC(o), y_E_EN(o)))
-    # 2n_N_E(o) <= n_N_EC(o) * y_E_EC(o) + n_N_EN(o) * y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for N conservation ", 
-    # (2n_N_E(o), n_N_EC(o), y_E_EC(o), n_N_EN(o), y_E_EN(o)))
-    2n_N_E(o) <= y_E_EC(o) + y_E_EN(o) || error("y_ECH_NO or y_E_EN too high for N conservation ", 
-                                                   (n_N_E(o), y_E_EC(o), y_E_EN(o)))
+    1 >= y_E_C(o) || error("y_E_C must be less than or equal to 1: ", y_E_C(o))
+    # 1 <= y_E_N(o) || error("y_E_N must be less than or equal to 1: ", y_E_N(o))
+    # 2n_N_E(o) <= n_N_C(o) * y_E_C(o) + n_N_N(o) * y_E_N(o) || error("y_E_C or y_E_N too high for N conservation ", 
+    # (2n_N_E(o), n_N_C(o), y_E_C(o), n_N_N(o), y_E_N(o)))
+    2n_N_E(o) <= y_E_C(o) + y_E_N(o) || error("y_E_C or y_E_N too high for N conservation ", 
+                                              (n_N_E(o), y_E_C(o), y_E_N(o)))
     check_params(production_pars(o), o)
 
     # These will be required if structures can have different reserve N ratios
     # y_E_ET(o) < n_N_E/n_N_E
-    # y_EC_ECT(o) <n_N_C/n_N_C
-    # y_EN_ENT(o) < n_N_N/n_N_N
+    # y_E_ECT(o) <n_N_C/n_N_C
+    # y_N_NT(o) < n_N_N/n_N_N
 end
 check_params(p::Nothing, o::Organ) = nothing 
 check_params(p::Production, o::Organ) = begin 
@@ -71,14 +69,22 @@ sum_flux!(du, organs::Tuple) = begin
 end
 sum_flux!(du, organ::Organ, offset::Int) = begin
     J = flux(organ)
-    z = zero(J[1,1])
+    z = zero(J[1, 1])
     for i in 1:size(J, 1) 
         s = z 
         for j in 1:size(J, 2)
-            s += J[i,j]
+            s += J[i, j]
         end
-        du[i+offset] = s
+        du[i + offset] = s
     end
     offset + size(J, 1)
 end
 
+using Base: tail
+
+offset_apply(f, a::AbstractArray, o::Tuple{O,Vararg}, offset::Int, args...) where O = begin
+    offset = f(a, o[1], offset, args...)
+    offset_apply(f, a, tail(o), offset::Int, args...)
+    nothing
+end
+offset_apply(f, a::AbstractArray, o::Tuple{}, offset::Int, args...) = nothing
