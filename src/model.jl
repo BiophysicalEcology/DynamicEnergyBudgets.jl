@@ -67,14 +67,14 @@ end
     map(zero_flux!, organs)
     map(update_height!, organs, ux)
     map(update_scaling!, organs, ux)
-    #try
+    try
         apply_environment!(organism, organs, ux, t)
-    #catch e
-        # du .= zero(eltype(du))
-        # set_dead!(organism, true)
-        # @warn "dead at $t due to error: $e"
-        # return
-    #end
+    catch e
+        du .= zero(eltype(du))
+        set_dead!(organism, true)
+        @warn "dead at $t due to error: $e"
+        return
+    end
 
     # Run the model, tag the organism as dead if it breaks.
     if !debmodel!(organs, ux, environment(organism))

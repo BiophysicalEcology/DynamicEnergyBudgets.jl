@@ -23,7 +23,6 @@ using ConstructionBase,
       FieldDocTables,
       Flatten,
       Mixers,
-      OrdinaryDiffEq,
       Setfield,
       SimpleRoots,
       Requires,
@@ -58,7 +57,7 @@ export AbstractAssimilation,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis,
-       KooijmanNH4_NO3Assim, AbstractFvCBCAssim, BBPotentialCAssim, BallBerryCAssim, EmaxCAssim, ConstantCAssim
+       KooijmanNH4_NO3Assim, ConstantCAssim
 
 export AbstractSynthesizingUnit, ParallelComplementarySU, MinimumRuleSU, KfamilySU
 

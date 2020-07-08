@@ -22,10 +22,6 @@ env = MicroclimControl()
     @test plant.records[2].vars.rate > 0.0u"d^-1"
     @test plant.records[1].vars.scaling > 0.0
     @test plant.records[2].vars.scaling > 0.0
-    for fn in fieldnames(Vars)
-        println(fn, " 1: ", getfield(plant.records[1].vars, fn))
-        println(fn, " 2: ", getfield(plant.records[2].vars, fn))
-    end
 
     @test plant.records[1].J[:C,:asi] > 0u"mol/hr"
     @test plant.records[2].J[:C,:asi] == 0u"mol/hr"
@@ -61,6 +57,7 @@ env = MicroclimControl()
     @test plant.records[2].J[:C,:res] > 0u"mol/hr"
     @test plant.records[1].J[:V,:res] < 0u"mol/hr"
     @test plant.records[2].J[:V,:res] < 0u"mol/hr"
+
 end
 
 @testset "diffeq works" begin

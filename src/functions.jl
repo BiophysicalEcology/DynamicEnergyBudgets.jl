@@ -27,3 +27,24 @@ end
     nothing
 end
 
+""" 
+    sum_flux!(du, organs::Tuple)
+
+Sum flux matrix and write to `du`.
+""" 
+sum_flux!(du, organs::Tuple) = begin
+    offset_apply(sum_flux!, du, organs, 0)
+    du
+end
+sum_flux!(du, organ::Organ, offset::Int) = begin
+    J = flux(organ)
+    z = zero(J[1, 1])
+    for i in 1:size(J, 1) 
+        s = z 
+        for j in 1:size(J, 2)
+            s += J[i, j]
+        end
+        du[i + offset] = s
+    end
+    offset + size(J, 1)
+end
