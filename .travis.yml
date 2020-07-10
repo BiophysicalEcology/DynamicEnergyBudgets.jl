@@ -1,48 +1,35 @@
-## Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
+
 os:
   - linux
   - osx
+  - windows
+
 julia:
-  - 0.7
+  - 1.0
+  - 1
   - nightly
+
 notifications:
   email: false
-git:
-  depth: 99999999
 
-## uncomment the following lines to allow failures on nightly julia
-## (tests will run but not make your overall status red)
-# matrix:
-  # allow_failures:
-  # - julia: nightly
-
-## uncomment and modify the following lines to manually install system packages
-#addons:
-#  apt: # apt-get for linux
-#    packages:
-#    - gfortran
-#before_script: # homebrew for mac
-#  - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; fi
-
-## uncomment the following lines to override the default test script
 script:
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/JuliaData/SplitApplyCombine.jl.git")); Pkg.build("SplitApplyCombine")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/TypedTables.jl.git")); Pkg.build("TypedTables")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/FieldMetadata.jl.git")); Pkg.build("FieldMetadata")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Nested.jl.git")); Pkg.build("Nested")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Mixers.jl.git")); Pkg.build("Mixers")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Flatten.jl.git")); Pkg.build("Flatten")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Defaults.jl.git")); Pkg.build("Defaults")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Photosynthesis.jl.git")); Pkg.build("Photosynthesis")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/SimpleRoots.jl.git")); Pkg.build("SimpleRoots")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Microclimate.jl.git")); Pkg.build("Microclimate")'
-  - julia -e 'using Pkg; Pkg.add(PackageSpec(url=pwd())); Pkg.build("DynamicEnergyBudgets"); Pkg.test("DynamicEnergyBudgets"; coverage=true)'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Photosynthesis.jl.git"));'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Microclimate.jl.git"));'
+
+jobs:
+  allow_failures:
+    - julia: nightly
+  fast_finish: true
+  include:
+    - stage: "Documentation"
+      julia: 1
+      os: linux
+      script:
+        - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd()));
+                                               Pkg.instantiate()'
+        - julia --project=docs/ docs/make.jl
+      after_success: skip
+
 after_success:
-  # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("DynamicEnergyBudgets")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
-  # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("DynamicEnergyBudgets")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
-  # update docs
-  - julia -e 'Pkg.add("Documenter"); Pkg.checkout("Documenter")'
-  - julia -e 'cd(Pkg.dir("DynamicEnergyBudgets")); ENV["DOCUMENTER_DEBUG"] = "true"; include(joinpath("docs", "make.jl"))'
+- julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
