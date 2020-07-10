@@ -113,18 +113,13 @@ depth(v) = height(v)
 build_vars(vars::Vars, tspan) = vars
 build_vars(vars::PlottableVars, tspan) = begin
     len = length(tspan)
-    len == length(vars.rate) && return vars
+    len <= length(vars.rate) && return vars
 
-    fields = []
     for fname in fieldnames(typeof(vars))
-        ft = fieldtype(typeof(vars), fname)
-        if ft <: AbstractArray
-            push!(fields, fill(getfield(vars, fname)[1], len))
-        else
-            push!(fields, getfield(vars, fname))
-        end
+        varvec = getfield(vars, fname)
+        append!(varvec, fill(getfield(vars, fname)[1], len - length(varvec)))
     end
-    typeof(vars).name.wrapper(fields...)
+    vars
 end
 
 ###########################################################################################
