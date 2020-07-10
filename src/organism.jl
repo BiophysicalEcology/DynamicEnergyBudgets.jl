@@ -278,7 +278,7 @@ define_organs(params::Tuple, shared, records::Tuple, t) =
 update_organs(organs, t) = update_organs(vars(first(organs)), organs, t)
 update_organs(::Vars, organs, t) = organs
 update_organs(::PlottableVars, organs, t) = begin
-    i = calc_tstep(organs[1].vars, t)
+    i = floor(Int, ustrip(t))
     map(organs) do organ
         organ.vars.tstep[1] = i
         J = organ.J
@@ -337,7 +337,7 @@ Plant(; states=(:V, :C, :N),
         records=nothing,
         environment=nothing,
         time=0.0hr:1.0hr:8760.0hr,
-        environment_start=Ref(1hr),
+        environment_start=Ref(1.0hr),
         dead=Ref(false)
       ) = begin
     fluxaxes = states, transformations

@@ -54,40 +54,6 @@ of parameters matches the number of parameters in the model.
     o(du, u, t, update_organs(organs(o), t))
     return
 end
-(organism::Plant)(du, u, t::Number, organs::Tuple) = begin
-    DynamicEnergyBudgets.dead(organism) && return
-    # Make sure the parameters don't any physical laws
-    check_params(organs)
-
-    # Split state into separate organs
-    ux = split_state(organs, u)
-
-    # Set up variables for this timestep and the current state
-    map(update_tstep!, organs, t)
-    map(zero_flux!, organs)
-    map(update_height!, organs, ux)
-    map(update_scaling!, organs, ux)
-    try
-        apply_environment!(organism, organs, ux, t)
-    catch e
-        du .= zero(eltype(du))
-        set_dead!(organism, true)
-        @warn "dead at $t due to error: $e"
-        return
-    end
-
-    # Run the model, tag the organism as dead if it breaks.
-    if !debmodel!(organs, ux, environment(organism))
-        du .= zero(eltype(du))
-        set_dead!(organism, true)
-        @warn "dead at $t due to growth rate"
-        return
-    end
-
-    # Sum the flux matrix to the state change vector
-    sum_flux!(du, organs)
-    return
-end
 # Deal with du, u, p without units
 (o::Plant)(du::AbstractVector{<:Real}, u::AbstractVector{<:Real}, p::AbstractVector{<:Real}, t::Real) = begin
     DynamicEnergyBudgets.dead(o) && return
@@ -117,6 +83,39 @@ end
     o(du1, u1, t1, update_organs(organs(o), t1))
     # Copy the result to the unitless state change vector
     du .= du1 ./ (mol/hr)
+    return
+end
+(organism::Plant)(du, u, t::Number, organs::Tuple) = begin
+    DynamicEnergyBudgets.dead(organism) && return
+    # Make sure the parameters don't break any physical laws
+    check_params(organs)
+
+    # Split state into separate organs
+    ux = split_state(organs, u)
+
+    # Set up variables for this timestep and the current state
+    map(zero_flux!, organs)
+    map(update_height!, organs, ux)
+    map(update_scaling!, organs, ux)
+    try
+        apply_environment!(organism, organs, ux, t)
+    catch e
+        du .= zero(eltype(du))
+        set_dead!(organism, true)
+        @warn "dead at $t due to error: $e"
+        return
+    end
+
+    # Run the model, tag the organism as dead if it breaks.
+    if !debmodel!(organs, ux, environment(organism))
+        du .= zero(eltype(du))
+        set_dead!(organism, true)
+        @warn "dead at $t due to growth rate"
+        return
+    end
+
+    # Sum the flux matrix to the state change vector
+    sum_flux!(du, organs)
     return
 end
 

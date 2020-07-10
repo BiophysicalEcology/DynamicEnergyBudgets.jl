@@ -18,11 +18,6 @@ split_state(o::Tuple{}, u::AbstractArray, offset) = ()
 unwrap(::Val{X}) where X = X
 unwrap(::Type{Val{X}}) where X = X
 
-update_tstep!(o::Organ, t) = set_tstep!(o, calc_tstep(o, t))
-
-calc_tstep(o::Organ, t) = calc_tstep(vars(o), t)
-calc_tstep(vars, t) = length(rate(vars)) != 1 ? floor(Int, ustrip(t)) : 1
-
 zero_flux!(o) = flux(o) .= zero(eltype(flux(o)))
 
 """

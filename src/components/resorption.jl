@@ -17,7 +17,7 @@ Structure is lost while reserves are retained.
     K_resorption::R | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
 end
 resorption!(p::StructuralLossResorption, o, u) = begin
-    o.J[:V,:res] -= resorption(m, o, u)
+    o.J[:V,:res] -= resorption(p, o, u)
     nothing
 end
 
@@ -65,5 +65,6 @@ Resoption of structure `V` with shape-adjusted metabolic rate
 """
 @inline resorption(p::AbstractResorption, o, u) = 
     resorption(u[:V], rate(o) / scaling(o), K_resorption(p))
+
 @inline resorption(v::Number, r::Number, a::Number) = 
     v * (oneunit(r) - 1 / (oneunit(1 / r) + a / r))
