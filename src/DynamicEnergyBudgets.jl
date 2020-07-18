@@ -1,13 +1,3 @@
-"""
-This package is a generalised DEB model. It was developed for plant modelling,
-but can potentially be used to model any organisms and symbioses.
-
-This model can also be run in microclimates provided by the NicheMapr R package, and
-can use wide a range of photosynthesis and stomatal conductance formulations from
-[Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
-
-It is also an in-progress attempt at using Julia's multiple-dispatch methods to abstract and generalise DEB theory and maintain a short, maintainable codebase
-for multiplt models - potentially any organism.  Code is adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M) plant model by Bas Kooijman.  """
 module DynamicEnergyBudgets
 @doc let
     path = joinpath(dirname(@__DIR__), "README.md")
