@@ -15,6 +15,10 @@ using [Microclimate.jl](https://github.com/rafaqz/Microclimate.jl),
 and can use wide a range of photosynthesis and stomatal conductance formulations 
 from [Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
 
+See scripts at https://github.com/rafaqz/DEBplant for a live user interface and plotting examples.
 
 Code is largely adapted from the original [DEBtool](https://github.com/add-my-pet/DEBtool_M)
 plant model by Bas Kooijman.
+
+
+![Plant model](https://raw.githubusercontent.com/rafaqz/DynamicEnergyBudgets.jl/assets/deb_plant.png)
