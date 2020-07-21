@@ -1,5 +1,7 @@
 using DynamicEnergyBudgets, Unitful, Test
 
+using DynamicEnergyBudgets: tempcorr
+
 reftemp = 310.0u"K"
 arrtemp = 2000.0u"K"
 lowerbound = 280.0u"K"
@@ -30,4 +32,3 @@ tc = TempCorr(reftemp, arrtemp)
 @test tempcorr(tc, -100.0u"°C") > 0.0
 @test tempcorr(tc, -100.0u"°C") < 1.0
 @test tempcorr(tc, reftemp) == 1.0
-

@@ -6,13 +6,17 @@ export KooijmanWaterPotentialPhotosynthesis
 
 abstract type AbstractFvCBCAssim <: AbstractCAssim end
 
-" Uses FvCB photosynthesis model from Photosynthesis.jl "
 @mix @flattenable @columns struct MixinFvCB{P,V,MG}
     vars::V        | false | Photosynthesis.EmaxVars() | _ | _ | _ | _
     photoparams::P | true  | nothing | _         | _           | _ | _
     SLA::MG        | true  | 24.0    | m^2*kg^-1 | (5.0, 30.0) | _ | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
+"""
+FCVB photosyntyhesis with Ball-Berry stomatal conductance
+
+$(FIELDDOCTABLE)
+"""
 @MixinFvCB struct BallBerryCAssim{} <: AbstractFvCBCAssim end
 
 @default BallBerryCAssim begin
@@ -27,6 +31,12 @@ end
 
 end
 
+"""
+FCVB photosyntyhesis with Ball-Berry stomatal conductance, 
+and a soil water potential model.
+
+$(FIELDDOCTABLE)
+"""
 @MixinFvCB struct BallBerryPotentialCAssim{} <: AbstractFvCBCAssim end
 
 @default BallBerryPotentialCAssim begin
@@ -82,8 +92,14 @@ apply_environment!(a::AbstractFvCBCAssim, o, u, shootenv, rootenv) = begin
     update_temp!(o, v.tleaf)
 end
 
+"""
+    KooijmanSLAPhotosynthesis(vars, k_C_binding, k_O_binding, K_C, K_O, J_L_K, j_L_Amax, j_C_Amax, j_O_Amax)
 
-@KooijmanPhoto struct KooijmanWaterPotentialPhotosynthesis{PL} <: AbstractKooijmanPhoto
+Koojman photosynthesis formulation modified by soil water potential.
+
+This is untested and experimental.
+"""
+@MixinKooijmanPhoto struct KooijmanWaterPotentialPhotosynthesis{PL} <: AbstractKooijmanPhoto
     potential_modifier::PL | Photosynthesis.ZhouPotentialDependence() | _ | _ | _ | _ | "Modify photosynthesis with a water potential model"
 end
 

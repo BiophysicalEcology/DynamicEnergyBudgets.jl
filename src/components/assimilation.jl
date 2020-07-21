@@ -10,7 +10,9 @@ fraction_per_litre_gas_to_mols(frac) = frac / 22.4
 """
     CarbonVars(J_L_F, X_C, X_O, soilwaterpotential)
 
-Variables for carbon assimilation 
+Variables for carbon assimilation
+
+$(FIELDDOCTABLE)
 """
 @flattenable @udefault_kw @units @bounds @description mutable struct CarbonVars{MoMS,MoL,KPA}
     # Field                  | Flatn | Default i                 | Unit          | Bounds                             | Description
@@ -23,7 +25,9 @@ end
 """
     NitrogenVars(soilwaterpotential, soilwaterconent, X_NH, X_NO, X_H)
 
-Variables for nitgroen assimilation.
+Variables for nitrogen assimilation.
+
+$(FIELDDOCTABLE)
 """
 @flattenable @udefault_kw @units @bounds @description mutable struct NitrogenVars{F,KPA,MoL}
     soilwaterpotential::KPA  | false | -100.0 | kPa      | (0.0, -10000.0) | "Soil water potential"
@@ -33,22 +37,24 @@ Variables for nitgroen assimilation.
     X_H::MoL                 | false | 10.0   | mol*L^-1 | (0.0, 20.0)     | _
 end
 
-" Assimilation "
+" Abstract supertype of all Assimilation components"
 abstract type AbstractAssim end
 
-" Parent of all Carbon assimilation types"
+" Abstract supertype of all Carbon assimilation types"
 abstract type AbstractCAssim <: AbstractAssim end
 
-" Parent of all Nitrogen assimilation types"
+" Abstract supertype of all Nitrogen assimilation types"
 abstract type AbstractNAssim <: AbstractAssim end
 
-" Parent of Ammonia/Nitrate assimilation types"
+" Abstract supertype of Ammonia/Nitrate assimilation types"
 abstract type AbstractNH4_NO3Assim <: AbstractNAssim end
 
 """
     ConstantCAssim(c_uptake)
 
 C is assimilated at a constant rate, without control from the environment
+
+$(FIELDDOCTABLE)
 """
 @columns struct ConstantCAssim{μMoMS} <: AbstractCAssim
     # Field         | Def | Unit              | Bounds      | Log | Description
@@ -59,6 +65,8 @@ end
     ConstantNAssim(n_uptake)
 
 N is assimilated at a constant rate, without control from the environment
+
+$(FIELDDOCTABLE)
 """
 @columns struct ConstantNAssim{μMoMS} <: AbstractNAssim
     n_uptake::μMoMS | 0.1  | μmol*mol^-1*s^-1 | (0.0, 0.5)  | _   | "Constant rate of N uptake"
@@ -68,8 +76,8 @@ end
     SLA::MG         | 24.0 | m^2*kg^-1        | (5.0, 30.0) | _   | "Specific leaf Area. Ferns: 17.4, Forbs: 26.2, Graminoids: 24.0, Shrubs: 9.10, Trees: 8.30"
 end
 
-
-@mix @columns @SLA struct KooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
+# Mixin paramters for multiple similar formulations
+@mix @columns @SLA struct MixinKooijmanPhoto{μMoMoS,MoL,μMoMS,MoMS,V}
     #Field              | Default           | Unit             | Bounds           | Log  | Description
     vars::V             | CarbonVars()      | _                | _                | _    | _
     k_C_binding::μMoMoS | 10000.0           | μmol*mol^-1*s^-1 | (1e-5, 2000.0)   | true | "Scaling rate for carbon dioxide"
@@ -84,15 +92,25 @@ end
 
 abstract type AbstractKooijmanPhoto <: AbstractCAssim end
 
-" Parameters for simple photosynthesis module. With specific leaf area to convert area to mass "
-@KooijmanPhoto struct KooijmanSLAPhotosynthesis{} <: AbstractKooijmanPhoto end
+"""
+    KooijmanSLAPhotosynthesis(vars, k_C_binding, k_O_binding, K_C, K_O, J_L_K, j_L_Amax, j_C_Amax, j_O_Amax)
+
+Parameters for simple photosynthesis module. With specific leaf area to convert area to mass
+
+$(FIELDDOCTABLE)
+"""
+@MixinKooijmanPhoto struct KooijmanSLAPhotosynthesis{} <: AbstractKooijmanPhoto end
 
 # @columns struct WaterPotentialCutoff{KPA}
     # cutoff::KPA    | -250.0  | kPa  | (0.0, -500.0) | _ | "Max spec uptake of oxygen"
 # end
 
 
-" Parameters for Ammonia/Nitrate assimilation "
+""" 
+Parameters for Ammonia/Nitrate assimilation 
+
+$(FIELDDOCTABLE)
+"""
 @columns struct KooijmanNH4_NO3Assim{μMoMS,F,MoMo,MoL,V} <: AbstractNH4_NO3Assim
     vars::V          | NitrogenVars() | _         | _             | _ | _
     j_NH_Amax::μMoMS | 50.0    | μmol*mol^-1*s^-1 | (0.1, 1000.0) | _ | "Max spec uptake of ammonia"
@@ -104,7 +122,11 @@ abstract type AbstractKooijmanPhoto <: AbstractCAssim end
     K_H::MoL         | 10.0    | mol*L^-1         | (5.0, 20.0)   | _ | "Half-saturation concentration of water"
 end
 
-" Parameters for lumped Nitrogen assimilation "
+""" 
+Parameters for Nitrogen assimilation 
+
+$(FIELDDOCTABLE)
+"""
 @columns struct NAssim{μMoS,MoL,V} <: AbstractNAssim
     vars::V          | NitrogenVars() | _         | _             | _ | _
     j_N_Amax::μMoS   | 50.0    | μmol*mol^-1*s^-1 | (0.1, 1000.0) | _ | "Max spec uptake of ammonia"
@@ -115,32 +137,21 @@ end
 
 
 """
-    assimilation!(o, u)
+    assimilation!(o::AbstractOrgan, u)
 
-Runs assimilation methods, depending on formulation and state.
+Runs assimilation methods, depending on formulation and state `u`.
 """
+function assimilation! end
 assimilation!(organs::Tuple, u) = map(assimilation!, organs, u)
 assimilation!(o, u) = begin
-    is_germinated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
+    isgerminated(o, u) && assimilation!(has_reserves(o), assimilation_pars(o), o, u)
     nothing
 end
 assimilation!(::Nothing, x, o, u, env) = nothing
-"""
-    assimilation!(::HasCNE, f::AbstractCAssim, o, u)
-
-Runs photosynthesis for organs with C, N, and E reserves,
-and combines N with translocated C.
-"""
 assimilation!(::Any, f::AbstractCAssim, o, u) = begin
     c = photosynthesis(f, o, u)
     flux(o)[:C,:asi] = max(c, zero(c)) * u[:V] * scaling(o)
 end
-"""
-    assimilation!(f::AbstractNH4_NO3Assim, o, u)
-
-Runs nitrogen uptake for nitrate and ammonia, and combines N with translocated C.
-Unused ammonia is discarded.
-"""
 assimilation!(p::HasCN, f::AbstractNH4_NO3Assim, o, u) = begin
     J = flux(o)
     J_N_ass, J_NO_ass, J_NH_ass = nitrogen_uptake(f, o, u) .* u[:V] * scaling(o)
@@ -171,17 +182,14 @@ end
 
 
 """
-    photosynthesis(f::ConstantCAssim, o, u)
+    photosynthesis(f::AbstractCAssim, o, u)
 
-Returns a constant rate of carbon assimilation.
+Return the assimilated C for `Organ` `o` with state variables `u`.
 """
+function photosynthesis end
+
 photosynthesis(f::ConstantCAssim, o, u) = f.c_uptake
 
-"""
-    photosynthesis(f::KooijmanSLAPhotosynthesis, o, u)
-
-Returns carbon assimilated in mols per time.
-"""
 photosynthesis(f::KooijmanSLAPhotosynthesis, o, u) = begin
     v = vars(o); va = f.vars
     mass_area_coef = w_V(o) * f.SLA
@@ -203,13 +211,13 @@ photosynthesis(f::KooijmanSLAPhotosynthesis, o, u) = begin
 
     j_c_intake / (1 + bound_c + bound_o + co_l)
 end
-    
-    
+
+
 
 
 """
     nitrogen_uptake(f::ConstantNAssim, o, u)
-    
+
 Returns constant nitrogen assimilation.
 """
 nitrogen_uptake(f::ConstantNAssim, o, u) = f.n_uptake * tempcorrection(o)

@@ -4,6 +4,8 @@ abstract type AbstractDEBCore end
     DEBCore(y_V_E, y_E_C, y_E_N, n_N_V, n_N_E, w_V)
 
 Core DEB model parameters.
+
+$(FIELDDOCTABLE)
 """
 @columns struct DEBCore{MoMoD,MoMo,GMo} <: AbstractDEBCore
     # Field        | Default | Unit            | Bounds       | Log   | Description
@@ -24,10 +26,14 @@ for fn in fieldnames(DEBCore)
 end
 
 """
-    growth!(o, u)
+    growth!(o::AbstractOrgan, u)
+    growth!(p::DEBCore, o::AbstractOrgan, u)
 
 Allocates reserves to growth flux, generalised for any number of reserves.
+
+Where `o` is the `Organ`, and `u` is the current state parameters
 """
+function growth! end
 growth!(o, u) = growth!(core_pars(o), o, u)
 growth!(p::DEBCore, o, u) = begin
     J = flux(o) 
@@ -38,10 +44,16 @@ growth!(p::DEBCore, o, u) = begin
 end
 
 """
+    maintenence!(o::AbstractOrgan, u)
+    maintenence!(p::DEBCore, o::AbstractOrgan, u)
+
 Allocates reserve drain due to maintenance, generalised for any number of reserves.
 
 Maintenance is temperature dependent.
+
+Where `o` is the `Organ`, and `u` is the current state parameters
 """
+function maintenance! end
 maintenence!(o, u) = maintenence!(core_pars(o), o, u)
 maintenence!(p::DEBCore, o, u) = begin
     drain = j_E_mai(p) * tempcorrection(o) * u[:V]

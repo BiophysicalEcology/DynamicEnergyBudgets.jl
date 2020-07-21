@@ -1,7 +1,7 @@
 
 """
-Astract supertype for organs parameters. 
-Extend to change the components that are specific to each organ.
+Abstract supertype for organ parameters. 
+Extend to add additional components to organ parameters.
 """
 abstract type AbstractParams end
 
@@ -127,7 +127,7 @@ end
 
 """
 Abstract supertype for organs. Inherit from it if you need to difine
-behaviour diferent to that or [`Organ`](@ref).
+behaviour different to that or [`Organ`](@ref).
 """
 abstract type AbstractOrgan{P,S} end
 
@@ -203,16 +203,10 @@ Organ(params::AbstractParams, shared::AbstractSharedParams, records) = begin
 end
 
 
+# Records hold vars and flux, allowing storage of each 
+# timestep for plotting if PlottableVars are used.
 abstract type AbstractRecords end
 
-"""
-    Records(vars, J)
-
-Time series of mutable variables and flux for ploting and analysis
-
-These are sliced with `view` for each timestep. An effecient implementation
-may use a single view repeatedly, losing ability to plot values over time.
-"""
 @plottable struct PlottableRecords{V,F} <: AbstractRecords
     vars::V | true
     J::F    | false
@@ -248,7 +242,28 @@ build_flux(fluxval, x::Tuple, y::Tuple, time::AbstractRange) = begin
 end
 
 
+"""
+A an Organism is a model object for modelling the growth
+of a single organism.
 
+It can be run as a functor:
+
+```julia
+(o::AbstactOrganism)(du, u, p, t) =
+...
+```
+
+So that it can be passed into DifferentialEquations.jl solvers
+if required.
+
+Where `du` is the flux to be updated, `u` is the current state, 
+`p` are new model paremeters or `nothing`, and `t` is the current
+time step. See model.jl for implemntations.
+
+When julia 1.5 is released this will be implemented for any 
+`AbstactOrganism`, but for now it is only implemented for `Plant`
+due to current limitations in Julia.
+"""
 abstract type AbstractOrganism end
 
 params(o::AbstractOrganism) = o.params
@@ -288,8 +303,44 @@ end
 
 """
     Plant(params, shared, records, environment, environment_start, dead)
+    Plant(states=(:V, :C, :N),
+          transformations=(:asi, :gro, :mai, :rej, :res),
+          params=(ShootParamsCN(), RootParamsCN()),
+          vars=(Vars(), Vars()),
+          shared=SharedParams(),
+          records=nothing,
+          environment=nothing,
+          time=0.0hr:1.0hr:8760.0hr,
+          environment_start=Ref(1.0hr),
+          dead=Ref(false))
 
-Basic plant model parameters.
+
+Plant model.
+
+`params` are a tuple of Parameters objects, one for each organ.
+
+`shared` is a struct of parameters shared between organs.
+
+`vars`: can be `Vars` or `PlottableVars` or custom struct with additional variables.
+  `PlottableVars` will be stored for each timestep for plotting.
+
+`environment` can be `nothing`, or a `MicroclimPoint` or `MicroclimControl`
+from Microclimates.jl
+
+`time` determines the timespan over which `PlottableVars` will be constructed.
+it isn't used with regular `Vars`.
+
+If 4 state model is used, pass in
+```julia
+states=(:V, :E, :C, :N),
+```
+
+Similarly, if additional components like Maturity or ActiveTranslocation 
+are used, their state label needs to be passed in:
+
+```julia
+transformations=(:asi, :gro, :mai, :mat, :rej, :tra, :res),
+```
 """
 @flattenable @description mutable struct Plant{P,S,R,O,E,ES,D} <: AbstractOrganism
     params::P             | true  | "Model parameters"
@@ -304,23 +355,6 @@ Basic plant model parameters.
         new{P,S,R,typeof(organs),E,ES,D}(params, shared, records, organs, environment, environment_start, dead)
     end
 end
-
-"""
-    Plant(states=(:V, :C, :N),
-          transformations=(:asi, :gro, :mai, :rej, :res),
-          catstates=(:CN, :C, :N, :E),
-          cattransformations=(:ctb,),
-          params=(ShootParamsCN(), RootParamsCN()),
-          vars=(Vars(), Vars()),
-          shared=SharedParams(),
-          records=nothing,
-          environment=nothing,
-          time=0.0hr:1.0hr:8760.0hr,
-          environment_start=Ref(1.0hr),
-          dead=Ref(false))
-
-Outer construtor for defaults
-"""
 Plant(; states=(:V, :C, :N),
         transformations=(:asi, :gro, :mai, :rej, :tra, :res),
         params=(
@@ -329,9 +363,9 @@ Plant(; states=(:V, :C, :N),
         ),
         vars=(Vars(), Vars()),
         shared=SharedParams(),
-        records=nothing,
         environment=nothing,
         time=0.0hr:1.0hr:8760.0hr,
+        records=nothing,
         environment_start=Ref(0.0hr),
         dead=Ref(false)
       ) = begin

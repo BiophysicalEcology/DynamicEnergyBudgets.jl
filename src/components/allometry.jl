@@ -1,4 +1,6 @@
-" Allometry. Scaling rules to relate size to mass. "
+"""
+Allometry. Scaling rules that relate size to mass
+"""
 abstract type AbstractAllometry end
 
 update_height!(o, u) = update_height!(allometry_pars(o), o, u)
@@ -11,6 +13,8 @@ update_height!(f::AbstractAllometry, o, u) =
 
 Height is given by the square root of mass above the initial mass `β0`,
 multiplied by the scalar `β1`.
+
+$(FIELDDOCTABLE)
 """
 @flattenable @columns struct SqrtAllometry{B0,B1} <: AbstractAllometry
     # Field       | Flatn | Default | Unit | Bounds         | Log  | Description
@@ -25,6 +29,8 @@ allometric_height(f::SqrtAllometry, mass) =
     Allometry(β0, β, α)
 
 Simple allometric relationship between mass and height
+
+$(FIELDDOCTABLE)
 """
 @flattenable @columns struct Allometry{B0,B1,A} <: AbstractAllometry
     β0::B0        | false | 1e-4*24 | g    | (1e-6, 10.00)  | true | "Intercept. Mass at Om"
@@ -39,6 +45,8 @@ allometric_height(f::Allometry, mass) =
     FixedAllometry(height)
 
 Height is fixed at `height`, independent of mass.
+
+$(FIELDDOCTABLE)
 """
 @flattenable @columns struct FixedAllometry{M} <: AbstractAllometry
     height::M     | true  | 1.0     | m    | (1e-3, 100.00) | true | "Fixed height or depth"

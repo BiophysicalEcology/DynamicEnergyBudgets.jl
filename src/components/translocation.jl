@@ -5,10 +5,9 @@ abstract type PassiveTranslocation end
 """
     passive_translocation!(source, dest)
 
-Reallocate state rejected from synthesizing units.
-
-TODO: add a 1-organs method. How does this interact with assimilation?
+Realocate state rejected from synthesizing units.
 """
+function passive_translocation! end
 passive_translocation!(source, dest) =
     passive_translocation!(passivetrans_pars(source), source, dest)
 passive_translocation!(f::Nothing, source, dest) = nothing
@@ -18,6 +17,8 @@ passive_translocation!(f::Nothing, source, dest) = nothing
 
 Substrate rejected from synthesizing units during catabolism is returned to
 reserve, but with some fraction of loss specified by yield parameters.
+
+$(FIELDDOCTABLE)
 """
 @columns struct DissipativePassiveTranslocation{MoMo} <: PassiveTranslocation
 #   Field          | Default | Unit       | Bounds     | Log | Description
@@ -33,10 +34,12 @@ passive_translocation!(f::DissipativePassiveTranslocation, source, dest) = begin
 end
 
 """
-    LosslessPassiveTranslocation)
+    LosslessPassiveTranslocation()
 
 Parameterless rejection where substrate rejected from synthesizing units
 during catabolism is returned to reserve without loss.
+
+$(FIELDDOCTABLE)
 """
 struct LosslessPassiveTranslocation <: PassiveTranslocation end
 
@@ -61,12 +64,12 @@ end
 κtra(activetrans_pars::ActiveTranslocation) = activetrans_pars.κtra
 
 """
-Versions for E, CN and CNE reserves.
+    active_translocation!(o1, o2) 
 
-Translocation is occurs between adjacent organs.
-This function is identical both directiono, and ox represents
-whichever is not the current organs. Will not run with less than 2 organs.
+Translocation that actively moves a fraction of catabolised 
+reserve between organs.
 """
+function active_translocation! end
 active_translocation!(o1, o2) = 
     active_translocation!(activetrans_pars(o1), o1, o2)
 active_translocation!(p::Nothing, o1, o2) = nothing
@@ -75,6 +78,8 @@ active_translocation!(p::Nothing, o1, o2) = nothing
     DissipativeTranslocation(κtra, y_E_ET)
 
 Translocation with dissipative losses to the environment.
+
+$(FIELDDOCTABLE)
 """
 @Active struct DissipativeActiveTranslocation{MoMo} <: ActiveTranslocation
     y_E_ET::MoMo   | true | 0.8      | mol*mol^-1 | (0.0,1.0) | _   | "yield of translocated reserve:"
@@ -97,6 +102,8 @@ end
     DissipativeTranslocation(κtra, y_E_ET)
 
 Perfect translocation between structures.
+
+$(FIELDDOCTABLE)
 """
 @Active struct LosslessActiveTranslocation{} <: ActiveTranslocation end
 
@@ -113,11 +120,15 @@ active_translocation!(p::LosslessActiveTranslocation, o1, o2) = begin
 end
 
 """
-Translocation occurs between adjacent organs.
-This function is identical both direction.
+    translocation!(organs::Tuple)
 
-Will not run with less than 2 organs.
+Translocation occurs between adjacent organs in 
+both directions.
+
+Both active and passive translocation are applied,
+although `nothing` valued formulations do not translocate.
 """
+function translocation! end
 translocation!(organs::Tuple{T1,T2}) where {T1,T2} = begin
     passive_translocation!(organs[1], organs[2])
     passive_translocation!(organs[2], organs[1])

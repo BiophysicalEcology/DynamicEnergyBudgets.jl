@@ -1,6 +1,6 @@
 using Test, DynamicEnergyBudgets, Microclimate, Unitful, Photosynthesis
 
-import DynamicEnergyBudgets: get_environment, temp
+import DynamicEnergyBudgets: get_environment, temp, apply_environment!
 
 
 rad = [1000.0, 900.0]u"W*m^-2"

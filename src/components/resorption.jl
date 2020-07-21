@@ -12,10 +12,13 @@ resorption!(p::Nothing, o, u) = nothing
     StructuralLossResorption(K_resorption) 
 
 Structure is lost while reserves are retained.
+
+$(FIELDDOCTABLE)
 """
 @columns struct StructuralLossResorption{R} <: AbstractResorption 
     K_resorption::R | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
 end
+
 resorption!(p::StructuralLossResorption, o, u) = begin
     o.J[:V,:res] -= resorption(p, o, u)
     nothing
@@ -25,10 +28,13 @@ end
     LosslessResorption(K_resorption)
 
 Structure is distributed back to C an N reserves without loss.
+
+$(FIELDDOCTABLE)
 """
 @columns struct LosslessResorption{R} <: AbstractResorption 
     K_resorption::R | 0.000001 | _    | (1e-8, 1e-3) | true | "Half saturation metabolic rate for resorption of tissues."
 end
+
 resorption!(p::LosslessResorption, o, u) = begin
     aph = resorption(p, o, u)
     o.J[:C,:res] += aph
@@ -43,6 +49,8 @@ end
 Some structure is distributed back to C an N reserves with a proportion lost to the environment.
 
 This model has parameters for controlling differential fractions of C an N resorption.
+
+$(FIELDDOCTABLE)
 """
 @columns struct DissipativeResorption{R,P} <: AbstractResorption
     # Field         | Default  | Unit       | Bounds       | Log  | Description
@@ -50,6 +58,7 @@ This model has parameters for controlling differential fractions of C an N resor
     r_EC_V::P       | 0.0      | mol*mol^-1 | (0.0, 1.0)   | _    | "Proportion of C recovered from structure"
     r_EN_V::P       | 0.5      | mol*mol^-1 | (0.0, 1.0)   | _    | "Proportion of N recovered from structure"
 end
+
 resorption!(p::DissipativeResorption, o, u) = begin
     aph = resorption(m, o, u)
     o.J[:C,:res] += aph * p.r_EC_V

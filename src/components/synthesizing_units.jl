@@ -1,19 +1,28 @@
+"""
+Synthesizing units bind multiple substrates to synthesize compounds, 
+depending on their availability
+"""
 abstract type AbstractSynthesizingUnit end
+
+"""
+    synthesizing_unit(::AbstractSynthesizingUnit, v, w)
+
+Apply a synthesizing unit formulation to substrates
+`v` and `w`, returning the amount of compound.
+"""
+function synthesizing_unit end
 
 """
     ParallelComplementarySU(k)
 
-0-parameter synthesizing unita.
+0-parameter synthesizing unit that merges two compounds stoichiometrically.
+
+See Ledder et al 2019. for details.
+
+$(FIELDDOCTABLE)
 """
 struct ParallelComplementarySU <: AbstractSynthesizingUnit end
 
-"""
-    synthesizing_unit(::Type, a, b)
-
-Merge two compounds stoichiometrically.
-
-See Ledder et al. TODO: add paper details once it's published.
-"""
 synthesizing_unit(::ParallelComplementarySU, v, w) = v * w * (v + w) / (v^2 + w^2 + v * w)
 
 
@@ -22,6 +31,8 @@ synthesizing_unit(::ParallelComplementarySU, v, w) = v * w * (v + w) / (v^2 + w^
 
 0-parameter synthesizing unit where law of the minimum controls
 the production of one compound form two other compounds.
+
+$(FIELDDOCTABLE)
 """
 struct MinimumRuleSU <: AbstractSynthesizingUnit end
 
@@ -32,6 +43,8 @@ synthesizing_unit(::MinimumRuleSU, v, w) = min(v, w)
 
 Flexible 1-parameter synthesizing unit with variable curve. Both `MinimumRuleSU`
 and `ParallelComplementarySU` can be approximated with this rule.
+
+$(FIELDDOCTABLE)
 """
 @columns struct KfamilySU{K} <: AbstractSynthesizingUnit 
     k::K | 1.0 | _ | (0.0, 10.0)  | _ | "Synthesizing unit parameter. Effiency = 2^-1/k"

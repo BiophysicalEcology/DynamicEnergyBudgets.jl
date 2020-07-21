@@ -1,5 +1,7 @@
 using DynamicEnergyBudgets, Test
 
+using DynamicEnergyBudgets: synthesizing_unit, stoich_merge
+
 @testset "ParallelComplementarySU" begin
     @test synthesizing_unit(ParallelComplementarySU(), 2.0, 2.0) ≈ 1.333333333333333333
     @test synthesizing_unit(ParallelComplementarySU(), 1000000000000000000000000.0, 2.0) == 2.0

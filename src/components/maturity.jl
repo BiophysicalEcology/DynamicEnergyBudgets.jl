@@ -1,29 +1,26 @@
+"""
+Maturity formulations allocate a fraction of 
+resources to maturity and reproduction.
+"""
 abstract type AbstractMaturity end
 
-# """
-#     ReproductionBuffer(j_E_mat_mai, κmat, threshold)
-
-# Maturity parameters. Seperated to make maturity modeling optional, reducing complexity
-# """
-# @columns struct ReproductionBuffer{MoMoD,F,Mo} <: AbstractMaturity
-#     # Field            | Default         | Unit            | Bounds       | Log  | Description
-#     j_E_mat_mai::MoMoD | 0.001           | mol*mol^-1*d^-1 | (0.0, 0.1)   | _    | "Spec maturity maint costs "
-#     κmat::F            | 0.05            | _               | (0.0, 1.0)   | _    | "Reserve flux allocated to development/reprod."
-#     threshold::Mo      | 1.0             | mol             | (1e-3, 20.0) | true | "Structural mass at start reproduction" # TODO: isn't this variable/seasonally triggered?  
-# end
-
 """
+    maturity!(o, u)
     maturity!(f, o, u)
+
 Allocates reserve drain due to maturity maintenance.
 Stores in M state variable if it exists.
 """
+function maturity! end
 maturity!(o, u) = maturity!(maturity_pars(o), o, u)
 maturity!(f::Nothing, o, u) = nothing
 
 """
     Maturity(j_E_mat_mai, κmat, threshold)
 
-Maturity parameters. Seperated to make maturity modeling optional, reducing complexity
+A maturity model seperated to make maturity modeling optional.
+
+$(FIELDDOCTABLE)
 """
 @columns struct Maturity{MoMoD,F,Mo} <: AbstractMaturity
     # Field            | Default         | Unit            | Bounds       | Log  | Description
@@ -44,4 +41,9 @@ maturity!(f::Maturity, o, u) = begin
     reserve_drain!(o, Val(:mat), drain)
 end
 
+"""
+    κmat(maturity_pars::Maturity)
+
+Kappa parameter for maturity.
+"""
 κmat(maturity_pars::Maturity) = maturity_pars.κmat

@@ -24,26 +24,7 @@ using Base: tail
 import FieldMetadata: @default, @description, @units, @bounds, @logscaled, @flattenable, @plottable, @selectable,
                       default, description, units, bounds, logscaled, flattenable, plottable, selectable
 
-
-
-export tempcorr,
-       rate_bracket,
-       rate_formula,
-       catabolic_fluxes,
-       half_saturation,
-       stoich_merge,
-       synthesizing_unit
-
-export integrate,
-       get_state1_names,
-       init_state,
-       describe,
-       paramrange,
-       runmodel!,
-       debmodel!,
-       apply_environment!
-
-export AbstractAssimilation,
+export AbstractAssim,
        AbstractNAssim, NH4_NO3Assim, NAssim, ConstantNAssim,
        AbstractCAssim, C3Photosynthesis,
        KooijmanPhotosynthesis, KooijmanSLAPhotosynthesis, KooijmanWaterPotentialPhotosynthesis,
@@ -56,6 +37,8 @@ export AbstractRate, SimpleRate, FZeroRate
 export AbstractResorption, LosslessResorption, StructuralLossResorption, DissipativeResorption
 
 export AbstractTemperatureCorrection, TempCorr, TempCorrLower, TempCorrLowerUpper, ParentTardieu
+
+export ManualTemperature
 
 export AbstractScaling, KooijmanArea
 
@@ -79,15 +62,16 @@ export AbstractCatabolism, Catabolism, CatabolismCN, CatabolismCNshared, Catabol
 
 export AbstractAllometry, Allometry, SqrtAllometry, FixedAllometry
 
-export AbstractParams, Params, SharedParams,
-       Vars, PlottableVars, CarbonVars, NitrogenVars, Records, PlottableRecords
+export AbstractParams, Params, AbstractSharedParams, SharedParams
+
+export AbstractVars, Vars, PlottableVars, CarbonVars, NitrogenVars
 
 export AbstractOrgan, Organ, AbstractOrganism, Plant
 
 
 const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
                                     (description, default, bounds);
-                                    truncation=(100,40,100))
+                                    truncation=(100, 40, 100))
 
 const DEAD, ALIVE = false, true
 
@@ -96,7 +80,6 @@ const DEAD, ALIVE = false, true
     """
     $(TYPEDEF)
     $(DOCSTRING)
-    $(FIELDDOCTABLE)
     """
 
 # Field metadata columns
@@ -117,6 +100,7 @@ include("components/maturity.jl")
 include("components/production.jl")
 include("components/translocation.jl")
 include("components/core.jl")
+include("components/rate.jl")
 include("components/catabolism.jl")
 include("organism.jl")
 include("components/environment.jl")

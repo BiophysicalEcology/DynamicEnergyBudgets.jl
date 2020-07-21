@@ -1,10 +1,18 @@
 
 """
-    metabolism!(organs::Tuple, u)
+    metabolism!(organs::Tuple, u::Tuple)
+    metabolism!(o::AbstractOrgan, u::AbstractVector)
 
-Metabolism is an identical process for all organs, with potentially
-different parameters or area and rate functions.
+Metabolism is the same basic process for all organs, 
+with potentially different components and parameters.
+
+`catabolism!` determines the current growth rate, flux
+from reserve and wether the organism is still alive,
+
+Then growth, maintenence, maturity and resorption update
+the flux matrix `o.J` based on catabolised reserve and state `u`.
 """
+function metabolism! end
 metabolism!(organs::Tuple, u::Tuple) = map(metabolism!, organs, u)
 metabolism!(o::AbstractOrgan, u::AbstractVector) = begin
     alive = catabolism!(o, u) 
@@ -22,12 +30,14 @@ end
 
 A generalised multi-reserve, multi-organ Dynamic Energy Budget model.
 
-Applies metabolism, translocation and assimilation methods to 2 organs.
+The method applies metabolism, translocation and assimilation methods 
+to all organs. If metabolism fails in any organ, the organism is dead,
+and `false` is returned.
 
-settings is a struct with required model data, DEBSettings or similar.
-t is the timestep
+`organs` is a tuple of Organ, `u` is a tuple of organ state variable vectors, 
+env is the environment component (or `nothing`).
 """
-debmodel!(organs::Tuple, u::Tuple, env) = begin
+function debmodel!(organs::Tuple, u::Tuple, env)
     # Quit if it dies
     false in metabolism!(organs, u) && return false
     translocation!(organs)
@@ -35,20 +45,8 @@ debmodel!(organs::Tuple, u::Tuple, env) = begin
     return true
 end
 
-"""
-    (organism::Plant)(du, u, p, t::Number)
-
-The `Plant` struct can be used as a function to run the DEB model in a solver,
-such as (i.e. from DiffEq).
-
-`du` is the change in state vector written to by the model, 
-`u` is the vector of current state, p is a tuple or vector of parameter values, 
-and t is time.
-
-If `p` is not `nothing` the model will be rebuilt with the new parameters. Note
-that this works with any model combination automatically as long as the number
-of parameters matches the number of parameters in the model. 
-"""
+# These are currently implemented for Plant. In future this will be implemented
+# for AbstractOrganism, when julis allows that.
 (o::Plant)(du::AbstractVector{<:Unitful.Quantity}, u::AbstractVector{<:Unitful.Quantity}, p, t::Unitful.Quantity) = begin
     DynamicEnergyBudgets.dead(o) && return
     o(du, u, t, update_organs(organs(o), t))

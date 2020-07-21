@@ -4,6 +4,8 @@ const parconv = 4.57mol*W^-1*s^-1
     ManualTemperature(airtemperature, soiltemperature)
 
 Environment for simple manual temperature control.
+
+$(FIELDDOCTABLE)
 """
 struct ManualTemperature{T}
     airtemperature::T

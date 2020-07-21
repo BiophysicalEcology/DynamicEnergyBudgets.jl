@@ -3,6 +3,13 @@ Surface area scaling rules
 """
 abstract type AbstractScaling end
 
+"""
+    scaling_correction(f::AbstractScaling, V)
+
+Calculate the shape/scaling correction coefficient 
+from the current mass `V`.
+"""
+function scaling_correction end
 scaling_correction(f::Nothing, V) = 1
 
 """
@@ -14,6 +21,8 @@ scaling_correction(f::Isomorph, V) = 1
 
 """
     V0morph(Vd)
+
+$(FIELDDOCTABLE)
 """
 @columns struct V0morph{Mo} <: AbstractScaling
 #   Field    | Def | Unit | Bounds        | Log | Description
@@ -24,6 +33,8 @@ scaling_correction(f::V0morph, V) = (V / f.Vd)^(-2//3)
 
 """
     V1morph(Vd)
+
+$(FIELDDOCTABLE)
 """
 @columns struct V1morph{Mo} <: AbstractScaling
 #   Field    | Def | Unit | Bounds        | Log | Description
@@ -34,6 +45,8 @@ scaling_correction(f::V1morph, V) = (V / f.Vd)^(1//3)
 
 """
     V1V0morph(Vd, Vmax, β)
+
+$(FIELDDOCTABLE)
 """
 @columns struct V1V0morph{Mo,B} <: AbstractScaling
 #   Field    | Def | Unit | Bounds        | Log | Description
@@ -45,7 +58,11 @@ end
 scaling_correction(f::V1V0morph, V) = (V / f.Vd)^(1//3 - (V/f.Vmax)^f.β)
 
 """
-    PlantMorph(M_Vref, M_Vscaling)
+    Plantmorph(M_Vref, M_Vscaling)
+
+Plant morph formulation from DEBtool.
+
+$(FIELDDOCTABLE)
 """
 @columns struct Plantmorph{Mo} <: AbstractScaling
 #   Field          | Def | Unit | Bounds           | Log  | Description

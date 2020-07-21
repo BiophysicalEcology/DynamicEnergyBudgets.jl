@@ -1,5 +1,7 @@
 using DynamicEnergyBudgets, Unitful, Test
 
+using DynamicEnergyBudgets: rate_formula, half_saturation
+
 @testset "Half saturation curve" begin
     mx = 10.0
     half = 5.0
@@ -15,13 +17,6 @@ using DynamicEnergyBudgets, Unitful, Test
     @test half_saturation(mx, half, x) == 0.0
 end
 
-@testset "Flux" begin
-    # (a, b, c) = non_growth_flux.((0.1,0.2,0.3), (0.2,0.3,0.4), 0.1)
-    # @test a ≈ 0.01
-    # @test b ≈ 0.04
-    # @test c ≈ 0.09
-end
-
 @testset "Rate CNE" begin
     j_E_mai    = 0.003
     y_E_CH_NO  = 1.0/1.5
@@ -33,7 +28,6 @@ end
     turnover   = ((0.2, 0.2, 0.2) .* 0.05)
     su = ParallelComplementarySU()
 
-    # rate_formula(r, su, rel_reserve::NTuple{3}, turnover::NTuple{3}, j_E_mai, y_E_Ea, y_E_Eb, y_V_E, κsoma) = begin
     rf = rate_formula(r, su, reserve, turnover, j_E_mai, y_E_CH_NO, y_E_EN, y_V_E, kap_soma)
 
     @test rf == 0.002874195250659631

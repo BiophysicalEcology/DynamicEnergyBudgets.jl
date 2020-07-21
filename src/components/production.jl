@@ -2,6 +2,8 @@ abstract type AbstractProduction end
 
 """
     Production(y_P_V, j_P_mai, n_N_P, w_P)
+
+$(FIELDDOCTABLE)
 """
 @columns struct Production{MoMo,MoMoD,GMo} <: AbstractProduction
     # Field        | Default | Unit            | Bounds       | Log | Description

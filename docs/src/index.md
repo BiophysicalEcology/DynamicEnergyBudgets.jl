@@ -7,125 +7,168 @@ Order   = [:module]
 
 ## Model
 
-Core functions of the model.
+Basic types functions of a DEB model.
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type, :function]
-Pages   = ["organism.jl", "model.jl"]
+```@docs
+AbstractOrgan
+Organ
+AbstractVars
+Vars
+PlottableVars
+AbstractParams
+Params
+AbstractSharedParams
+SharedParams
+AbstractOrganism
+Plant
+DynamicEnergyBudgets.debmodel!
+DynamicEnergyBudgets.metabolism!
 ```
 
-### Core Parameters
-
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Pages   = ["core.jl"]
-```
 
 ## Components
 
+### Core Parameters
+
+```@docs
+DEBCore
+DynamicEnergyBudgets.growth!
+DynamicEnergyBudgets.maintenance!
+```
+
 ### Allometry
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["allometry.jl"]
+```@docs
+AbstractAllometry
+Allometry
+SqrtAllometry
+FixedAllometry
 ```
 
 ### Assimilation
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["assimilation.jl"]
+```@docs
+AbstractAssim
+AbstractCAssim
+ConstantCAssim
+KooijmanSLAPhotosynthesis
+CarbonVars
+AbstractNAssim
+ConstantNAssim
+NAssim
+KooijmanNH4_NO3Assim
+NitrogenVars
+DynamicEnergyBudgets.assimilation!
+DynamicEnergyBudgets.photosynthesis
+DynamicEnergyBudgets.nitrogen_uptake
 ```
 
 ### Catabolism
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["catabolism.jl"]
+```@docs
+CatabolismCN
+CatabolismCNE
+CatabolismCNshared
+DynamicEnergyBudgets.catabolism!
 ```
 
 ### Environment
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["environment.jl"]
+```@docs
+ManualTemperature
+DynamicEnergyBudgets.apply_environment!
 ```
 
-### Maintenance
+### Germination
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["maintenance.jl"]
+```@docs
+AbstractGermination
+ThresholdGermination
+DynamicEnergyBudgets.isgerminated
 ```
 
 ### Maturity
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["maturity.jl"]
+```@docs
+AbstractMaturity
+Maturity
+DynamicEnergyBudgets.maturity!
+```
+
+### Production
+
+```@docs
+Production
 ```
 
 ### Rate
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["rate.jl"]
+```@docs
+DynamicEnergyBudgets.calc_rate
+DynamicEnergyBudgets.rate_formula
 ```
 
 ### Resorption
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["resorption.jl"]
+```@docs
+AbstractResorption
+LosslessResorption
+StructuralLossResorption
+DissipativeResorption
+DynamicEnergyBudgets.resorption
 ```
 
-### Shape
+### Scaling
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["shape.jl"]
+```@docs
+AbstractScaling
+Isomorph
+V0morph
+V1morph
+V1V0morph
+Plantmorph
+DynamicEnergyBudgets.scaling_correction
 ```
 
 ### Synthesizing Units
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["synthesizing_units.jl"]
+```@docs
+AbstractSynthesizingUnit
+ParallelComplementarySU
+MinimumRuleSU
+KfamilySU
+DynamicEnergyBudgets.synthesizing_unit
+DynamicEnergyBudgets.stoich_merge
 ```
 
 ### Temperature Correction
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["temperature_correction.jl"]
+```@docs
+AbstractTemperatureCorrection
+TempCorr
+TempCorrLower
+TempCorrLowerUpper
+ParentTardieu
+DynamicEnergyBudgets.tempcorr
 ```
 
 ### Translocation
 
-```@autodocs
-Modules = [DynamicEnergyBudgets]
-Order   = [:type]
-Pages   = ["translocation.jl"]
+```@docs
+DissipativePassiveTranslocation
+LosslessPassiveTranslocation
+LosslessActiveTranslocation
+DissipativeActiveTranslocation
+DynamicEnergyBudgets.active_translocation!
+DynamicEnergyBudgets.passive_translocation!
+DynamicEnergyBudgets.translocation!
 ```
 
 ## Other functions
 
-Low-level DEB theory functions
+Low-level model functions
 
 ```@autodocs
 Modules = [DynamicEnergyBudgets]
-Order   = [:function]
-Pages   = ["functions.jl","apply.jl","setup.jl"]
+Pages   = ["functions.jl", "setup.jl"]
 ```
