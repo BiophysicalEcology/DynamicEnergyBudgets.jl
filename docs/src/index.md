@@ -52,6 +52,9 @@ AbstractAssim
 AbstractCAssim
 ConstantCAssim
 KooijmanSLAPhotosynthesis
+KooijmanWaterPotentialPhotosynthesis
+BallBerryCAssim
+BallBerryPotentialCAssim
 CarbonVars
 AbstractNAssim
 ConstantNAssim

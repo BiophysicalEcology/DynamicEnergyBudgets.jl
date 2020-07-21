@@ -13,7 +13,11 @@ abstract type AbstractFvCBCAssim <: AbstractCAssim end
 end
 
 """
-FCVB photosyntyhesis with Ball-Berry stomatal conductance
+    BallBerryCAssim(vars, photoparams, SLA)
+
+FCVB photosyntyhesis with Ball-Berry stomatal conductance.
+
+Requires Photosynthesis.jl.
 
 $(FIELDDOCTABLE)
 """
@@ -28,12 +32,15 @@ $(FIELDDOCTABLE)
                           ),
                           flux=Flux(),
                          ))
-
 end
 
 """
+    BallBerryCAssim(vars, photoparams, SLA)
+
 FCVB photosyntyhesis with Ball-Berry stomatal conductance, 
 and a soil water potential model.
+
+Requires Photosynthesis.jl.
 
 $(FIELDDOCTABLE)
 """
@@ -51,20 +58,8 @@ $(FIELDDOCTABLE)
 
 end
 
-
-"""
-    photosynthesis(f::AbstractFvCBCAssimilation, o, u)
-
-Returns carbon assimilated in mols per unit time.
-"""
 photosynthesis(f::AbstractFvCBCAssim, o, u) = f.vars.aleaf * f.SLA * w_V(o)
 
-
-"""
-    apply_environment!(a::AbstractFvCBCAssim, o, u, shootenv, rootenv)
-
-Apply environment to shoot with `AbstractFvCBCAssim` assimilation model.
-"""
 apply_environment!(a::AbstractFvCBCAssim, o, u, shootenv, rootenv) = begin
     v = a.vars
 
@@ -97,7 +92,9 @@ end
 
 Koojman photosynthesis formulation modified by soil water potential.
 
-This is untested and experimental.
+Requires Photosynthesis.jl. Untested and experimental.
+
+$(FIELDDOCTABLE)
 """
 @MixinKooijmanPhoto struct KooijmanWaterPotentialPhotosynthesis{PL} <: AbstractKooijmanPhoto
     potential_modifier::PL | Photosynthesis.ZhouPotentialDependence() | _ | _ | _ | _ | "Modify photosynthesis with a water potential model"

@@ -1,4 +1,4 @@
-using Documenter, DocStringExtensions, DynamicEnergyBudgets
+using Documenter, DocStringExtensions, DynamicEnergyBudgets, Microclimate, Photosynthesis
 
 makedocs(
     modules = [DynamicEnergyBudgets],
