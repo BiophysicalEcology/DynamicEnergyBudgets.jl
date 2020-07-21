@@ -33,7 +33,6 @@ Apply an environment to a plant using live user input for variables,
 instead of data.
 """
 apply_environment!(env::ManualTemperature, plant::Plant, organs, u, t) = begin
-    envpos = ustrip(calc_envtime(plant, t))
     shoot, root = organs
     update_temp!(shoot, env.airtemperature)
     update_temp!(root, env.soiltemperature)
@@ -48,7 +47,3 @@ update_temp!(o, temp) = begin
     set_temp!(o, temp)
     set_tempcorrection!(o, tempcorr(tempcorr_pars(o), temp))
 end
-
-# We need an environment data point for t = 0 even if we
-# never use it - we may need to interpolate at t = 0.5
-calc_envtime(o, t) = t + o.environment_start[]

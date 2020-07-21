@@ -26,7 +26,10 @@ u = [9.0,8.0,7.0]u"mol"
 
 
 @testset "apply environment to deb vars" begin
-    o = DynamicEnergyBudgets.Plant(environment=environment)
+    o = DynamicEnergyBudgets.Plant(
+        environment=environment, 
+        environment_start=0u"hr",
+       )
     o1, o2 = o.organs
     v1 = o1.vars; v2 = o2.vars
     p1 = o1.params; p2 = o2.params
@@ -38,16 +41,16 @@ u = [9.0,8.0,7.0]u"mol"
 
     t = 0u"hr"
     apply_environment!(o, o.organs, u, t)
-    @test temp(v1) == 25.0u"°C"
-    @test temp(v2) == 20.0u"°C"
+    @test temp(v1) |> u"°C" == 25.0u"°C"
+    @test temp(v2) |> u"°C"  == 20.0u"°C"
     @test av1.J_L_F == 1000.0u"W*m^-2" * 4.57u"mol*W^-1*s^-1"
     @test av1.soilwaterpotential == -100.0u"kPa"
     # @test av2.soilwaterpotential == -100.0u"kPa"
 
     t = 1u"hr"
     apply_environment!(o, o.organs, u, t)
-    @test temp(v1) == 30.0u"°C"
-    @test temp(v2) == 12.0u"°C"
+    @test temp(v1) |> u"°C"  == 30.0u"°C"
+    @test temp(v2) |> u"°C"  == 12.0u"°C"
     @test av1.J_L_F == 900.0u"W*m^-2" * 4.57u"mol*W^-1*s^-1"
     @test av1.soilwaterpotential == -200.0u"kPa"
     # @test av2.soilwaterpotential == -200.0u"kPa"
@@ -56,7 +59,8 @@ end
 @testset "apply environment to deb vars" begin
     o = DynamicEnergyBudgets.Plant(
         params=(Params(assimilation_pars=BallBerryPotentialCAssim()), Params()),
-        environment=environment
+        environment=environment,
+        environment_start=0u"hr",
     )
 
     o1, o2 = o.organs;

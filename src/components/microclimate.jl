@@ -6,18 +6,22 @@ using .Microclimate
 Apply a microclimate from Microclimates.jl to a `Plant`.
 """
 apply_environment!(env::AbstractMicroclimate, plant::Plant, organs, u, t) = begin
-    envpos = ustrip(calc_envtime(plant, t))
+    envind = calc_envind(plant, t)
     shoot, root = organs
     # Get the climate at a particular height and time
     # Use half the height for the median temperature/windspeed/humidity etc.
     # relating temperature to the distribution of biomass may be more accurate.
-    shootenv = MicroclimInstant(env, height(shoot)/2, envpos)
-    rootenv = MicroclimInstant(env, depth(root)/2, envpos)
+    shootenv = MicroclimInstant(env, envind, height(shoot)/2)
+    rootenv = MicroclimInstant(env, envind, depth(root)/2)
     # Update any environment dependent variables
     apply_environment!(assimilation_pars(shoot), shoot, u, shootenv, rootenv)
     apply_environment!(assimilation_pars(root), root, u, rootenv, shootenv)
     nothing
 end
+
+# We need an environment data point for t = 0 even if we
+# never use it - we may need to interpolate at t = 0.5
+calc_envind(o, t) = ustrip(o.environment_start[] + t) + 1
 
 """
     apply_environment!(plant::Plant, env::MicroclimControl, organs, u, t)
