@@ -16,6 +16,9 @@ notifications:
 script:
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Photosynthesis.jl.git"));'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Microclimate.jl.git"));'
+  - julia -e 'using Pkg; Pkg.build(); Pkg.test(coverage=true)'
+
+codecov: true
 
 jobs:
   allow_failures:
@@ -26,10 +29,11 @@ jobs:
       julia: 1
       os: linux
       script:
+        - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Photosynthesis.jl.git"));'
+        - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Microclimate.jl.git"));'
         - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd()));
                                                Pkg.instantiate()'
         - julia --project=docs/ docs/make.jl
       after_success: skip
 
-after_success:
-- julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+codecov: true
