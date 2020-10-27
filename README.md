@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://rafaqz.github.io/DynamicEnergyBudgets.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://rafaqz.github.io/DynamicEnergyBudgets.jl/dev)
-[![Build Status](https://travis-ci.org/rafaqz/DynamicEnergyBudgets.jl.svg?branch=master)](https://travis-ci.org/rafaqz/DynamicEnergyBudgets.jl)
+[![Build Status](https://travis-ci.com/rafaqz/DynamicEnergyBudgets.jl.svg?branch=master)](https://travis-ci.com/rafaqz/DynamicEnergyBudgets.jl)
 [![codecov.io](http://codecov.io/github/rafaqz/DynamicEnergyBudgets.jl/coverage.svg?branch=master)](http://codecov.io/github/rafaqz/DynamicEnergyBudgets.jl?branch=master)
 
 A Dynamic Energy Budget modelling framework written in Julia.
