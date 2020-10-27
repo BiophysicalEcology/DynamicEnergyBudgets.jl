@@ -14,7 +14,7 @@ using [Microclimate.jl](https://github.com/rafaqz/Microclimate.jl),
 and can use wide a range of photosynthesis and stomatal conductance formulations 
 from [Photosynthesis.jl](https://github.com/rafaqz/Photosynthesis.jl).
 
-See scripts at https://github.com/rafaqz/DEBplant for a live user interface and plotting examples. As this package and Photosynthesis.jl are officially registered, so build a project using DEBplant as the package versions are locked in the Manifest.toml.
+See scripts at https://github.com/rafaqz/DEBplant for a live user interface and plotting examples. This package and Photosynthesis.jl are not officially registered, so build a project using DEBplant as the package versions are locked in the Manifest.toml.
 
 If you need this package to be registered, make an issue and request it! I am not currently working on DEB models and have many other packages competing for my time. If there is a project that wishes to use it, I will gladly help get things working for you. 
 
