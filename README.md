@@ -7,8 +7,7 @@
 
 A Dynamic Energy Budget modelling framework written in Julia.
 
-This is a generalised DEB model that for plant modelling, but can
-used to used model any kind of organism.
+This is a generalised DEB model developed for plant modelling, but can be used to model any kind of organism.
 
 This models can also be run in microclimates provided by the NicheMapR R package
 using [Microclimate.jl](https://github.com/rafaqz/Microclimate.jl), 
