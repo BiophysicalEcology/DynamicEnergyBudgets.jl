@@ -81,8 +81,8 @@ catabolism!(p::AbstractCatabolismCNE, o, u) = begin
     E_ctb = J1_EE_ctb + J1_CN_ctb # Total catabolic flux
 
     # Set rejected flux
-    J[:N,:rej] = -C_rej
-    J[:C,:rej] = -N_rej
+    J[:N,:rej] = -N_rej
+    J[:C,:rej] = -C_rej
     # Set catabolism vars for use in other components
     set_θE!(o, J_EE_ctb / J_E_ctb) # Proportion of general reserve flux in total catabolic flux
     set_E_ctb!(o, J_E_ctb)
