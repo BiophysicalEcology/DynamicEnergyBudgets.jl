@@ -78,7 +78,7 @@ tempcorr(t, tref, a, l, al, h, ah) =
 
 Simple 3 parameter temperature correction method. 
 Growth response to temperature has smoother transients in plants than in animals, 
-and a simpler formulaiton is more applicable.
+and a simpler formulation is more applicable.
 
 $(FIELDDOCTABLE)
 """
